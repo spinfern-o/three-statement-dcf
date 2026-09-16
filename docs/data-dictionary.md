@@ -626,7 +626,7 @@ it into PASS is precisely the failure rule 1.14 is about. See
 | `status` | `Status` enum | Present: `PASS`, `FAIL`, `SKIP`. |
 | `message` | `detail` | Present. |
 | `check_code` | — | **Absent.** Checks are identified by display name only (`"PP&E schedule linkage"`). [`validation-policy.md`](validation-policy.md) assigns codes; nothing reads them yet. |
-| `severity` | — | **Absent.** All twelve checks are equal; there is no CRITICAL/ERROR/WARNING/INFO distinction anywhere in `model/`. |
+| `severity` | — | **Absent.** All thirteen checks are equal; there is no CRITICAL/ERROR/WARNING/INFO distinction anywhere in `model/`. |
 | `expected_value_optional`, `actual_value_optional`, `difference_optional` | folded into `detail` text | **Divergence.** The numbers exist — `"2027E: out by 0.0004"` — but as formatted prose, not as queryable decimals. A diagnostics page (7.10) cannot sort or threshold on them. |
 | `tolerance_optional` | `Tolerance`, model-wide | **Partial.** One tolerance for the whole run, printed once in the panel header, not recorded per result. |
 | `created_at`, `model_version_id`, `scenario_id_optional` | — | **Absent.** |

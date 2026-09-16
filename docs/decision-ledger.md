@@ -267,7 +267,12 @@ and rationale. The nearest Section 9 fit is a pair of `Assumption` rows plus an
 Neither is answerable by inference. Both need the owner, or an amendment to
 Section 9.
 
-### F-6 — `run_model.py --rel-tol` and `--abs-tol` crash with an unhandled traceback
+### F-6 — RESOLVED in #7. `--rel-tol` / `--abs-tol` crashed with an unhandled traceback
+
+**Fixed 2026-09-16.** Both flags now parse as decimal strings (4.2), and an
+unparseable value exits 2 instead of raising. Regression test
+`test_f6_tolerance_flags_accept_a_decimal_string`, verified to fail against the
+unfixed `run_model.py`. Original finding follows.
 
 **Reproducible. [`README.md`](../README.md) documents these flags as the
 supported override mechanism, and they do not work.**
@@ -297,7 +302,10 @@ explicitly out of scope.
 
 None was fixed, for the same scope reason. All are verified, not suspected.
 
-**F-7a. `sensitivity._shift_wacc` silently fails when `beta = 0`.**
+**F-7a. RESOLVED in #7.** `_shift_wacc` now raises rather than returning an
+unshifted cost of capital labelled with a WACC it did not reach. Regression test
+`test_f7a_shifting_wacc_refuses_rather_than_missing_its_target`. Original
+finding: **`sensitivity._shift_wacc` silently fails when `beta = 0`.**
 The line `implied_erp = (implied_ke - base.risk_free_rate) / base.beta if base.beta else ZERO`
 returns a zero ERP when beta is zero — but with beta zero the cost of equity
 equals the risk-free rate regardless of the ERP, so the target WACC is never
@@ -308,13 +316,19 @@ whose `.wacc` is still `0.039166…`. Beta of exactly zero is an unusual input;
 the failure is silent, which is the class of thing this repository exists to
 prevent.
 
-**F-7b. `Valuation.tv_share_of_ev`'s None guard is not honoured by its only
+**F-7b. RESOLVED in #7.** `report.valuation_block` now prints "undefined"
+instead of formatting `None`. Regression test
+`test_f7b_report_survives_an_undefined_terminal_value_share`. Original finding:
+**`Valuation.tv_share_of_ev`'s None guard is not honoured by its only
 consumer.** The property returns `None` rather than dividing by zero when
 enterprise value is zero (specification 17.27). `report.valuation_block` then
 formats it with `f"{valuation.tv_share_of_ev:.1%}"`, which raises `TypeError`
 on `None`. The guard is correct; the call site defeats it.
 
-**F-7c. Dividends use silent precedence where every comparable driver
+**F-7c. RESOLVED in #7.** Declaring both `dividend_payout_ratio` and
+`dividends_amount` is now rejected, as it already was for COGS, opex and CapEx.
+Regression test `test_f7c_dividends_reject_two_declared_methods`. Original
+finding: **Dividends use silent precedence where every comparable driver
 refuses.** `forecast._pick_driver` rejects declaring both a percentage and an
 absolute driver for COGS, opex or CapEx in the same year — STEP 14/18 require
 one stated methodology per line. Dividends do not go through `_pick_driver`:
@@ -362,7 +376,14 @@ owner — not a quieter engine. Phase 2 item 23 ("define error codes and
 severity") is where that belongs; it depends on no OPEN decision and has not
 been done.
 
-### F-10 — Two of the twelve STEP 37 checks test the same identity
+### F-10 — RESOLVED in #7. Two of the twelve STEP 37 checks tested the same identity
+
+**Fixed 2026-09-16.** The two are now distinct: "Forecast cash flow
+reconciliation" checks each cash-flow subtotal against the items beneath it,
+and "Ending cash linkage" checks the cash balance against those subtotals. The
+FCFF check now rebuilds its terms from the statements instead of re-calling
+`fcff_inputs`. `Ledger.cross_check` is wired in as a thirteenth check (17.10).
+The panel reports **13 PASS**, all names distinct. Original finding follows.
 
 `checks.run_all_checks` calls `_cashflow_reconciliation` with **identical
 arguments** for both "Forecast cash flow reconciliation" and "Ending cash
@@ -405,7 +426,7 @@ Buildable now, because it depends on no OPEN decision:
 - Validation check registry and severity model (Section 17), as declarations —
   registry written; **severity assignment blocked by F-4**.
 - Design tokens as *named* tokens with contrast-tested candidate values (6.4).
-- Fixing F-6 and F-7a–c, adding a dependency-audit step to CI (3.5.c, 20.20),
+- Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
 

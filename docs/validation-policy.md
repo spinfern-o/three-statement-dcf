@@ -5,7 +5,13 @@ lists thirty required checks. This file is the check registry: a stable code
 for each, its severity, what it compares, and whether the engine in
 [`model/`](../model) implements it today.
 
-The short answer on coverage: **the engine's twelve-check panel covers ten of
+> **Updated 2026-09-16 (#7).** The panel is now **thirteen** checks, all
+> distinct, and 17.10 is wired in. The duplicate this document reported is
+> fixed. The aggregate tallies in §5 were counted before that change and are
+> therefore understated by the 17.10 wiring; the individual rows below are
+> current.
+
+The short answer on coverage as first surveyed: **the engine's twelve-check panel covered ten of
 the thirty specification checks, of which eight do what their name says.
 Thirteen of the thirty have some mechanism behind them; ten have none.** The
 per-check detail is in §4 and the accounting is in §5.
@@ -67,7 +73,7 @@ A check that silently passes because the data was never supplied is worse than
 one that fails honestly, and collapsing SKIP into PASS is precisely the failure
 rule 1.14 exists to prevent. [`model/checks.py`](../model/checks.py) reports
 the three separately and `run_model.py` prints
-`12 PASS   0 FAIL   0 SKIP` as three counts.
+`13 PASS   0 FAIL   0 SKIP` as three counts.
 
 **A SKIP is never evidence of correctness.** For release gating, a SKIP on a
 CRITICAL or ERROR check must be treated as unresolved.
@@ -109,7 +115,7 @@ reported as such rather than as a calculation success.
 
 ---
 
-## 3. The engine's twelve checks
+## 3. The engine's thirteen checks
 
 `checks.run_all_checks` returns these, in this order — the order STEP 37 lists
 them:
@@ -196,7 +202,7 @@ the owner. `Engine` is what [`model/`](../model) does today.
 |---|---|---|---|---|
 | `VAL-017-008` | 17.8 | `total_assets = total_liabilities + total_equity`, every historical period | ERROR | **Yes** — check #1. SKIPs when any of the three totals is absent for every year. Reports the delta per year and appends "find the mapping error, do not plug it" (STEP 6) |
 | `VAL-017-009` | 17.9 | `cash_(t−1) + CFO + CFI + CFF = cash_t`, historical | ERROR | **Yes** — check #3 |
-| `VAL-017-010` | 17.10 | Every reported subtotal equals its mapped components (11.7, 12.4.i) | ERROR | **Implemented but not wired in.** `Ledger.cross_check()` does exactly this — compares a *reported* subtotal against its derived value at `rel = 1e-6` and returns `Discrepancy` objects without correcting them. It is called by `tests/test_model.py` and **by nothing in `run_model.py`, `report.py` or `checks.py`**, so a discrepancy never reaches the panel or the report. Check #5 (net income linkage) covers one adjacent identity |
+| `VAL-017-010` | 17.10 | Every reported subtotal equals its mapped components (11.7, 12.4.i) | ERROR | **Implemented and wired in as of #7.** `Ledger.cross_check()` compares a *reported* subtotal against its derived value and returns `Discrepancy` objects without correcting them; it is now the panel's thirteenth check, "Reported subtotals reconcile (17.10)", and the discrepancy message carries 4.10's relative error. Before #7 it was called only by `tests/test_model.py`, so a discrepancy never reached the panel |
 | `VAL-017-011` | 17.11 | `SCH-PPE-01` ending balance = `ppe_net` on the balance sheet | ERROR | **Yes** — check #6, forecast years only. Historical PP&E is not rolled forward |
 | `VAL-017-012` | 17.12 | `SCH-INTANGIBLES` ending balance = intangibles on the balance sheet (13.3) | ERROR | **No, and not possible.** The chart of accounts has no `goodwill` or `intangibles` line (12.2.e) and there is no intangibles schedule |
 | `VAL-017-013` | 17.13 | `SCH-DEBT-01` ending balance = `debt` on the balance sheet | ERROR | **Yes** — check #7, forecast years only |
@@ -230,7 +236,7 @@ the owner. `Engine` is what [`model/`](../model) does today.
 |---|---|---|---|---|
 | `VAL-017-027` | 17.27 | No NaN, Infinity or null in a released calculation | **CRITICAL** (17.27; 4.4) | **Partial, and well done as far as it goes.** The Decimal context traps `InvalidOperation`, `DivisionByZero` and `Overflow`, so a NaN or Infinity raises rather than propagating; `D()` rejects a non-finite `Decimal` outright; `tv_share_of_ev` returns `None` instead of dividing by zero. What is missing is the *scan*: nothing enumerates released values and asserts the property. And `report.valuation_block` formats `tv_share_of_ev` with `:.1%`, which raises `TypeError` when the guard returns `None` — the guard's only consumer does not honour it |
 | `VAL-017-028` | 17.28 | Primary and independent benchmark results meet the Section 4 tolerance (4.15–4.16) | **ERROR** (4.20) | **Implemented as a test, not a check.** `tests/test_precision.py::test_independent_recomputation` rebuilds all seven years with its own loader and its own Decimal construction, sharing no helper with `model/` as 4.15 requires, and compares 192 values — all agreeing exactly. `test_randomized_identity_sweep` covers 150 further models across nine orders of magnitude. It runs in CI, not at model-release time, and produces no `ValidationResult`. **4.16 coverage gap: EBITDA** is named among the benchmarked outputs and the model has no EBITDA line — already recorded in [`decision-ledger.md`](decision-ledger.md) F-1 |
-| `VAL-017-029` | 17.29 | Every displayed rounded value ties to its full-precision stored value (4.18, 4.19) | ERROR | **No check, and a gap in the path.** Report values are formatted from the stored `Decimal` with f-strings, so they do tie in practice — but `numeric.quantize_for_display`, the declared display boundary, is **called by nothing**, and no test asserts the tie. 4.19's full-decimal tooltip has no CLI analogue |
+| `VAL-017-029` | 17.29 | Every displayed rounded value ties to its full-precision stored value (4.18, 4.19) | ERROR | **Partial as of #7.** `report._fmt` now rounds through `numeric.quantize_for_display`, the declared 4.9/4.18 boundary, so display rounding has a single place rather than scattered f-strings. Still **no check** asserts the tie, and 4.19's full-decimal tooltip has no CLI analogue |
 | `VAL-017-030` | 17.30 | Every released output has source and formula lineage (24.12) | ERROR | **Partial.** Every `Cell` carries `origin` plus either a `Source` (page + the company's own line-item wording) or a prose `basis` naming its driver, so the lineage *data* exists for every cell. There is no lineage **query, export or check** — 7.10.d's dependency graph and 19.17's lineage endpoint do not exist |
 
 ---
@@ -294,7 +300,7 @@ thirty severities are settled. Gating on a proposed severity assignment would
 make a guess load-bearing.
 
 `run_model.py` implements the nearest available thing: exit code `1` if any of
-the twelve checks FAILs, `2` if an input is missing, `0` otherwise. SKIP does
+the thirteen checks FAILs, `2` if an input is missing, `0` otherwise. SKIP does
 not affect the exit code — which is right for a CLI that prints the three
 counts side by side, and would be wrong for a release gate.
 

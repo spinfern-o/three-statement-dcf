@@ -66,7 +66,9 @@ which is the useful distinction:
 | **ctx** | Contains a division that may not terminate. Rounded to 50 significant digits, `ROUND_HALF_EVEN`, by the context — not by the formula. |
 
 Two functions in [`model/numeric.py`](../model/numeric.py) exist for display
-and error measurement and are **called by nothing** in `model/`,
+and error measurement. Both were called by nothing until #7; they are now
+wired in (`quantize_for_display` as `report._fmt`'s rounding boundary,
+`relative_error` in the discrepancy message),
 `run_model.py` or `tests/`:
 
 - `quantize_for_display(value, places=1)` — the intended 4.9/4.18 display
@@ -405,9 +407,9 @@ exists to prevent. Recorded as a finding in
 | Code | Expression | Unit | Rounding | Spec |
 |---|---|---|---|---|
 | `CHK-TOL-01` | `close(a, b) ⟺ abs(a − b) ≤ max(rel × max(abs(a), abs(b)), abs_floor)` | ratio | **ctx** | 4.13 (both absolute and relative tolerances) |
-| `NUM-RELERR-01` | `relative_error_percent = abs(actual − expected) / abs(expected) × 100` | percent | **ctx** | **4.10** — implemented in `numeric.relative_error`, **called by nothing** |
+| `NUM-RELERR-01` | `relative_error_percent = abs(actual − expected) / abs(expected) × 100` | percent | **ctx** | **4.10** — implemented in `numeric.relative_error`; wired into `Discrepancy.__str__` in #7 |
 | `NUM-POW-01` | `power(base, n) = base ** n`, integer `n` only | ratio | **ctx** | 4.13 |
-| `NUM-QUANT-01` | `quantize_for_display(v, places)` — `ROUND_HALF_EVEN` | as input | half-even | 4.9, 4.18 — **called by nothing** |
+| `NUM-QUANT-01` | `quantize_for_display(v, places)` — `ROUND_HALF_EVEN` | as input | half-even | 4.9, 4.18 — `report._fmt` rounds through it as of #7 |
 
 `CHK-TOL-01` defaults to `rel = 1e-9`, `abs_floor = 0`
 ([`model/checks.py`](../model/checks.py)). `Ledger.cross_check` uses a looser
