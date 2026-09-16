@@ -250,9 +250,12 @@ def test_sensitivity_grid(loaded, fcff_years):
 
 def test_all_checks_pass_on_a_sound_model(forecast, fcff_years, valuation):
     results = run_all_checks(forecast, fcff_years, valuation)
-    assert len(results) == 12
+    # STEP 37's twelve, plus specification 17.10 which STEP 37 does not list.
+    assert len(results) == 13
     failures = [r.line() for r in results if r.status is not Status.PASS]
-    assert failures == [], f"expected all 12 to pass: {failures}"
+    assert failures == [], f"expected all 13 to pass: {failures}"
+    # Every check must be distinct: two used to run the same comparison.
+    assert len({r.name for r in results}) == 13
 
 
 def test_a_broken_balance_sheet_fails_rather_than_being_plugged(forecast, fcff_years, valuation):
@@ -268,7 +271,12 @@ def test_a_broken_balance_sheet_fails_rather_than_being_plugged(forecast, fcff_y
     by_name = {r.name: r for r in results}
     assert by_name["Forecast balance sheet balances"].status is Status.FAIL
     assert "50" in by_name["Forecast balance sheet balances"].detail
-    assert by_name["Forecast cash flow reconciliation"].status is Status.FAIL
+    # Corrupting the balance sheet breaks the cash linkage, which compares the
+    # sheet against the flows. It does NOT break the subtotal check, which
+    # compares cash-flow subtotals against their own components -- the two are
+    # now distinct tests rather than the same one run twice.
+    assert by_name["Ending cash linkage"].status is Status.FAIL
+    assert by_name["Forecast cash flow reconciliation"].status is Status.PASS
 
 
 def test_a_missing_input_skips_rather_than_passes(forecast, fcff_years, valuation):

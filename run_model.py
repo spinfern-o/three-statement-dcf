@@ -22,6 +22,7 @@ from model.checks import DEFAULT_ABS_TOL, DEFAULT_REL_TOL, Status, Tolerance, ru
 from model.dcf import build_fcff, run_dcf
 from model.forecast import build_forecast
 from model.loader import load_assumptions, load_historical, load_profile, load_valuation
+from model.numeric import PrecisionError
 from model.provenance import ProvenanceError
 from model.sensitivity import sensitivity_grid
 
@@ -30,11 +31,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--inputs", type=Path, default=Path("inputs"), help="directory holding the four input files")
     parser.add_argument(
-        "--rel-tol", type=float, default=DEFAULT_REL_TOL,
-        help=f"relative tolerance for the STEP 37 checks (default {DEFAULT_REL_TOL:.0e})",
+        "--rel-tol", type=str, default=None,
+        help=f"relative tolerance for the STEP 37 checks, as a decimal string "
+             f"(default {DEFAULT_REL_TOL:.0e})",
     )
     parser.add_argument(
-        "--abs-tol", type=float, default=DEFAULT_ABS_TOL,
+        "--abs-tol", type=str, default=None,
         help="absolute floor for near-zero accounts; raise only to absorb a filing's own rounding",
     )
     parser.add_argument(
@@ -70,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
             diluted_shares=valuation_inputs["diluted_shares"],
             shares_source=valuation_inputs["shares_source"],
         )
-    except ProvenanceError as exc:
+    except (ProvenanceError, PrecisionError) as exc:
         print(f"\nMODEL HALTED\n{report.rule()}\n{exc}\n", file=sys.stderr)
         print("The workflow stops rather than substituting a value. Fix the input and re-run.", file=sys.stderr)
         return 2
@@ -101,7 +103,16 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(report.sensitivity_block(grid, args.sensitivity))
 
-    tolerance = Tolerance(rel=args.rel_tol, abs=args.abs_tol)
+    # Parsed as strings, not floats: D() refuses floats (1.15, 4.4), so
+    # argparse type=float made these flags raise on every use.
+    try:
+        tolerance = Tolerance(
+            rel=DEFAULT_REL_TOL if args.rel_tol is None else args.rel_tol,
+            abs=DEFAULT_ABS_TOL if args.abs_tol is None else args.abs_tol,
+        )
+    except (ProvenanceError, PrecisionError) as exc:
+        print(f"\n{report.rule()}\n{exc}\n", file=sys.stderr)
+        return 2
     results = run_all_checks(forecast, fcff_years, valuation, tolerance)
     print(report.checks_block(results, tolerance))
 
