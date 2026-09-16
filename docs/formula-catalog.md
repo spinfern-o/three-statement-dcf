@@ -475,7 +475,7 @@ plainly:
 | 18.12 | Unit checking | **No.** Assumptions carry no unit (see [`data-dictionary.md`](data-dictionary.md) §9.10); units are a naming convention. |
 | 18.13 | Reject division by zero with a visible diagnostic | **Yes** — via the context trap, plus explicit guards on `days_in_year`, `total_capital`, `diluted_shares` and `tv_share_of_ev`. |
 | 18.14 | Reject missing inputs; do not coerce to zero | **Yes, thoroughly.** `Ledger.require`, `Assumptions.get` and `provenance.require` all raise. This is the engine's strongest property. |
-| 18.15–18.16 | Server-side authoritative calculation | **N/A** — there is no server. Blocked on **OPEN (2.2.a)**. |
+| 18.15–18.16 | Server-side authoritative calculation | **Not implemented** — there is no server yet. No longer blocked: 2.2.a is answered *private hosted* (2026-09-16), so a server exists in the target design and the calculation must run on it. |
 
 ---
 

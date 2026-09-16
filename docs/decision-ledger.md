@@ -18,8 +18,10 @@ itself recommends, which is not the same as a decision having been made.
 | **N/A** | Established as not applicable, with reason |
 
 Last reviewed: 2026-09-16. Recorded by: Claude (implementing agent).
-No owner answers had been supplied at the time of writing, so no row below is
-CONFIRMED by a person.
+
+**1 of 37 decisions answered.** 2.2.a (private hosted) was supplied by the
+owner on 2026-09-16. The remaining 36 are OPEN, and Section 2 forbids
+replacing any of them with an inferred answer.
 
 ---
 
@@ -39,13 +41,26 @@ treated as one.
 
 | ID | Decision | Status | Answer | Blocks |
 |---|---|---|---|---|
-| 2.2.a | Local-only, private hosted, or public | OPEN | — | Phase 17 deployment entirely; DB choice (3.2.d); security model depth |
-| 2.2.b | Single user or multi-user | OPEN | — | User entity, ownership columns, Phase 15 |
+| 2.2.a | Local-only, private hosted, or public | **CONFIRMED** | **Private hosted application** — owner (spinfern-o), 2026-09-16, relayed via the parent session | *(was: Phase 17 deployment entirely; DB choice (3.2.d); security model depth — all now unblocked)* |
+| 2.2.b | Single user or multi-user | OPEN | — | **Now top blocker.** User entity, ownership columns, RBAC (20.6), Phase 15 |
 | 2.2.c | Authentication required | OPEN | — | All auth work; API auth middleware (Section 19) |
 | 2.2.d | Roles (owner/analyst/reviewer/read-only) | OPEN | — | RBAC, approval workflow gating (14.x), audit actor semantics |
 
-**This is the highest-priority blocker.** 2.2.a alone gates deployment, database
-selection, and how much of Section 20 applies.
+**2.2.a is answered: private hosted.** Three consequences follow from the
+specification's own wording, not from inference:
+
+- **3.2.d — PostgreSQL.** The spec permits SQLite "only for a documented
+  single-user local prototype", which a hosted deployment is not.
+- **20.2 — encryption in transit and at rest now binds.** The requirement is
+  written "for hosted deployments".
+- **Phase 17 and Section 20 are no longer blocked on 2.2.a**, and
+  [`security-model.md`](security-model.md) §1's *Private hosted* column is now
+  the governing one rather than one of three branches.
+
+**2.2.b, 2.2.c and 2.2.d remain OPEN and are now the highest-priority
+blockers.** "Private hosted" settles none of them. Note 20.6 in particular:
+"Apply role-based access control **if** multi-user" — RBAC stays conditional on
+2.2.b.
 
 ## 2.3 Source documents
 

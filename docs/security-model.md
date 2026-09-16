@@ -6,11 +6,24 @@ with **what is decidable now** versus **what is blocked** on decision 2.2.a
 (local-only application / private hosted application / public website) and
 2.2.b–d (single- or multi-user, authentication, roles).
 
-**No hosting model is assumed anywhere in this document.** 2.2.a is recorded in
-[`decision-ledger.md`](decision-ledger.md) as the highest-priority blocker, and
-Section 2 forbids replacing OPEN with an inferred answer. Where a requirement's
-*content* depends on the answer, both the invariant part and the branch are
-stated, and the branch is not chosen.
+> **2.2.a ANSWERED (2026-09-16): private hosted application.** Decided by the
+> repository owner and recorded in [`decision-ledger.md`](decision-ledger.md).
+> This document was written before the answer arrived, so it states all three
+> branches throughout. **The *Private hosted* column of §1 is now the governing
+> one**; the local-only and public columns are retained for contrast, not as
+> live options. Requirements below marked "blocked on 2.2.a" are unblocked —
+> those marked blocked on **2.2.b–d** are not, and those remain open.
+>
+> The three immediate consequences, from the specification's own wording:
+> **3.2.d resolves to PostgreSQL** (SQLite is permitted "only for a documented
+> single-user local prototype"); **20.2 binds** (written "for hosted
+> deployments"); and **Phase 17 deployment is unblocked**.
+
+**No hosting model is assumed anywhere in the body of this document**, which
+was written before 2.2.a was answered. Section 2 forbids replacing OPEN with an
+inferred answer, so where a requirement's *content* depends on 2.2.b–d, both
+the invariant part and the branch are still stated and the branch is not
+chosen.
 
 **Scope note.** There is no application to secure yet: no server, no database,
 no upload path, no authentication, no network listener. The repository today is
@@ -26,7 +39,9 @@ The three options are not three deployment targets for one design. They are
 three different threat models, and several requirements below change meaning
 rather than degree.
 
-| | Local-only | Private hosted | Public website |
+Private hosted is the confirmed answer; that column governs.
+
+| | Local-only | **Private hosted (CONFIRMED)** | Public website |
 |---|---|---|---|
 | **Adversary** | Anyone with the machine | Anyone on the network, plus other tenants | Anyone on the internet |
 | **20.2** encryption at rest / in transit | Filesystem + OS disk encryption; no transit | **Required** (TLS, encrypted storage) | **Required**, plus HSTS and certificate management |

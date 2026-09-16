@@ -29,7 +29,8 @@ definition, not a description of something that exists.
 Conventions that apply to every table:
 
 - Every `id` is an opaque server-generated identifier. Its concrete type
-  (UUID, integer, ULID) is **OPEN (2.2.a)** — it follows from the database
+  (UUID, integer, ULID) follows from the database engine, now PostgreSQL via
+  2.2.a *private hosted* (so UUID or bigint, not SQLite rowid) — it follows from the database
   choice, which follows from the hosting model (3.2.d).
 - Every `*_at` / `*_date` timestamp is UTC, ISO 8601. Storing local time
   would make `10.19` (columns with different dates) and `2.5.b–h`
