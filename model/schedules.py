@@ -52,7 +52,9 @@ class RollForward:
     ) -> RollForwardRow:
         if self._order:
             prior = self.rows[self._order[-1]]
-            if abs(prior.ending - beginning) > 0.01:
+            # Relative, for the same reason as model/checks.py: an absolute
+            # bound is a different test at every reporting scale.
+            if abs(prior.ending - beginning) > 1e-9 * max(abs(prior.ending), abs(beginning), 1.0):
                 raise ProvenanceError(
                     f"{self.name}: {year} beginning balance {beginning:,.1f} does not equal "
                     f"{prior.year} ending balance {prior.ending:,.1f}. The schedule must chain "

@@ -177,11 +177,17 @@ class Ledger:
                         changed = True
         return filled
 
-    def cross_check(self, tolerance: float = 0.5) -> list[Discrepancy]:
+    def cross_check(self, rel_tol: float = 1e-6, abs_tol: float = 0.0) -> list[Discrepancy]:
         """STEP 9: where a subtotal is BOTH reported and derivable, compare.
 
         A mismatch means an extraction or mapping error. It is surfaced, not
         corrected -- STEP 6 forbids plugging a difference away.
+
+        The default here is looser than the forecast checks (1e-6 rather than
+        1e-9) because both sides are transcribed from a filing that rounds its
+        own figures, so a disagreement in the last printed digit is the
+        company's rounding rather than a mapping error. Tighten it with
+        `rel_tol` if the filing reports to full precision.
         """
         out: list[Discrepancy] = []
         for year in self.years:
@@ -192,7 +198,7 @@ class Ledger:
                 derived = self._try_derive(account, year)
                 if derived is None:
                     continue
-                if abs(cell.value - derived) > tolerance:
+                if abs(cell.value - derived) > max(rel_tol * max(abs(cell.value), abs(derived)), abs_tol):
                     out.append(Discrepancy(account, year, cell.value, derived))
         return out
 

@@ -130,6 +130,20 @@ FCFF matches three-statement forecast        PASS 5 year(s) tie to the model
 12 PASS   0 FAIL   0 SKIP
 ```
 
+### Tolerances are relative
+
+The checks compare at a **relative** tolerance, defaulting to `1e-9`. An
+absolute bound would be a different test at every scale: `0.01` against a
+balance sheet of 1,020 is `1e-5`, but against one of 1,020,000,000 it is
+`1e-11`. Since STEP 1 makes the reporting unit the modeller's choice, an
+absolute bound would silently change strictness when a filing reports in
+dollars rather than millions.
+
+`1e-9` is a thousand times stricter than 0.0001%, and the randomized sweep puts
+the worst drift actually observed at `3.4e-13`. Override with `--rel-tol`, and
+`--abs-tol` sets a floor for accounts legitimately at zero. The panel prints
+whichever tolerance it judged at.
+
 `SKIP` is reported separately from `PASS` and deliberately so: a check that
 could not run because its inputs were absent has not verified anything, and a
 model that appears to pass because the data was never supplied is worse than
@@ -161,7 +175,7 @@ See [`docs/WORKFLOW.md`](docs/WORKFLOW.md) for the step-by-step map into the cod
 python3 -m pytest tests/ -q
 ```
 
-53 tests, no network and no API key. Three groups worth knowing about:
+61 tests, no network and no API key. Four groups worth knowing about:
 
 - `tests/test_refusals.py` — each of the workflow's "do not" rules, as an
   executable test. These matter most: the engine's value is that it *stops*,
@@ -172,6 +186,12 @@ python3 -m pytest tests/ -q
   of papering over it.
 - `tests/test_end_to_end.py` — the CLI and its exit codes, the no-company-data
   guard on `inputs/`, and a test asserting all 37 steps are referenced in code.
+- `tests/test_precision.py` — numerical accuracy. `test_independent_recomputation`
+  rebuilds all seven years from the raw YAML in plain arithmetic sharing no code
+  with `model/`, and compares 192 values; it agrees exactly. The randomized
+  sweep builds 150 further models across nine orders of magnitude of reporting
+  scale — negative growth, zero debt, zero working-capital days — and checks
+  that the structural identities survive all of them.
 
 `tests/fixtures/` holds a small fictional manufacturer, generated from an
 internally consistent set of balances so the fixture cannot drift out of

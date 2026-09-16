@@ -18,7 +18,7 @@ from model import report
 from model.accounts import (
     BALANCE_ACCOUNTS, CASHFLOW_ACCOUNTS, INCOME_ACCOUNTS, Statement,
 )
-from model.checks import Status, run_all_checks
+from model.checks import DEFAULT_ABS_TOL, DEFAULT_REL_TOL, Status, Tolerance, run_all_checks
 from model.dcf import build_fcff, run_dcf
 from model.forecast import build_forecast
 from model.loader import load_assumptions, load_historical, load_profile, load_valuation
@@ -29,6 +29,14 @@ from model.sensitivity import sensitivity_grid
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--inputs", type=Path, default=Path("inputs"), help="directory holding the four input files")
+    parser.add_argument(
+        "--rel-tol", type=float, default=DEFAULT_REL_TOL,
+        help=f"relative tolerance for the STEP 37 checks (default {DEFAULT_REL_TOL:.0e})",
+    )
+    parser.add_argument(
+        "--abs-tol", type=float, default=DEFAULT_ABS_TOL,
+        help="absolute floor for near-zero accounts; raise only to absorb a filing's own rounding",
+    )
     parser.add_argument(
         "--sensitivity",
         choices=("implied_share_price", "equity_value", "enterprise_value"),
@@ -93,8 +101,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(report.sensitivity_block(grid, args.sensitivity))
 
-    results = run_all_checks(forecast, fcff_years, valuation)
-    print(report.checks_block(results))
+    tolerance = Tolerance(rel=args.rel_tol, abs=args.abs_tol)
+    results = run_all_checks(forecast, fcff_years, valuation, tolerance)
+    print(report.checks_block(results, tolerance))
 
     return 1 if any(r.status is Status.FAIL for r in results) else 0
 
