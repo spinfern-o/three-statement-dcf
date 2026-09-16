@@ -1,0 +1,84 @@
+# STEP 10-11, 13-19 -- the assumptions register.
+#
+# STEP 10: "Every forecast assumption must have a visible source or
+# explanation" and "Never hide assumptions inside formulas."
+#
+# Every driver the forecast reads comes from this file. There is no default
+# for a structural driver: omit one and the model stops and names it, rather
+# than assuming zero. `basis` must be one of:
+#   company_guidance | external_research | model_assumption
+# and `source` must be non-empty. The report groups drivers by basis so the
+# three categories stay visibly distinct.
+#
+# `year` scopes a driver to one forecast year. Omit `year` to apply it to
+# every year -- but note STEP 14: "Do not assume every expense should remain
+# a constant percentage of revenue." Per-year entries are how you avoid that.
+
+drivers: []
+  # --- STEP 13: revenue ---
+  # - name: revenue_growth
+  #   year: 2026E
+  #   value: 0.08
+  #   basis: company_guidance
+  #   source: FY2025 10-K MD&A p.31
+  #   note: midpoint of guided range
+  #
+  # For segment-level forecasting, use revenue_growth.<segment name> per
+  # segment and list the segments' last-actual revenue under `segments`.
+  #
+  # --- STEP 14: operating costs (choose ONE method per line) ---
+  #   cogs_pct_revenue      or  cogs_amount
+  #   opex_pct_revenue      or  opex_amount
+  # Declaring both for the same line in the same year is rejected.
+  #
+  # --- STEP 17: working capital, account by account ---
+  #   dso, inventory_days, dpo
+  #   other_current_assets_pct_revenue
+  #   other_current_liabilities_pct_revenue
+  #
+  # --- STEP 18: depreciation and capex, forecast SEPARATELY ---
+  #   depreciation_pct_beginning_ppe
+  #   capex_pct_revenue     or  capex_amount
+  #   ppe_disposals                      (optional, defaults to 0)
+  #
+  # --- STEP 19: debt and interest ---
+  #   interest_rate_on_debt              (applied to BEGINNING debt)
+  #   debt_issuance                      (optional, defaults to 0)
+  #   debt_repayment                     (optional, defaults to 0)
+  #
+  # --- equity and discretionary flows (all optional, default 0) ---
+  #   sbc_pct_revenue
+  #   share_repurchases
+  #   dividend_payout_ratio   or  dividends_amount
+  #   acquisitions
+  #   other_income_expense
+  #
+  # --- residual lines (optional, default 0) ---
+  # Each is linked to a balance-sheet account so the sheet still balances:
+  #   other_operating  -> other_noncurrent_liabilities  (+)
+  #   other_investing  -> other_noncurrent_assets       (-)
+  #   other_financing  -> other_noncurrent_liabilities  (+)
+
+# STEP 11 -- where two sources disagree, record both, date both, and state
+# which one the model uses. `chosen` must equal source_a or source_b.
+conflicts: []
+  # - topic: FY2026 capital expenditure guidance
+  #   source_a: FY2025 10-K
+  #   date_a: 2026-02-01
+  #   value_a: about $120m
+  #   source_b: Q1 investor presentation
+  #   date_b: 2026-03-15
+  #   value_b: $135-145m
+  #   chosen: Q1 investor presentation
+  #   rationale: more recent, and management reaffirmed it on the call
+
+# STEP 16 -- state which rate the model uses and why.
+tax:
+  basis:                                # statutory | historical_effective | normalized_effective
+  source:                               # required
+  rates: {}                             # one rate per forecast year, e.g. {2026E: 0.24}
+
+# STEP 13 -- optional segment-level revenue build.
+# Map each segment to its LAST ACTUAL revenue. When present, total revenue
+# is the sum of segments and each needs a revenue_growth.<segment> driver.
+segments: {}

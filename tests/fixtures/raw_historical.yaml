@@ -1,0 +1,164 @@
+# FICTIONAL TEST FIXTURE -- NOT A REAL COMPANY, NOT FROM ANY FILING.
+# Generated to be internally consistent so the engine's checks have
+# something valid to verify. Never copy into inputs/.
+balance_sheet:
+  accounts_payable:
+    line_item: 'Reported: accounts payable'
+    page: 42
+    values:
+      2024A: 75.0
+      2025A: 80.0
+  accounts_receivable:
+    line_item: 'Reported: accounts receivable'
+    page: 42
+    values:
+      2024A: 140.0
+      2025A: 150.0
+  cash:
+    line_item: 'Reported: cash'
+    page: 42
+    values:
+      2024A: 150.0
+      2025A: 200.0
+  common_equity:
+    line_item: 'Reported: common equity'
+    page: 42
+    values:
+      2024A: 295.0
+      2025A: 300.0
+  debt:
+    line_item: 'Reported: debt'
+    page: 42
+    values:
+      2024A: 320.0
+      2025A: 300.0
+  inventory:
+    line_item: 'Reported: inventory'
+    page: 42
+    values:
+      2024A: 85.0
+      2025A: 90.0
+  other_current_assets:
+    line_item: 'Reported: other current assets'
+    page: 42
+    values:
+      2024A: 18.0
+      2025A: 20.0
+  other_current_liabilities:
+    line_item: 'Reported: other current liabilities'
+    page: 42
+    values:
+      2024A: 38.0
+      2025A: 40.0
+  other_noncurrent_assets:
+    line_item: 'Reported: other noncurrent assets'
+    page: 42
+    values:
+      2024A: 60.0
+      2025A: 60.0
+  other_noncurrent_liabilities:
+    line_item: 'Reported: other noncurrent liabilities'
+    page: 42
+    values:
+      2024A: 50.0
+      2025A: 50.0
+  ppe_net:
+    line_item: 'Reported: ppe net'
+    page: 42
+    values:
+      2024A: 470.0
+      2025A: 500.0
+  retained_earnings:
+    line_item: 'Reported: retained earnings'
+    page: 42
+    values:
+      2024A: 145.0
+      2025A: 250.0
+cash_flow_statement:
+  capex:
+    line_item: 'Reported: capex'
+    page: 44
+    values:
+      2025A: -105.0
+  cash_flow_from_financing:
+    line_item: 'Reported: Net cash used in financing activities'
+    page: 44
+    values:
+      2025A: -26.4
+  cash_flow_from_investing:
+    line_item: 'Reported: Net cash used in investing activities'
+    page: 44
+    values:
+      2025A: -105.0
+  cash_flow_from_operations:
+    line_item: 'Reported: Net cash provided by operating activities'
+    page: 44
+    values:
+      2025A: 181.4
+  change_in_nwc:
+    line_item: 'Reported: change in nwc'
+    page: 44
+    values:
+      2025A: -10.0
+  debt_repayment:
+    line_item: 'Reported: debt repayment'
+    page: 44
+    values:
+      2025A: -20.0
+  depreciation_amortization:
+    line_item: 'Reported: depreciation amortization'
+    page: 44
+    values:
+      2025A: 75.0
+  dividends:
+    line_item: 'Reported: dividends'
+    page: 44
+    values:
+      2025A: -1.4
+  net_income:
+    line_item: 'Reported: net income'
+    page: 44
+    values:
+      2025A: 106.4
+  share_repurchases:
+    line_item: 'Reported: share repurchases'
+    page: 44
+    values:
+      2025A: -5.0
+  stock_based_compensation:
+    line_item: 'Reported: stock based compensation'
+    page: 44
+    values:
+      2025A: 10.0
+document: Fixture Manufacturing FY2025 Form 10-K (FICTIONAL)
+income_statement:
+  cogs:
+    line_item: 'Reported: cogs'
+    page: 40
+    values:
+      2024A: 534.0
+      2025A: 580.0
+  interest_expense:
+    line_item: 'Reported: interest expense'
+    page: 40
+    values:
+      2024A: 31.0
+      2025A: 30.0
+  operating_expenses:
+    line_item: 'Reported: operating expenses'
+    page: 40
+    values:
+      2024A: 232.0
+      2025A: 250.0
+  revenue:
+    line_item: 'Reported: revenue'
+    page: 40
+    values:
+      2024A: 920.0
+      2025A: 1000.0
+  taxes:
+    line_item: 'Reported: taxes'
+    page: 40
+    values:
+      2024A: 29.8
+      2025A: 33.6

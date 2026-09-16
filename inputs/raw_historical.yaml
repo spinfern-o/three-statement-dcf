@@ -1,0 +1,64 @@
+# STEP 4-7 -- transcribed historical figures.
+#
+# STEP 4: "Transcribe reported figures exactly as shown in the PDF."
+# Every account records the company's own line-item wording and the PDF
+# page, so each number can be traced back. Values are in the units declared
+# in company_profile.yaml -- nothing is rescaled here.
+#
+# STEP 5: "If the company does not report a line such as COGS or gross
+# profit separately, do not invent it." Delete the account block, or leave a
+# year's value null. Absent stays absent; it never becomes zero.
+#
+# Subtotals (gross_profit, ebit, pretax_income, net_income, total_assets,
+# total_liabilities, total_equity, and the three cash-flow subtotals) are
+# computed from their components when you omit them. Supply them anyway if
+# the company reports them -- the model will cross-check the two and report
+# any disagreement rather than silently preferring one (STEP 9).
+
+document:                               # e.g. Example Industries FY2025 Form 10-K
+
+# Sign convention, so a formula is never ambiguous:
+#   stored POSITIVE and subtracted: cogs, operating_expenses,
+#                                   interest_expense, taxes
+#   stored NEGATIVE (cash outflows): capex, acquisitions, debt_repayment,
+#                                   share_repurchases, dividends
+
+income_statement:
+  revenue:
+    line_item:                          # the company's exact wording
+    page:
+    values:                             # one entry per historical year
+      # 2023A:
+      # 2024A:
+      # 2025A:
+  # cogs:
+  #   line_item:
+  #   page:
+  #   values:
+  #     2025A:
+  # operating_expenses:
+  # interest_expense:
+  # other_income_expense:
+  # taxes:
+
+balance_sheet:
+  # The forecast needs these from the LAST ACTUAL year to anchor its
+  # roll-forwards: cash, accounts_receivable, inventory,
+  # other_current_assets, ppe_net, other_noncurrent_assets,
+  # accounts_payable, other_current_liabilities, debt,
+  # other_noncurrent_liabilities, common_equity, retained_earnings.
+  cash:
+    line_item:
+    page:
+    values:
+      # 2025A:
+
+cash_flow_statement:
+  # STEP 7: preserve the company's treatment of D&A, stock-based
+  # compensation, acquisitions, capex, debt issuance and repayment,
+  # buybacks, dividends, and other major items.
+  depreciation_amortization:
+    line_item:
+    page:
+    values:
+      # 2025A:
