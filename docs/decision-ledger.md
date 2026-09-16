@@ -420,6 +420,95 @@ The model's underlying property is real (FCFF genuinely comes from the
 forecast, satisfying 24.9); the check's evidentiary value is weaker than its
 name. See [`validation-policy.md`](validation-policy.md) §3.
 
+
+### F-11 — OPEN. Refusing a whole filing for one scanned page may be too strict
+
+Decision 2.3.c is **text-native only**, and
+[`source-policy.md`](source-policy.md) §3 states the consequence: "an
+image-only page is a hard rejection with an explanatory message rather than a
+silent empty extraction." Phase 3 implements exactly that — `ING-010-08`
+refuses the document and names the pages.
+
+**The practical problem.** Real filings are not uniformly text-native. A 10-K
+routinely carries a scanned signature page, a scanned auditor's letter, or an
+image-only exhibit, inside a document that is otherwise perfectly readable.
+Under the rule as written, one such page refuses the entire filing, and the
+owner's only recourse is to split the PDF by hand — which produces a document
+whose SHA-256 is no longer the filing's.
+
+**Why it was implemented as written anyway.** The policy document is the
+contract, it was written and shipped before this phase, and changing it
+mid-implementation without the owner is worse than implementing it. The
+refusal is also the safe direction: it never produces a model with pages
+silently missing.
+
+**The proposed amendment**, for the owner to accept or reject:
+
+> An image-only page refuses the document only when it falls inside a page
+> range the reviewer has mapped as a financial statement or a relevant note
+> (10.14). Outside that range it is recorded as a document-level finding the
+> reviewer must acknowledge, listed by page, and no fact is created from it.
+
+That requires the source map, which is Phase 4 work, so the change cannot land
+before then. Until it does, the current behaviour stands.
+
+### F-12 — RESOLVED in Phase 3. The extraction lifecycle enumerations were OPEN
+
+[`data-dictionary.md`](data-dictionary.md) recorded
+`SourceDocument.extraction_status`, `SourceDocument.verification_status` and
+`ReportedFact.verification_status` as **OPEN**: required fields whose value
+sets the specification describes behaviourally but never enumerates. Phase 2
+item 24 asked for lifecycle states and legal transitions and was not done.
+
+Item 29 ("implement extraction job states") cannot be built on an open
+enumeration, so Phase 3 closed the extraction half of it:
+[`apps/api/app/extraction/jobs.py`](../apps/api/app/extraction/jobs.py) defines
+`JobState` (8 states), `LEGAL_TRANSITIONS` (the graph, asserted complete at
+import), `DocumentVerificationState` and `FactVerificationState`. Three
+properties are enforced rather than documented: every non-terminal state may
+refuse or fail, every terminal state is terminal, and a transition without a
+stated reason raises (10.33).
+
+The design choice worth recording: **the graph has no backward edges.** A
+re-extraction is a new job over the same stored document, not a rewind, because
+10.33 requires the old job's history not be mutated.
+
+Still open from Phase 2 item 24: the **model version** lifecycle (7.1.b's
+Draft / Extracting / Needs Review / Validated / Forecast Ready / Valuation
+Ready / Archived), which belongs to Phases 9-13 and has no implementation to
+constrain it yet.
+
+Phase 2 item 23 (error codes) is in the same position, and the same half is
+now done: `ING-010-NN` and `ING-020-NN` in
+[`apps/api/app/core/errors.py`](../apps/api/app/core/errors.py), on the pattern
+[`validation-policy.md`](validation-policy.md) set with `VAL-017-NNN`. Each
+code carries the specification rule it enforces.
+
+### F-13 — RESOLVED in Phase 3. The confidence scoring function was OPEN
+
+[`source-policy.md`](source-policy.md) §7 left the scoring function
+deliberately open: 10.28 requires a score and 10.29 requires a review
+threshold, but the specification never defines how the score is computed, and
+inventing a formula would be unjustified precision.
+
+That was right about the danger and insufficient as a stopping point — item 36
+cannot ship without a score. The resolution is to define it as the one thing
+defensible without calibration data: **the fraction of eight named evidence
+conditions the fact satisfies**, listed in `EvidenceCheck` and computed
+exactly. It satisfies §7's three stated requirements (monotonic in evidence
+rather than plausibility, never raised by a downstream success, and
+independent of the blocking reason codes), and it is explainable — a reviewer
+sees which conditions failed, not a number.
+
+**What it is not**, stated in the module and repeated here: it is not a
+probability. 0.75 means six of eight evidence conditions hold, not a
+three-in-four chance the number is right. Nothing downstream may treat it as a
+likelihood.
+
+The threshold is configuration (`INGEST_REVIEW_THRESHOLD`, default 0.875 — "at
+most one piece of evidence missing"), which 7.10 requires be shown on the
+diagnostics page.
+
 ---
 
 ---
@@ -438,10 +527,12 @@ Buildable now, because it depends on no OPEN decision:
   [`validation-policy.md`](validation-policy.md),
   [`security-model.md`](security-model.md).
   Still outstanding in Phase 2: **item 19** (API schemas), **item 20**
-  (database schema and migrations — needs 3.2.d, which needs 2.2.a),
-  **item 23** (error codes and severity), **item 24** (model lifecycle states
-  and legal transitions — the state *names* are given in 7.1.b, the transition
-  graph is not), and **item 25** (owner review of these contracts).
+  (database schema and migrations — 3.2.d resolves to PostgreSQL now that
+  2.2.a is answered; records are written to JSON files meanwhile), and
+  **item 25** (owner review of these contracts).
+  **Item 23** (error codes) and **item 24** (lifecycle states) were closed for
+  ingestion by Phase 3 — see F-12. The model-version lifecycle and the check
+  severities (F-4) are still open.
 - Canonical chart of accounts and line-item definitions (11.1) — the engine's
   40 codes are catalogued in [`data-dictionary.md`](data-dictionary.md) §9.6,
   but **no account has a written definition**, which 11.3 mapping review needs.
@@ -451,6 +542,15 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 3 (items 26–38) is built**, in
+[`apps/api/app/extraction/`](../apps/api/app/extraction), with
+[`ingest_pdf.py`](../ingest_pdf.py) as its entry point: signature validation,
+SHA-256 custody and duplicate detection, write-once storage, the extraction job
+state machine, text-native extraction with page geometry, page classification
+with an image-only refusal (item 31 under 2.3.c — see F-11), metadata detection
+in the UNCONFIRMED state, the deterministic locale/sign/unit parser, reason
+codes and confidence, and 178 tests over eight committed fixture PDFs.
 
 Nothing is blocked on a Section 2 decision any more. What remains unbuilt is
 unbuilt for want of work, not for want of an answer.

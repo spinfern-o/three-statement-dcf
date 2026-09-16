@@ -30,4 +30,6 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Run tests
-        run: python -m pytest tests/ -q
+        # Two trees: tests/ is the calculation engine (the 37-step workflow),
+        # apps/api/tests/ is PDF ingestion (Phase 3 of the website spec).
+        run: python -m pytest tests/ apps/api/tests/ -q

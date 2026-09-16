@@ -9,12 +9,19 @@ treated, and what the confidence and reason-code model is.
 Section 11 (normalization and mapping) is included where it is inseparable
 from verification — 11.11 gates the Verified label, so it belongs here.
 
-**Scope note.** None of this is implemented. The engine in [`model/`](../model)
-begins at STEP 4 of the workflow, with a human having already read the PDF and
-transcribed figures into YAML with a page citation. There is no upload, no
-extraction, no OCR, no confidence score and no review workflow. Where this
-document says "the reviewer", it is describing a system to be built. Where the
-engine does something equivalent, it is named.
+**Scope note.** The *ingestion* half of this policy is now implemented, in
+[`apps/api/app/extraction/`](../apps/api/app/extraction) (Phase 3, items
+26-38): upload custody, extraction job states, text-native extraction with page
+geometry, metadata detection in the UNCONFIRMED state, the deterministic
+parser, reason codes and confidence. §12 has the rule-by-rule status.
+
+The *review* half is not. There is no UI, no reviewer action, no mapping and no
+verified fact. Where this document says "the reviewer", it is still describing
+a system to be built (Phase 4). And the calculation engine in
+[`model/`](../model) is unchanged: it begins at STEP 4, with a human having
+already read the PDF and transcribed figures into YAML with a page citation.
+Nothing yet connects extracted facts to that engine — the mapping stage
+between them is Phase 5.
 
 ---
 
@@ -206,11 +213,26 @@ codes**. 10.29 requires manual review for every low-confidence fact.
 `ReportedFact.confidence` is a decimal in `[0, 1]`, stored as a decimal string
 like every other number.
 
-**The scoring function is OPEN**, and deliberately left so. The specification
-requires a score and a review threshold; it does not define how the score is
-computed, and inventing a formula here would be exactly the kind of
-unjustified precision Section 27 tells the implementing agent to label rather
-than guess. What *can* be fixed now:
+**The scoring function was OPEN and is now defined** (Phase 3, finding F-13).
+The specification requires a score and a review threshold and does not say how
+the score is computed, and inventing a calibrated-looking formula would be
+exactly the unjustified precision Section 27 warns against. So the score is
+defined as the one thing defensible without calibration data:
+
+> **Confidence is the fraction of eight named evidence conditions the fact
+> satisfies**, computed exactly.
+
+The eight are listed in `EvidenceCheck` in
+[`reasons.py`](../apps/api/app/extraction/reasons.py): read from the embedded
+text layer; inside a detected table; a non-empty row label; a resolved column
+period; the parse produced a value; the sign follows from an explicit
+convention; no footnote marker had to be stripped; the table neither split
+across a page break nor repeated its header.
+
+**It is not a probability.** 0.75 means six of eight conditions hold, not a
+three-in-four chance the number is right. A reviewer is shown the failed
+conditions, not the number alone. The requirements below all still hold, and
+the definition was chosen to satisfy them:
 
 - Confidence is **monotonic in evidence**, not in plausibility. A number that
   looks reasonable does not score higher for looking reasonable.
@@ -219,7 +241,9 @@ than guess. What *can* be fixed now:
   its score. Reason codes are not inputs to a threshold — they are independent
   gates.
 - The review threshold is a recorded configuration value, not a constant
-  buried in code, and it is shown on the diagnostics page (7.10).
+  buried in code, and it is shown on the diagnostics page (7.10). It is
+  `INGEST_REVIEW_THRESHOLD`, default `0.875` — "at most one piece of evidence
+  may be missing".
 
 ### Reason codes
 
@@ -408,20 +432,51 @@ refusals are about *absence*, not about *comparability*.
 
 ## 12. Section 10 coverage summary
 
-| # | Rule | Implemented today |
-|---|---|---|
-| 10.1–10.5 | MIME signature, hash, duplicates, scan, metadata | **No** — no upload path exists |
-| 10.6–10.8 | Page-type detection, text extraction, OCR | **No**; 10.8 out of scope by 2.3.c (text-native only) |
-| 10.9 | Preserve page number for every span | **Partial** — `Source.page` exists and is cited, but is **optional** (`int \| None`) where 10.9 and 24.3 require it |
-| 10.10–10.13 | Detect metadata, mark UNCONFIRMED, require confirmation | **Different mechanism** — nothing is detected; `CompanyProfile` refuses blanks instead |
-| 10.14 | Source map for statements and notes | **Yes, in spirit** — `profile.SourceMap`, twelve required sections, `missing()` reports gaps (STEP 2) |
-| 10.15–10.19 | Table normalization, parentheses, dashes, footnotes, columns | **No** — there is no table extraction |
-| 10.20–10.21 | Restatement detection and retention | **No** for facts; `assumptions.Conflict` implements the equivalent shape for assumptions |
-| 10.22–10.24 | Discontinued ops, scope, period basis | **No** |
-| 10.25–10.27 | Raw strings, deterministic parse, ambiguous separators | **Partial** — `yaml_exact.py` preserves numeric scalars as written so parsing cannot lose precision (4.2), but the raw string is not retained on the `Figure` |
-| 10.28–10.30 | Confidence, reason codes, mandatory review | **No** — no confidence model, no review workflow |
-| 10.31–10.33 | Highlighted cell, correction with note, audit log | **No** — no UI, no audit log |
-| 10.34–10.35 | Locked snapshot, re-run dependents | **No versioning.** Every run rebuilds the whole model from the input files, which is *reproducible* but is not a snapshot |
+Two columns, because they are two different systems. **Ingestion** is
+[`apps/api/app/extraction/`](../apps/api/app/extraction), built in Phase 3.
+**Engine** is [`model/`](../model), which begins after a human has transcribed
+the figures and is unchanged by Phase 3.
+
+| # | Rule | Ingestion (Phase 3) | Engine (`model/`) |
+|---|---|---|---|
+| 10.1 | Type by MIME signature | **Yes** — `signature.py`; header at offset 0, version, `%%EOF`, size limit. The filename is never consulted | n/a |
+| 10.2 | SHA-256 hash | **Yes** — `hashing.py`, computed on the bytes as received | No |
+| 10.3 | Refuse duplicates unless explicitly linked | **Yes** — refused by default; a linked duplicate needs an explicit action *and* a reason | No |
+| 10.4 | Security scan | **Structural only** — `scan.py` refuses encryption, JavaScript, `/OpenAction`, launch actions and embedded files, and records a MuPDF repair. **Not an antivirus scan**, and says so | n/a |
+| 10.5 | Record filename, size, pages, timestamp | **Yes**, filename stored sanitized (20.11) | No |
+| 10.6 | Text-native / image-only / mixed per page | **Yes** — `pages.py` | No |
+| 10.7 | Embedded text and coordinates | **Yes** — `text_native.py` + `geometry.py` | No |
+| 10.8 | OCR image-only pages | **Refused, by decision 2.3.c.** An image-only page rejects the document and names the page. See finding F-11 | n/a |
+| 10.9 | Page number for every span and cell | **Yes**, required — every fact has a `SourceLocation` with a page and a bounding box | **Partial** — `Source.page` is optional where 10.9 requires it |
+| 10.10 | Detect the ten metadata fields | **Yes** — `metadata.py`, plus `filing_type` and `number_locale` | No; `CompanyProfile` refuses blanks instead |
+| 10.11 | Mark detected metadata UNCONFIRMED | **Yes**, without exception | Different mechanism |
+| 10.12–10.13 | Present to a reviewer; require confirmation | **State transition yes, UI no.** `confirm_metadata()` implements 10.13 and 10.35; the reviewer interface is Phase 4 item 44 | n/a |
+| 10.14 | Source map for statements and notes | **Partial** — tables are found and captioned, but a *mapped* source map is Phase 4 | **Yes, in spirit** — `profile.SourceMap`, twelve required sections, `missing()` reports gaps |
+| 10.15 | Repeated headers removed only from normalized data | **Yes** — raw cells kept; repeated header rows flagged and excluded from facts | n/a |
+| 10.16 | Parentheses as negative-sign evidence | **Yes** — the value is negative *and* `"(1,234)"` is retained | n/a |
+| 10.17 | Distinguish hyphen as zero / blank / unavailable | **Yes** — every dash form is `DASH_AMBIGUOUS` with no value. This is rule 1.5's main test | Sparse `Ledger`: absent is not zero |
+| 10.18 | Footnote markers not in the numeric value | **Yes**, and the marker is kept. NFKC is deliberately *not* used, because it turns a superscript one into a digit | n/a |
+| 10.19 | Columns with different dates or periods | **Yes** — per-column period labels | n/a |
+| 10.20–10.21 | Restatement detection and retention | **No** — `RESTATEMENT_CONFLICT` is defined but nothing raises it | No for facts; `assumptions.Conflict` has the shape for assumptions |
+| 10.22 | Continuing versus discontinued operations | **No** — the code exists, the detector does not | No |
+| 10.23 | Consolidated versus segment | **Yes** — read from the table caption; `SCOPE_AMBIGUOUS` when it cannot be determined | No |
+| 10.24 | Annual / quarterly / YTD / TTM | **Detected to be refused** — a column header naming another basis raises `PERIOD_AMBIGUOUS` (2.3.b is annual only) | `Periods` validates structure; no dates, so basis cannot be checked |
+| 10.25 | Raw strings before numeric parsing | **Yes** — `raw_value` is always stored | **Partial** — `yaml_exact.py` preserves the scalar as written, but the text is not retained on the `Figure` |
+| 10.26 | Deterministic parse by locale, currency, unit, sign | **Yes** — `parsing.py` | n/a |
+| 10.27 | Reject ambiguous separators for review | **Yes** — a cell is ambiguous iff two locales both read it and disagree | n/a |
+| 10.28 | Confidence and reason codes | **Yes** — see §7 and finding F-13 | No |
+| 10.29 | Low confidence forces review | **Yes** — `LOW_CONFIDENCE` below the configured threshold | No |
+| 10.30 | Reconciliation failure forces review | **Codes defined, not raised.** `SUBTOTAL_MISMATCH` and `CROSS_STATEMENT_MISMATCH` need the mapping of Phase 5 before a subtotal has components to compare | The engine's own equivalent runs: `Ledger.cross_check()` is check 17.10 |
+| 10.31 | Highlighted PDF cell beside the fact | **Data yes, UI no** — every fact carries a page and a box | n/a |
+| 10.32 | Correction only with a reviewer note | **Yes for metadata**; fact-level correction is Phase 4 | n/a |
+| 10.33 | Audit every action | **Partial** — `AuditEvent` exists, an entry without a reason raises, and job transitions and metadata confirmations are recorded. Fact-level actions are Phase 4 | No audit log |
+| 10.34 | Lock verified facts in a versioned snapshot | **No** — nothing is verified yet, so there is nothing to lock | No versioning |
+| 10.35 | Re-run dependents after an approved change | **Yes, at the parse level** — confirming metadata re-parses and re-scores every fact | Every run rebuilds the whole model, which is reproducible but not a snapshot |
+
+**What is still missing, stated plainly:** no fact reaches `VERIFIED`. §9's
+conjunction requires a reviewer action (Phase 4) and an approved mapping
+(Phase 5), and neither exists. Everything Phase 3 produces is `UNVERIFIED` and
+waiting.
 
 ---
 
@@ -431,4 +486,5 @@ refusals are about *absence*, not about *comparability*.
 - [`data-dictionary.md`](data-dictionary.md) — the `SourceDocument`, `SourceLocation`, `ReportedFact` and `FactMapping` fields this policy governs
 - [`validation-policy.md`](validation-policy.md) — checks 17.1–17.7, which test compliance with this policy
 - [`security-model.md`](security-model.md) — 20.8–20.11, upload safety
-- [`decision-ledger.md`](decision-ledger.md) — the OPEN decisions cited above
+- [`decision-ledger.md`](decision-ledger.md) — the decisions cited above, and findings F-11 to F-13
+- [`../apps/api/app/extraction/`](../apps/api/app/extraction) — the implementation

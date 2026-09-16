@@ -137,6 +137,12 @@ reviewer confirmation or correction (10.12–10.13). `displayed_scale`,
 `reporting_currency` and the period bounds are the four that rules 1.7, 1.9
 and 1.10 make dangerous to get wrong, and 1.4 forbids choosing silently.
 
+**Now implemented for ingestion (Phase 3).**
+[`apps/api/app/extraction/records.py`](../apps/api/app/extraction/records.py)
+holds every field in this table, with the hash computed on the bytes as
+received and the file stored write-once and content-addressed. The engine note
+below still describes `model/`, which is a separate stage and unchanged.
+
 **Engine counterpart: a string.** `Source.document` in
 [`model/provenance.py`](../model/provenance.py) and `SourceMap.document` in
 [`model/profile.py`](../model/profile.py) are both free text, e.g.
@@ -168,6 +174,12 @@ reason as everything else: it is the evidence that a reviewer's highlight sits
 where the number was, and it should reconstruct exactly. Its coordinate origin
 and rotation handling must be recorded alongside it — 22.3.g requires rotated
 pages be tested.
+
+**Now implemented for ingestion (Phase 3).** `SourceLocation` in
+[`records.py`](../apps/api/app/extraction/records.py) carries the page, a
+`BoundingBox` of four decimal strings, the raw text, and the table, row and
+column labels. `page_number` is required and `bounding_box` is produced for
+every fact, which is what acceptance criterion 24.3 asks for.
 
 **Engine counterpart: `Source(document, page, line_item)`** in
 [`model/provenance.py`](../model/provenance.py).
@@ -219,6 +231,22 @@ happens:
 
 `sign_convention`, `verification_status` and the `confidence` reason codes are
 enumerated in [`source-policy.md`](source-policy.md) rather than here.
+
+**Now implemented for ingestion (Phase 3),** with three recorded divergences
+from this table:
+
+1. **`period_label` exists, and `period_start`/`period_end` may be null at
+   ingestion.** A column headed `2025` is an unambiguous *label*; its date
+   range depends on the fiscal year-end, which is UNCONFIRMED until a reviewer
+   confirms it. Filling the dates from an unconfirmed year-end is what rule 1.4
+   forbids, so the label is stored and the dates wait.
+2. **`currency` and `source_scale` are references to the document's detected
+   metadata, not values copied onto each fact.** Copying an UNCONFIRMED scale
+   onto ten thousand facts makes correcting it a migration. Until both are
+   confirmed, every fact carries `SCALE_UNCONFIRMED` and
+   `CURRENCY_UNCONFIRMED`, which block it.
+3. **`confidence` is a `Confidence` object, not a bare number** — the score
+   plus the evidence conditions that produced it. See finding F-13.
 
 **Engine counterpart: `Figure`** in
 [`model/provenance.py`](../model/provenance.py) — `value`, `year`, `source`.
@@ -677,19 +705,42 @@ and one hard transition rule in 15.21 ("Do not label the model Forecast Ready
 until every critical check passes"), plus 19.18 (release locks a version) and
 13x/137 (prevent release when CRITICAL or ERROR checks remain).
 
-**The legal transition table is OPEN.** The specification gives the states and
-three constraints but not the graph — whether Validated can return to Needs
-Review after a fact correction (10.35 implies yes), whether Archived is
-terminal, and whether a locked version can be superseded rather than
-unlocked. 10.35 ("re-run all dependent mappings and calculations after an
+**The model-version transition table is still OPEN.** The specification gives
+the states and three constraints but not the graph — whether Validated can
+return to Needs Review after a fact correction (10.35 implies yes), whether
+Archived is terminal, and whether a locked version can be superseded rather
+than unlocked. 10.35 ("re-run all dependent mappings and calculations after an
 approved change") and 11.12 ("invalidate dependent model results") both imply
-backward transitions exist, but neither names them.
+backward transitions exist, but neither names them. This is **not** a Section 2
+decision, so it is not in the ledger's Section 2 tables; it is recorded as
+finding F-4's neighbour in the ledger.
 
-This is **not** a Section 2 decision, so it is not in the ledger's Section 2
-tables; it is recorded as a finding. `SourceDocument.extraction_status` and
-`verification_status` (9.3), and `ReportedFact.verification_status` (9.5), are
-in the same position: required fields whose value sets the specification
-describes behaviourally but never enumerates.
+### The extraction lifecycle is now CLOSED (Phase 3, finding F-12)
+
+`SourceDocument.extraction_status`, `SourceDocument.verification_status` and
+`ReportedFact.verification_status` were in the same position — required fields
+whose value sets the specification describes behaviourally but never
+enumerates. Phase 3 item 29 could not be built on an open enumeration, so
+[`apps/api/app/extraction/jobs.py`](../apps/api/app/extraction/jobs.py) defines
+them:
+
+| Field | Enumeration | Serves |
+|---|---|---|
+| `SourceDocument.extraction_status` | `JobState`: received → validating → stored → classifying → extracting → extracted, plus terminal `refused` and `failed` | 10.6–10.8; Phase 3 item 29 |
+| `SourceDocument.verification_status` | `DocumentVerificationState`: `unconfirmed` → `in_review` → `confirmed` | 10.11–10.13; check `VAL-017-002` |
+| `ReportedFact.verification_status` | `FactVerificationState`: `unverified`, `needs_review`, `accepted`, `corrected`, `rejected`, `verified` | 10.29–10.33; check `VAL-017-005` |
+
+`LEGAL_TRANSITIONS` is the graph, asserted complete at import. Three properties
+are enforced rather than described: every non-terminal state may refuse or
+fail, every terminal state is terminal, and a transition without a stated
+reason raises (10.33). There are **no backward edges** — a re-extraction is a
+new job over the same stored document, because 10.33 requires the old job's
+history not be mutated.
+
+`refused` and `failed` are distinguished deliberately. A refusal is a *policy*
+stop: a rule said no, and the system is working. A failure is an *unexpected*
+stop. The first is answered by a reviewer, the second by an engineer, and
+collapsing them into one state loses that.
 
 ---
 
@@ -699,9 +750,9 @@ describes behaviourally but never enumerates.
 |---|---|---|
 | 9.1 User | — | None |
 | 9.2 Company | `profile.CompanyProfile` | Partial — no id/ticker/industry/timestamps; scale and audited status sit here instead of on the document |
-| 9.3 SourceDocument | a free-text string | None of substance — no file, hash, or status |
-| 9.4 SourceLocation | `provenance.Source` | Partial — page and row label only; no geometry, no raw text |
-| 9.5 ReportedFact | `provenance.Figure` | Partial — value, year label and citation; no raw string, confidence, verification, scope or per-fact currency/scale |
+| 9.3 SourceDocument | a free-text string in `model/`; **full record in `apps/api` (Phase 3)** | Complete for ingestion |
+| 9.4 SourceLocation | `provenance.Source` in `model/`; **full record in `apps/api` (Phase 3)** | Complete for ingestion, including geometry and raw text |
+| 9.5 ReportedFact | `provenance.Figure` in `model/`; **full record in `apps/api` (Phase 3)** | Complete for ingestion; three recorded divergences, above |
 | 9.6 NormalizedLineItem | `model/accounts.py` | **Strongest overlap** — codes, statement type and component structure present; no display name, definition, or per-item sign/cash tags |
 | 9.7 FactMapping | — | None; the input file fuses fact and mapping |
 | 9.8 ModelVersion | — | None; no versioning, no valuation date, no base-unit normalization |
@@ -710,7 +761,7 @@ describes behaviourally but never enumerates.
 | 9.11 FormulaDefinition | — | None as data; prose `basis` strings only |
 | 9.12 CalculatedValue | `statements.Cell` | Partial — value plus an `origin` field Section 9 lacks; no fingerprint, formula reference or timestamp |
 | 9.13 ValidationResult | `checks.CheckResult` | Partial — status and message; no code, severity, or structured expected/actual/difference |
-| 9.14 AuditEvent | — | None |
+| 9.14 AuditEvent | **`records.AuditEvent` (Phase 3)** | Present for ingestion; an entry without a reason raises (10.33). Not yet wired to reviewer actions, which are Phase 4 |
 
 ---
 
