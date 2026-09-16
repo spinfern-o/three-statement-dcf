@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.DS_Store
+
+# Company inputs you fill in locally. The blank templates ARE tracked;
+# a filled-in copy may contain material non-public information, so keep it
+# out of the repo unless you have decided otherwise.
+inputs/*.local.yaml

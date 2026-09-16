@@ -1,0 +1,30 @@
+# FICTIONAL TEST FIXTURE -- NOT A REAL COMPANY.
+# These numbers exist only to exercise the engine. They are not sourced from
+# any filing and must never be copied into inputs/.
+company:
+  name: Fixture Manufacturing Company (FICTIONAL TEST DATA)
+  reporting_period: FY2025
+  fiscal_year_end: December 31
+  reporting_currency: USD
+  units: millions
+  audited: true
+
+source_map:
+  document: Fixture Manufacturing FY2025 Form 10-K (FICTIONAL)
+  pages:
+    income_statement: 40
+    balance_sheet: 42
+    cash_flow_statement: 44
+    statement_of_shareholders_equity: 46
+    revenue_notes: 55
+    ppe_depreciation_notes: 61
+    debt_notes: 67
+    tax_notes: 72
+    lease_notes: 75
+    stock_compensation_notes: 78
+    share_count_eps_notes: 81
+    mdna: 28
+
+periods:
+  historical: [2024A, 2025A]
+  forecast: [2026E, 2027E, 2028E, 2029E, 2030E]

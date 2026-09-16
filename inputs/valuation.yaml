@@ -1,0 +1,56 @@
+# STEP 25-36 -- cost of capital, terminal value, bridge, sensitivity.
+#
+# STEP 25: "Do not derive these from the financial statements." The CAPM
+# inputs and the market values below are external facts about the company's
+# securities, and each one requires its own source string.
+
+cost_of_capital:
+  risk_free_rate:                       # STEP 25, decimal (0.042 = 4.2%)
+  beta:                                 # STEP 25
+  equity_risk_premium:                  # STEP 25, decimal
+  pretax_cost_of_debt:                  # STEP 26, decimal
+  tax_rate:                             # STEP 26, decimal, for the after-tax cost of debt
+
+  # STEP 27: use MARKET values. "Do not automatically use book equity for
+  # market capitalization." Same units as the statements.
+  market_value_equity:
+  market_value_debt:
+
+  # STEP 25-27 require a source for each. All six are mandatory; the model
+  # refuses to compute a WACC out of unsourced inputs.
+  sources:
+    risk_free_rate:
+    beta:
+    equity_risk_premium:
+    pretax_cost_of_debt:
+    market_value_equity:
+    market_value_debt:
+
+# STEP 30-31. The model enforces WACC > terminal growth rate.
+terminal_growth:
+  value:                                # decimal, e.g. 0.025
+  source:                               # required
+
+# STEP 34 -- enterprise value to equity value.
+# "Do not silently ignore these items": the optional lines default to 0 and
+# every one of them is printed in the bridge, zero or not.
+equity_bridge:
+  cash:                                 # required
+  debt:                                 # required
+  non_operating_investments: 0
+  minority_interest: 0
+  preferred_stock: 0
+  pension_obligations: 0
+  other_claims: 0
+
+# STEP 35 -- omit this block entirely for a private company.
+# If diluted_shares_outstanding is given, the source is mandatory.
+shares:
+  diluted_shares_outstanding:
+  source:                               # source AND date
+
+# STEP 36 -- at minimum vary WACC and terminal growth.
+# Combinations where WACC <= g are shown as n/a rather than dropped.
+sensitivity:
+  wacc: []                              # e.g. [0.080, 0.085, 0.090, 0.095, 0.100]
+  terminal_growth: []                   # e.g. [0.015, 0.020, 0.025, 0.030, 0.035]

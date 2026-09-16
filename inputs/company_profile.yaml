@@ -1,0 +1,41 @@
+# STEP 1-3 and STEP 12 -- identification, source map, periods.
+#
+# STEP 1: "Do not begin modeling until each item is identified."
+# Every field below is required. The model refuses to run on blanks rather
+# than filling them with a default.
+
+company:
+  name:                                 # e.g. Example Industries, Inc.
+  reporting_period:                     # e.g. FY2025
+  fiscal_year_end:                      # e.g. December 31
+  reporting_currency:                   # e.g. USD
+  units:                                # dollars | thousands | millions
+  audited:                              # true | false
+
+# STEP 2 -- record the exact PDF page for each section.
+# Leave a page null if you have not located it yet; the report will list
+# every section still missing instead of pretending the map is complete.
+source_map:
+  document:                             # e.g. Example Industries FY2025 Form 10-K
+  pages:
+    income_statement:
+    balance_sheet:
+    cash_flow_statement:
+    statement_of_shareholders_equity:
+    revenue_notes:
+    ppe_depreciation_notes:
+    debt_notes:
+    tax_notes:
+    lease_notes:
+    stock_compensation_notes:
+    share_count_eps_notes:
+    mdna:
+
+periods:
+  # STEP 3: use only the historical years the company actually provides.
+  # "Do not invent missing historical years."
+  historical: []                        # e.g. [2023A, 2024A, 2025A]
+
+  # STEP 12: A = Actual, E = Estimate. The forecast must start the year
+  # after the last actual -- a gap would silently skip a year of compounding.
+  forecast: []                          # e.g. [2026E, 2027E, 2028E, 2029E, 2030E]

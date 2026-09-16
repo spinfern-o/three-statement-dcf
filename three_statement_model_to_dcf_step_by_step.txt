@@ -1,0 +1,590 @@
+Three-Statement Model to DCF — Step-by-Step Workflow
+
+Goal:
+Convert a company-provided financial PDF into:
+1. Historical three-statement model
+2. Explicit forecast model
+3. DCF valuation based on predicted free cash flow
+
+STEP 1 — RECEIVE AND IDENTIFY THE PDF
+Record:
+- Company name
+- Reporting period
+- Fiscal year-end
+- Reporting currency
+- Whether figures are shown in dollars, thousands, or millions
+- Whether statements are audited
+
+Do not begin modeling until each item is identified.
+
+STEP 2 — CREATE A SOURCE MAP
+Record the exact PDF page for:
+- Income statement
+- Balance sheet
+- Cash flow statement
+- Statement of shareholders’ equity
+- Revenue notes
+- PP&E / depreciation notes
+- Debt notes
+- Tax notes
+- Lease notes
+- Stock compensation notes
+- Share count / EPS notes
+- Management discussion and analysis
+
+STEP 3 — DEFINE THE HISTORICAL PERIOD
+Use only the historical years actually provided by the company.
+
+Example:
+2023A
+2024A
+2025A
+
+Do not invent missing historical years.
+
+STEP 4 — BUILD A RAW DATA SECTION
+Transcribe reported figures exactly as shown in the PDF.
+
+For every historical hardcoded number, record:
+- Figure
+- Reporting year
+- PDF page
+- Reported line-item name
+
+Do not reclassify or combine accounts yet.
+
+STEP 5 — STANDARDIZE THE HISTORICAL INCOME STATEMENT
+Map company-reported lines into a model structure.
+
+Example:
+
+Revenue
+- COGS
+= Gross Profit
+- Operating Expenses
+= EBIT
+- Interest Expense
++/- Other Income / Expense
+= Pre-Tax Income
+- Taxes
+= Net Income
+
+If the company does not report a line such as COGS or gross profit separately, do not invent it.
+
+STEP 6 — STANDARDIZE THE HISTORICAL BALANCE SHEET
+Map all reported balances into:
+- Assets
+- Liabilities
+- Equity
+
+Check:
+
+Assets = Liabilities + Equity
+
+If the balance sheet does not balance, stop and find the extraction or mapping error.
+Do not use a plug simply to force the model to balance.
+
+STEP 7 — STANDARDIZE THE HISTORICAL CASH FLOW STATEMENT
+Separate:
+- Cash flow from operating activities
+- Cash flow from investing activities
+- Cash flow from financing activities
+
+Preserve the company’s treatment of:
+- Depreciation and amortization
+- Stock-based compensation
+- Acquisitions
+- Capital expenditures
+- Debt issuance
+- Debt repayment
+- Share repurchases
+- Dividends
+- Other major cash flow items
+
+STEP 8 — BUILD SUPPORTING SCHEDULES
+Create supporting schedules before forecasting major balance sheet accounts.
+
+At minimum:
+- PP&E / depreciation schedule
+- Working capital schedule
+- Debt / interest schedule
+- Tax schedule
+- Shares outstanding schedule, if relevant
+
+PP&E schedule:
+
+Ending PP&E
+= Beginning PP&E
++ CapEx
+- Depreciation
+- Disposals
+
+Debt schedule:
+
+Ending Debt
+= Beginning Debt
++ New Borrowing
+- Debt Repayment
+
+Retained earnings schedule:
+
+Ending Retained Earnings
+= Beginning Retained Earnings
++ Net Income
+- Dividends
+
+STEP 9 — VERIFY THE HISTORICAL THREE-STATEMENT MODEL
+Check each linkage explicitly.
+
+Net Income:
+- Flows into the cash flow statement
+- Flows into retained earnings
+
+Depreciation:
+- Reduces operating income
+- Is added back on the cash flow statement
+- Reduces PP&E through the PP&E schedule
+
+CapEx:
+- Appears in investing cash flow
+- Increases PP&E
+
+Debt:
+- Borrowing and repayment appear in financing cash flow
+- Ending debt matches the balance sheet
+
+Cash:
+- Ending cash from the cash flow statement equals balance sheet cash
+
+Do not begin forecasting until the historical model works.
+
+STEP 10 — CREATE A SEPARATE ASSUMPTIONS SECTION
+Every forecast assumption must have a visible source or explanation.
+
+Separate assumptions into:
+1. Company-provided guidance
+2. Externally researched information
+3. Analyst / model assumptions
+
+Example:
+
+Revenue Growth 2026E: 8% — Company guidance
+Revenue Growth 2027E: 7% — Model assumption
+Gross Margin: 42% — Historical trend / model assumption
+Tax Rate: 24% — Company filing
+Terminal Growth Rate: 2.5% — DCF assumption
+
+Never hide assumptions inside formulas.
+
+STEP 11 — RESEARCH THE COMPANY OUTSIDE THE PDF
+After extracting the PDF, compare against:
+- Latest annual filing
+- Latest quarterly filing
+- Investor presentation
+- Earnings release
+- Company guidance
+- Debt disclosures
+- Other relevant public filings
+
+If two sources conflict:
+- Record both
+- Note their dates
+- Explicitly choose which one the model uses
+
+STEP 12 — DEFINE THE FORECAST PERIOD
+Example:
+
+Historical:
+2023A
+2024A
+2025A
+
+Forecast:
+2026E
+2027E
+2028E
+2029E
+2030E
+
+A = Actual
+E = Estimate
+
+STEP 13 — FORECAST REVENUE
+State the exact forecasting methodology.
+
+Basic approach:
+
+Revenue_t
+= Revenue_(t-1) × (1 + Growth Rate_t)
+
+If the company has multiple business segments, forecast each separately where possible.
+
+Total Revenue
+= Segment A Revenue
++ Segment B Revenue
++ Segment C Revenue
+
+Every forecast-year growth assumption must be visible.
+
+STEP 14 — FORECAST OPERATING COSTS AND MARGINS
+Determine the correct driver for each operating line.
+
+Possible drivers:
+- Percentage of revenue
+- Unit volume
+- Price
+- Headcount
+- Store count
+- Contractual commitments
+- Historical margin
+- Company guidance
+
+Examples:
+
+COGS_t
+= Revenue_t × COGS %_t
+
+Gross Profit_t
+= Revenue_t - COGS_t
+
+SG&A_t
+= Revenue_t × SG&A %_t
+
+Do not assume every expense should remain a constant percentage of revenue.
+
+STEP 15 — FORECAST EBIT
+
+EBIT
+= Revenue
+- COGS
+- Operating Expenses
+
+Keep EBIT separate from financing items such as interest expense.
+
+STEP 16 — FORECAST TAXES
+State whether the model uses:
+- Statutory tax rate
+- Historical effective tax rate
+- Normalized effective tax rate
+
+Calculate:
+
+NOPAT
+= EBIT × (1 - Tax Rate)
+
+STEP 17 — FORECAST WORKING CAPITAL ACCOUNT BY ACCOUNT
+Do not forecast total working capital as one guessed number.
+
+Accounts Receivable:
+
+AR
+= Revenue × DSO / 365
+
+Inventory:
+
+Inventory
+= COGS × Inventory Days / 365
+
+Accounts Payable:
+
+AP
+= COGS × DPO / 365
+
+Define operating net working capital explicitly.
+
+A common version is:
+
+NWC
+= Operating Current Assets
+- Operating Current Liabilities
+
+Normally exclude:
+- Cash
+- Debt
+- Other financing balances
+
+Then calculate:
+
+Change in NWC
+= NWC_t - NWC_(t-1)
+
+STEP 18 — FORECAST DEPRECIATION AND CAPEX SEPARATELY
+Do not assume Depreciation = CapEx.
+
+Use the PP&E schedule:
+
+Ending PP&E
+= Beginning PP&E
++ CapEx
+- Depreciation
+- Disposals
+
+CapEx may be forecast using:
+- Company guidance
+- Percentage of revenue
+- Historical capital intensity
+- Specific expansion plans
+
+State the selected methodology explicitly.
+
+STEP 19 — FORECAST DEBT AND INTEREST
+Use a debt schedule.
+
+Show:
+- Beginning debt
+- New borrowing
+- Mandatory repayments
+- Optional repayments
+- Ending debt
+- Interest rate
+- Interest expense
+
+Do not forecast interest expense independently if it can be linked to debt.
+
+STEP 20 — COMPLETE THE PROJECTED INCOME STATEMENT
+After forecasting:
+- Revenue
+- Operating expenses
+- EBIT
+- Interest
+- Taxes
+- Other relevant items
+
+Calculate projected net income.
+
+STEP 21 — COMPLETE THE PROJECTED BALANCE SHEET
+Link:
+- Cash
+- Receivables
+- Inventory
+- PP&E
+- Payables
+- Other operating balances
+- Debt
+- Equity
+- Retained earnings
+
+Verify every year:
+
+Assets = Liabilities + Equity
+
+STEP 22 — COMPLETE THE PROJECTED CASH FLOW STATEMENT
+Start with projected net income.
+
+Adjust for:
+- Depreciation
+- Other non-cash charges
+- Changes in working capital
+- Capital expenditures
+- Investing activities
+- Debt issuance
+- Debt repayment
+- Dividends
+- Repurchases
+- Other financing activities
+
+Calculate:
+
+Ending Cash
+= Beginning Cash
++ CFO
++ CFI
++ CFF
+
+Ending cash must equal the cash balance on the projected balance sheet.
+
+At this point, the forecast three-statement model is complete.
+
+--------------------------------------------------
+DCF VALUATION
+--------------------------------------------------
+
+STEP 23 — CHOOSE THE DCF CASH FLOW TYPE
+For a standard enterprise-value DCF, use Free Cash Flow to the Firm (FCFF).
+
+FCFF:
+
+FCFF
+= EBIT × (1 - Tax Rate)
++ D&A
+- CapEx
+- Change in NWC
+
+This represents cash flow available to both debt and equity capital providers before financing costs.
+
+STEP 24 — CALCULATE FCFF FOR EVERY FORECAST YEAR
+Example:
+
+FCFF_2026
+= EBIT_2026 × (1 - Tax Rate_2026)
++ D&A_2026
+- CapEx_2026
+- Change in NWC_2026
+
+Repeat independently for every forecast year.
+
+This is the predicted free cash flow produced by the three-statement model.
+
+STEP 25 — CALCULATE COST OF EQUITY
+Use CAPM:
+
+Cost of Equity
+= Risk-Free Rate
++ Beta × Equity Risk Premium
+
+Explicitly source:
+- Risk-free rate
+- Beta
+- Equity risk premium
+
+Do not derive these from the financial statements.
+
+STEP 26 — CALCULATE COST OF DEBT
+Determine the company’s current pre-tax cost of debt from:
+- Bond yields
+- Borrowing rates
+- Credit spreads
+- Other justified sources
+
+Then calculate:
+
+After-Tax Cost of Debt
+= Pre-Tax Cost of Debt × (1 - Tax Rate)
+
+STEP 27 — DETERMINE CAPITAL STRUCTURE
+Use market values where appropriate.
+
+E = Market Value of Equity
+D = Market Value of Debt
+
+Do not automatically use book equity for market capitalization.
+
+STEP 28 — CALCULATE WACC
+
+WACC
+= [E / (D + E)] × Cost of Equity
++ [D / (D + E)] × Cost of Debt × (1 - Tax Rate)
+
+The WACC assumptions should all be visible in the assumptions section.
+
+STEP 29 — DISCOUNT EACH YEAR’S FCFF
+For a simple year-end convention:
+
+PV of FCFF_t
+= FCFF_t / (1 + WACC)^t
+
+Show separately:
+- Forecast FCFF
+- Discount period
+- Discount factor
+- Present value
+
+STEP 30 — CALCULATE TERMINAL-YEAR CASH FLOW
+If 2030E is the last explicit forecast year:
+
+FCFF_2031
+= FCFF_2030 × (1 + Terminal Growth Rate)
+
+STEP 31 — CALCULATE TERMINAL VALUE
+Using the perpetual-growth method:
+
+Terminal Value_2030
+= FCFF_2031 / (WACC - Terminal Growth Rate)
+
+The model must satisfy:
+
+WACC > Terminal Growth Rate
+
+STEP 32 — DISCOUNT TERMINAL VALUE
+For a five-year year-end forecast:
+
+PV of Terminal Value
+= Terminal Value_2030 / (1 + WACC)^5
+
+STEP 33 — CALCULATE ENTERPRISE VALUE
+
+Enterprise Value
+= Sum of Present Values of Explicit FCFF
++ Present Value of Terminal Value
+
+STEP 34 — BRIDGE ENTERPRISE VALUE TO EQUITY VALUE
+Simplified bridge:
+
+Equity Value
+= Enterprise Value
++ Cash
+- Debt
+
+Also include separately, when relevant:
+- Non-operating investments
+- Minority interest
+- Preferred stock
+- Pension obligations
+- Other non-operating assets or claims
+
+Do not silently ignore these items.
+
+STEP 35 — CALCULATE IMPLIED VALUE PER SHARE
+For a public company:
+
+Implied Share Price
+= Equity Value / Diluted Shares Outstanding
+
+State the source and date for diluted shares outstanding.
+
+STEP 36 — BUILD DCF SENSITIVITY TABLES
+At minimum, vary:
+- WACC
+- Terminal growth rate
+
+For each combination, calculate:
+- Enterprise value
+- Equity value
+- Implied share price, if applicable
+
+STEP 37 — ADD FINAL MODEL CHECKS
+Display PASS / FAIL checks for:
+
+- Historical balance sheet balances
+- Forecast balance sheet balances
+- Historical cash flow reconciliation
+- Forecast cash flow reconciliation
+- Net income linkage
+- PP&E schedule linkage
+- Debt schedule linkage
+- Retained earnings linkage
+- Ending cash linkage
+- No unintended forecast hardcodes
+- WACC > terminal growth rate
+- FCFF matches the three-statement forecast
+
+--------------------------------------------------
+COMPLETE MODEL FLOW
+--------------------------------------------------
+
+Company PDF
+→ Raw Historical Data
+→ Historical Income Statement
+→ Historical Balance Sheet
+→ Historical Cash Flow Statement
+→ Supporting Schedules
+→ Forecast Assumptions
+→ Forecast Income Statement
+→ Forecast Balance Sheet
+→ Forecast Cash Flow Statement
+→ FCFF
+→ WACC
+→ Terminal Value
+→ Enterprise Value
+→ Equity Value
+→ Implied Share Price
+
+--------------------------------------------------
+THREE-SENTENCE PROJECT DESCRIPTION
+--------------------------------------------------
+
+Build an integrated three-statement financial model from a company-provided financial PDF, using the company’s reported income statement, balance sheet, cash flow statement, notes, and supporting public disclosures as sourced historical inputs.
+
+Forecast each financial statement through explicit operating, working-capital, capital-expenditure, debt, tax, and other identified drivers, with every assumption separately documented rather than inferred.
+
+Use the resulting projections to calculate FCFF, discount forecast cash flows and terminal value at WACC, and derive implied enterprise value and equity value through a complete DCF valuation.

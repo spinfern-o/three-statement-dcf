@@ -1,0 +1,38 @@
+# FICTIONAL TEST FIXTURE -- NOT A REAL COMPANY, NOT FROM ANY FILING.
+# Never copy into inputs/.
+cost_of_capital:
+  risk_free_rate: 0.042
+  beta: 1.10
+  equity_risk_premium: 0.055
+  pretax_cost_of_debt: 0.055
+  tax_rate: 0.24
+  market_value_equity: 4000.0
+  market_value_debt: 300.0
+  sources:
+    risk_free_rate: "FIXTURE: placeholder 10-year yield"
+    beta: "FIXTURE: placeholder levered beta"
+    equity_risk_premium: "FIXTURE: placeholder ERP"
+    pretax_cost_of_debt: "FIXTURE: placeholder bond yield"
+    market_value_equity: "FIXTURE: placeholder share price x diluted shares"
+    market_value_debt: "FIXTURE: placeholder, book approximates market"
+
+terminal_growth:
+  value: 0.025
+  source: "FIXTURE: placeholder long-run growth"
+
+equity_bridge:
+  cash: 200.0
+  debt: 300.0
+  non_operating_investments: 0
+  minority_interest: 0
+  preferred_stock: 0
+  pension_obligations: 0
+  other_claims: 0
+
+shares:
+  diluted_shares_outstanding: 100.0
+  source: "FIXTURE: placeholder diluted share count, as of 2026-02-01"
+
+sensitivity:
+  wacc: [0.080, 0.085, 0.090, 0.095, 0.100]
+  terminal_growth: [0.015, 0.020, 0.025, 0.030, 0.035]

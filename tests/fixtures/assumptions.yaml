@@ -1,0 +1,63 @@
+# FICTIONAL TEST FIXTURE -- NOT A REAL COMPANY, NOT FROM ANY FILING.
+# Sources below are placeholders that satisfy the STEP 10 requirement
+# structurally; they cite nothing real. Never copy into inputs/.
+
+drivers:
+  # STEP 13 -- revenue growth, fading. Per-year entries demonstrate STEP 14's
+  # warning against holding every driver constant.
+  - {name: revenue_growth, year: 2026E, value: 0.080, basis: company_guidance,  source: "FIXTURE: guidance placeholder"}
+  - {name: revenue_growth, year: 2027E, value: 0.070, basis: model_assumption,  source: "FIXTURE: fade toward trend"}
+  - {name: revenue_growth, year: 2028E, value: 0.060, basis: model_assumption,  source: "FIXTURE: fade toward trend"}
+  - {name: revenue_growth, year: 2029E, value: 0.050, basis: model_assumption,  source: "FIXTURE: fade toward trend"}
+  - {name: revenue_growth, year: 2030E, value: 0.040, basis: model_assumption,  source: "FIXTURE: fade toward trend"}
+
+  # STEP 14 -- operating costs. Margin improves slightly, so COGS % is not flat.
+  - {name: cogs_pct_revenue, year: 2026E, value: 0.578, basis: model_assumption, source: "FIXTURE: historical trend"}
+  - {name: cogs_pct_revenue, year: 2027E, value: 0.576, basis: model_assumption, source: "FIXTURE: historical trend"}
+  - {name: cogs_pct_revenue, year: 2028E, value: 0.574, basis: model_assumption, source: "FIXTURE: historical trend"}
+  - {name: cogs_pct_revenue, year: 2029E, value: 0.572, basis: model_assumption, source: "FIXTURE: historical trend"}
+  - {name: cogs_pct_revenue, year: 2030E, value: 0.570, basis: model_assumption, source: "FIXTURE: historical trend"}
+  - {name: opex_pct_revenue, value: 0.250, basis: model_assumption, source: "FIXTURE: held at 2025A ratio"}
+
+  # STEP 17 -- working capital, account by account, carried at 2025A levels.
+  - {name: dso,            value: 54.75,   basis: model_assumption, source: "FIXTURE: 2025A AR / revenue x 365"}
+  - {name: inventory_days, value: 56.6379, basis: model_assumption, source: "FIXTURE: 2025A inventory / COGS x 365"}
+  - {name: dpo,            value: 50.3448, basis: model_assumption, source: "FIXTURE: 2025A AP / COGS x 365"}
+  - {name: other_current_assets_pct_revenue,      value: 0.020, basis: model_assumption, source: "FIXTURE: 2025A ratio"}
+  - {name: other_current_liabilities_pct_revenue, value: 0.040, basis: model_assumption, source: "FIXTURE: 2025A ratio"}
+
+  # STEP 18 -- depreciation and capex forecast SEPARATELY (capex > depreciation here).
+  - {name: depreciation_pct_beginning_ppe, value: 0.150, basis: model_assumption, source: "FIXTURE: 2025A D&A / opening PP&E"}
+  - {name: capex_pct_revenue,              value: 0.105, basis: model_assumption, source: "FIXTURE: 2025A capital intensity"}
+
+  # STEP 19 -- debt and interest; interest is linked to the debt schedule.
+  - {name: interest_rate_on_debt, value: 0.060, basis: external_research, source: "FIXTURE: placeholder borrowing rate"}
+  - {name: debt_repayment,        value: 20.0,  basis: company_guidance,  source: "FIXTURE: scheduled amortization placeholder"}
+
+  # equity and discretionary flows
+  - {name: sbc_pct_revenue,       value: 0.010, basis: model_assumption, source: "FIXTURE: 2025A SBC / revenue"}
+  - {name: share_repurchases,     value: 5.0,   basis: model_assumption, source: "FIXTURE: continues 2025A pace"}
+  - {name: dividend_payout_ratio, value: 0.100, basis: model_assumption, source: "FIXTURE: placeholder payout"}
+
+conflicts:
+  - topic: FY2026 capital expenditure
+    source_a: FIXTURE 10-K
+    date_a: "2026-02-01"
+    value_a: "about 105"
+    source_b: FIXTURE investor day
+    date_b: "2026-03-15"
+    value_b: "115 to 125"
+    chosen: FIXTURE investor day
+    rationale: "FIXTURE: more recent and reaffirmed; demonstrates STEP 11 resolution"
+
+tax:
+  basis: historical_effective
+  source: "FIXTURE: 2025A effective rate placeholder"
+  rates:
+    2026E: 0.24
+    2027E: 0.24
+    2028E: 0.24
+    2029E: 0.24
+    2030E: 0.24
+
+segments: {}
