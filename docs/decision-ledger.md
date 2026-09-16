@@ -509,6 +509,55 @@ The threshold is configuration (`INGEST_REVIEW_THRESHOLD`, default 0.875 — "at
 most one piece of evidence missing"), which 7.10 requires be shown on the
 diagnostics page.
 
+
+### F-14 — RESOLVED by decision. Phase 4 deviates from 3.1.a, deliberately
+
+Specification 3.1.a recommends **Next.js with TypeScript** for the front end.
+The source room built in Phase 4 is **server-rendered HTML from FastAPI**
+instead.
+
+The reasoning is 3.1.b's own — "React Server Components only where they do not
+complicate financial state":
+
+- **The source room has no financial state to complicate.** It is a document
+  annotation surface: a page image, rectangles drawn on it, a list of printed
+  values, and a form that posts one decision with one reason. Nothing
+  recalculates. Nothing is derived. Nothing changes as you type.
+- **Every requirement in 6.6 is easier to meet in semantic HTML** than in a
+  component tree — landmarks, heading order, labels, focus order and the
+  error summary are all markup, and all of them are tested in
+  `apps/api/tests/integration/test_accessibility.py` against a real browser.
+- **No build step** means the review tool runs from a checkout, which matters
+  for something whose whole job is to be opened next to a PDF.
+
+Where React earns its place is **Phase 12's dashboard**: live recalculation,
+charts, and 6.5.c's unsaved assumption edits marked as you type. That is the
+right place to introduce it, and doing so does not require rewriting this —
+the review room's URLs are the API.
+
+Section 3 permits this explicitly ("If the repository already has a supported
+stack, preserve it and document the deviation"); this is the documentation.
+The cost is real and worth naming: two front-end idioms in one repository once
+Phase 12 lands.
+
+### F-15 — OPEN. The review application has no authentication
+
+Decision **2.2.c is CONFIRMED: authentication is required.** The reasoning in
+that row still holds — 2.2.a puts confidential financial PDFs behind a network
+endpoint, and 20.1 classifies them confidential.
+
+**It is not implemented.** `review_server.py` binds to `127.0.0.1` by default
+and prints a warning if told to bind anywhere else, which is a mitigation, not
+the requirement. Until a credential sits in front of it, this is a local
+review tool, and deploying it as the private hosted application 2.2.a
+describes would put filings on a network with nothing guarding them.
+
+What it needs, and why none of it is guessed here: a session mechanism, a
+credential store, and a decision about what the second factor is for a
+single-user application — none of which is a Section 2 row, and all of which
+belongs with Phase 15 (security and operations) rather than being half-built
+now. Recorded so it cannot be mistaken for done.
+
 ---
 
 ---
@@ -532,7 +581,8 @@ Buildable now, because it depends on no OPEN decision:
   **item 25** (owner review of these contracts).
   **Item 23** (error codes) and **item 24** (lifecycle states) were closed for
   ingestion by Phase 3 — see F-12. The model-version lifecycle and the check
-  severities (F-4) are still open.
+  severities (F-4) are still open. **Item 9** (select the documented stack) is
+  now answered for the front end as well — see F-14.
 - Canonical chart of accounts and line-item definitions (11.1) — the engine's
   40 codes are catalogued in [`data-dictionary.md`](data-dictionary.md) §9.6,
   but **no account has a written definition**, which 11.3 mapping review needs.
@@ -542,6 +592,18 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 4 (items 39–49) is built**, in
+[`apps/api/app/review/`](../apps/api/app/review) and
+[`apps/api/app/api/`](../apps/api/app/api), with
+[`review_server.py`](../review_server.py) as its entry point: the source room
+with the PDF page and its extracted values side by side (6.3.f), bounding-box
+overlays, statement bookmarks, metadata confirmation, accept/correct/reject
+with a mandatory reason, the audit trail, and review progress that reports
+**zero verified facts** and says why. Design tokens are in
+[`packages/design-tokens/`](../packages/design-tokens) with their contrast
+ratios tested rather than asserted. Specification 22.7's keyboard and
+screen-reader workflows run against a real browser in CI.
 
 **Phase 3 (items 26–38) is built**, in
 [`apps/api/app/extraction/`](../apps/api/app/extraction), with

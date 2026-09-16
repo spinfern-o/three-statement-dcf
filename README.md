@@ -8,11 +8,11 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2 and 3 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2, 3 and 4 of 17** |
 
 ## Status, stated plainly
 
-**What works today:** two command-line programs, sharing one Decimal core.
+**What works today:** three programs, sharing one Decimal core.
 
 1. **The calculation engine** (`run_model.py`). Takes verified filing data as
    YAML, builds the historical and forecast statements, runs a FCFF DCF, and
@@ -23,15 +23,26 @@ Two documents govern this repository, and they are different things:
    text and table extraction with page geometry, metadata detection in the
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
+3. **The source-review room** (`review_server.py`) — specification Phase 4,
+   items 39–49. A browser interface showing the PDF page beside the values
+   read from it, with every extracted number boxed on the page it came from,
+   and accept / correct / reject actions that each require a written reason
+   and each write an audit entry.
 
-247 tests pass on Python 3.10–3.13. All arithmetic is exact decimal.
+343 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+suite driven through a real browser. All arithmetic is exact decimal.
 
-**What does not exist yet:** everything between the two, and the website around
-them. No browser interface, no API, no database, no source-review UI, no
-mapping, no exports. Nothing yet carries an extracted fact into the calculation
-engine — that is the mapping stage, Phase 5. And **no extracted fact is ever
-`VERIFIED`**, because verification requires a reviewer action (Phase 4) and an
-approved mapping (Phase 5).
+**What does not exist yet:** the mapping between the two halves, and most of
+the website. No database, no exports, no dashboard, no forecast or valuation
+screens. Nothing yet carries an extracted fact into the calculation engine —
+that is the mapping stage, Phase 5.
+
+**And no extracted fact is ever `VERIFIED`.** Verification is a seven-part
+conjunction (`docs/source-policy.md` §9) whose seventh condition is a
+human-approved mapping to a normalized line item. A fully reviewed document is
+reviewed, not verified. The application evaluates all seven conditions
+separately and reports zero verified facts on every page, because rule 1.14
+says an unresolved requirement must never appear as PASS.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
 1.15 and 4.4 prohibit binary floating point here, so the engine runs on
@@ -105,6 +116,23 @@ starts UNCONFIRMED (10.11). Add `--confirm-metadata` to accept the detected
 values and watch 47 of them clear — what remains is exactly the three cells
 that print an em dash, an en dash and `N/A`, which rule 1.5 says a human must
 resolve.
+
+Review what it extracted, in a browser:
+
+```bash
+python3 ingest_pdf.py apps/api/tests/fixtures/text_native_statements.pdf --store var/sources
+python3 review_server.py --store var/sources        # http://127.0.0.1:8000/
+```
+
+The page appears on the left with every extracted value boxed on it, and the
+values on the right with what was printed beside what was parsed. Confirm the
+document's metadata and 47 of the 50 facts clear at once; the three that
+remain are the cells printing an em dash, an en dash and `N/A`, which rule 1.5
+says a human must resolve. Every decision needs a typed reason, and the audit
+log at the bottom of the page shows what was recorded.
+
+It binds to localhost and **has no authentication** — decision 2.2.c requires
+it and it is not built (finding F-15).
 
 See what the engine does with missing data:
 
@@ -257,6 +285,19 @@ PDF ingestion (specification Phase 3, items 26–38):
 | `apps/api/app/persistence/json_store.py` | 33 | Records to JSON; PostgreSQL (3.2.d) is Phase 15/17 |
 | `ingest_pdf.py` | — | CLI |
 
+Source review (specification Phase 4, items 39–49):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/review/actions.py` | 45, 46, 47 | Accept, correct, reject — each needs a reason, each writes an audit entry |
+| `apps/api/app/review/progress.py` | 48 | Progress, the unresolved count, and §9's seven conditions evaluated one by one |
+| `apps/api/app/api/routes.py` | 39, 44 | Navigation, metadata confirmation, and the decision endpoints |
+| `apps/api/app/api/rendering.py` | 40 | Page images, rendered from the re-hashed stored bytes |
+| `apps/api/app/api/bookmarks.py` | 41 | Statement bookmarks, labelled system-proposed |
+| `apps/api/app/api/templates/` | 42, 43 | The split view, the box overlay, raw beside parsed |
+| `packages/design-tokens/` | — | Section 6.4 tokens, with their contrast ratios tested |
+| `review_server.py` | — | Launcher |
+
 Documentation:
 
 | Path | What it is |
@@ -281,11 +322,11 @@ does nothing at all:
 ## Tests
 
 ```bash
-python3 -m pytest tests/ apps/api/tests/ -q
+python3 -m pytest -q
 ```
 
-247 tests, no network and no API key. Two trees: `tests/` is the calculation
-engine, `apps/api/tests/` is ingestion.
+343 tests, no network and no API key. Two trees: `tests/` is the calculation
+engine, `apps/api/tests/` is the website backend — ingestion and review.
 
 Four groups in the engine's suite worth knowing about:
 
@@ -319,6 +360,27 @@ And in the ingestion suite:
   with em dashes and footnote markers, a comma-decimal filing, a scan, a
   part-scanned filing, a mixed page, an encrypted file, a truncated file, and a
   GIF named `.pdf`.
+
+And in the review suite:
+
+- `apps/api/tests/integration/test_review.py` — the reviewer actions and their
+  refusals. Accepting a fact whose cell held an em dash is refused, because
+  rule 1.5 lets a dash become zero only when someone says so in words; that is
+  a *correction*, with a different audit entry. A decision with no reason is
+  refused in the domain, not only in the form.
+- `apps/api/tests/integration/test_web.py` — the source room over HTTP,
+  including the structural accessibility checks: landmarks, one `h1`, no
+  skipped heading level, a label for every control, and no status conveyed by
+  colour alone.
+- `apps/api/tests/integration/test_accessibility.py` — specification 22.7,
+  driven through Chromium: a keyboard-only walk from page load to a recorded
+  decision, focus order, a visible focus ring, accessible names, no sideways
+  scroll at 200% zoom, and reduced motion. It has its own CI job, which fails
+  if every test in it skipped — a skip that never un-skips is not a test.
+- `apps/api/tests/unit/test_design_tokens.py` — parses
+  `packages/design-tokens/tokens.css` and computes every contrast ratio the
+  application renders. A colour edited to something prettier that fails WCAG
+  breaks the build.
 
 CI runs the suite on Python 3.10, 3.11, 3.12 and 3.13 for every pull request.
 It is **not** a required status check, so it does not block a merge (finding F-3).

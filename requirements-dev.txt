@@ -1,0 +1,13 @@
+# Development and browser-test dependencies. Not needed to run the engine, the
+# ingester, or the review server -- see requirements.txt for those.
+
+-r requirements.txt
+
+# Item 49 / specification 22.7: the keyboard and screen-reader tests drive a
+# real browser. apps/api/tests/integration/test_accessibility.py skips cleanly
+# when neither this package nor a browser is present, so the rest of the suite
+# runs without it.
+playwright>=1.40
+
+# Static checks.
+pyflakes>=3.0
