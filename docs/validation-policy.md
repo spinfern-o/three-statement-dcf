@@ -225,9 +225,9 @@ the owner. `Engine` is what [`model/`](../model) does today.
 | Code | Spec | What it compares | Severity | Engine |
 |---|---|---|---|---|
 | `VAL-017-022` | 17.22 | DCF FCFF equals the three-statement FCFF bridge | ERROR | **Yes in form, weak in substance** — check #12. Recomputes from the same function it was built from. See §3b |
-| `VAL-017-023` | 17.23 | Every WACC component has a source **and a date** | ERROR | **Half.** `CostOfCapital` refuses construction unless all six components have non-empty source strings (STEP 25–27) — that half is enforced. The strings are free text, never parsed, and **no date is separately required or validated**, so the "dated" half is unmet. **OPEN (2.5.b–f)** supply the sources and dates a real model would need |
+| `VAL-017-023` | 17.23 | Every WACC component has a source **and a date** | ERROR | **Half.** `CostOfCapital` refuses construction unless all six components have non-empty source strings (STEP 25–27) — that half is enforced. The strings are free text, never parsed, and **no date is separately required or validated**, so the "dated" half is unmet. 2.5.b–f now fix the sources and the requirement that each carry an observation date; enforcing the date in code is unbuilt |
 | `VAL-017-024` | 17.24 | `WACC > terminal_growth` | **CRITICAL** (16.16, 1.18) | **Yes, twice.** `run_dcf` raises before computing any terminal value — the correct CRITICAL behaviour — and check #11 reports on a valuation that already passed that gate. `sensitivity_grid` returns `WACC ≤ g` cells with an explanatory note rather than omitting them |
-| `VAL-017-025` | 17.25 | Every enterprise-to-equity adjustment is sourced (16.19) | ERROR | **No.** `EquityBridge` takes seven bare `Decimal`s with **no source fields at all**. Every line is printed, zero or not — which satisfies STEP 34's "do not silently ignore these items" — but nothing is sourced. The bridge also has **no lease line** (16.19), blocked on **OPEN (2.4.j)** |
+| `VAL-017-025` | 17.25 | Every enterprise-to-equity adjustment is sourced (16.19) | ERROR | **No.** `EquityBridge` takes seven bare `Decimal`s with **no source fields at all**. Every line is printed, zero or not — which satisfies STEP 34's "do not silently ignore these items" — but nothing is sourced. The bridge also has **no lease line** (16.19), which 2.4.j makes a real gap: leases are debt in the bridge when disclosed |
 | `VAL-017-026` | 17.26 | Diluted shares are nonzero and sourced before per-share value is shown | **CRITICAL** (16.20) | **Yes, as a hard block.** `run_dcf` raises if `diluted_shares ≤ 0`, and raises if shares are supplied without a non-empty `shares_source`. With no share count, `implied_share_price` is `None` and the report says "not calculated — no diluted share count supplied". Not reported as a check result |
 
 ### Release integrity (17.27–17.30)
@@ -277,7 +277,7 @@ absent:** `001`, `005`, `006` need the ingestion pipeline (Phase 3–5);
 `012` needs an intangibles account and schedule; `014` needs a real tax
 reconciliation rather than a rate table; `019` needs assumption statuses
 (14.2); `025` needs sourced bridge lines and the lease decision
-(**OPEN 2.4.j**); `003` needs period dates and a cadence (**OPEN 2.4.f**);
+(2.4.j: leases are debt, so the line is owed); `003` needs period dates and a cadence (2.4.f: annual);
 `021` and `029` need the formula engine (Phase 8).
 
 ## 6. Release gating

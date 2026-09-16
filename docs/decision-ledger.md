@@ -19,9 +19,27 @@ itself recommends, which is not the same as a decision having been made.
 
 Last reviewed: 2026-09-16. Recorded by: Claude (implementing agent).
 
-**1 of 37 decisions answered.** 2.2.a (private hosted) was supplied by the
-owner on 2026-09-16. The remaining 36 are OPEN, and Section 2 forbids
-replacing any of them with an inferred answer.
+**All 37 decisions are answered as of 2026-09-16.**
+
+Two by the owner directly: **2.2.a** (private hosted) and **2.2.b** (single
+user — the owner alone). The remaining 35 were **delegated**: the owner
+instructed the implementing agent to decide them ("do single user just me and
+everything else you can assume", 2026-09-16).
+
+That delegation is why these are recorded CONFIRMED rather than inferred.
+Section 2 forbids *replacing OPEN with an inferred answer*; it does not forbid
+the owner delegating the choice. Each delegated row names its decider and the
+reasoning, so any of them can be overturned by saying so — none is load-bearing
+on anything already built.
+
+**One line was held, and matters.** The delegation covers *policy*: which
+method, which source, which convention. It does **not** cover *values* — a
+risk-free rate, a beta, a company's fiscal year-end, a share count. Those are
+facts about a specific filing or a specific market on a specific date, and
+inventing one would be precisely the fabrication rules 1.1 and 1.4 forbid and
+that this entire codebase is built to refuse. So 2.4.a–f and 2.5.a–h below fix
+the **source and convention**; the number itself still arrives at model time,
+sourced and dated, and the engine still refuses to run without it.
 
 ---
 
@@ -29,9 +47,9 @@ replacing any of them with an inferred answer.
 
 | ID | Decision | Status | Answer | Blocks |
 |---|---|---|---|---|
-| 2.1.a | Product name | OPEN | — | Branding, page titles, export headers, README naming |
-| 2.1.b | Logo or text-only wordmark | OPEN | — | Navigation shell, export cover page |
-| 2.1.c | Company/owner name for footer and exports | OPEN | — | Footer, PDF/XLSX cover, LICENSE decision |
+| 2.1.a | Product name | **CONFIRMED** (delegated) | **"Three-Statement DCF"** — plain and descriptive, matching the repository. Invented branding is the easiest thing to get wrong on someone else's behalf and the cheapest to change later | — |
+| 2.1.b | Logo or text-only wordmark | **CONFIRMED** (delegated) | **Text-only wordmark.** No logo asset exists, and commissioning one is not an implementation decision | — |
+| 2.1.c | Company/owner name for footer and exports | **CONFIRMED** (delegated) | **"spinfern-o"** (the owner's GitHub handle), with the footer line "Private model — not for distribution". A real legal name was not assumed, and the owner's email address is deliberately not used anywhere in output | — |
 
 Note: the repository description reads "three statement dcf model done by astra".
 That is a repository description, not a confirmed product name, and has not been
@@ -42,9 +60,9 @@ treated as one.
 | ID | Decision | Status | Answer | Blocks |
 |---|---|---|---|---|
 | 2.2.a | Local-only, private hosted, or public | **CONFIRMED** | **Private hosted application** — owner (spinfern-o), 2026-09-16, relayed via the parent session | *(was: Phase 17 deployment entirely; DB choice (3.2.d); security model depth — all now unblocked)* |
-| 2.2.b | Single user or multi-user | OPEN | — | **Now top blocker.** User entity, ownership columns, RBAC (20.6), Phase 15 |
-| 2.2.c | Authentication required | OPEN | — | All auth work; API auth middleware (Section 19) |
-| 2.2.d | Roles (owner/analyst/reviewer/read-only) | OPEN | — | RBAC, approval workflow gating (14.x), audit actor semantics |
+| 2.2.b | Single user or multi-user | **CONFIRMED** | **Single user — the owner alone.** Stated by the owner, 2026-09-16 | — |
+| 2.2.c | Authentication required | **CONFIRMED** (delegated) | **Yes.** Not a preference: 2.2.a puts confidential financial PDFs behind a network endpoint, and 20.1 classifies them confidential. A single-user hosted app still needs one credential in front of it | — |
+| 2.2.d | Roles | **CONFIRMED** (delegated) | **One role: owner.** 20.6 applies RBAC "if multi-user", and 2.2.b says single — so RBAC is **N/A**, not deferred. The `User.role` enumeration collapses to a single value, and the reviewer/approver in 14.x is the same person as the author | — |
 
 **2.2.a is answered: private hosted.** Three consequences follow from the
 specification's own wording, not from inference:
@@ -57,20 +75,18 @@ specification's own wording, not from inference:
   [`security-model.md`](security-model.md) §1's *Private hosted* column is now
   the governing one rather than one of three branches.
 
-**2.2.b, 2.2.c and 2.2.d remain OPEN and are now the highest-priority
-blockers.** "Private hosted" settles none of them. Note 20.6 in particular:
-"Apply role-based access control **if** multi-user" — RBAC stays conditional on
-2.2.b.
+2.2.b was subsequently answered **single user**, which makes 20.6's RBAC
+**N/A** rather than deferred — the requirement is written "if multi-user".
 
 ## 2.3 Source documents
 
 | ID | Decision | Status | Answer | Blocks |
 |---|---|---|---|---|
-| 2.3.a | One PDF per company or multiple | OPEN | — | SourceDocument cardinality, restatement handling (10.20–10.21) |
-| 2.3.b | Annual only, or annual and quarterly | OPEN | — | Period cadence (2.4.f), rule 1.7 enforcement |
-| 2.3.c | Text-native only, or scanned too | OPEN | — | Whether OCR (3.3.c) is built at all; Phase 3 scope; job queue need |
-| 2.3.d | May public filings/XBRL cross-check the PDF | OPEN | — | Cross-check validation, external fetch permissions |
-| 2.3.e | May external market data be retrieved | OPEN | — | Whether 2.5.b–2.5.e are manual entry or fetched; egress policy |
+| 2.3.a | One PDF per company or multiple | **CONFIRMED** (delegated) | **One primary filing per model version**, many model versions per company. This keeps 4.6 unit normalization genuinely out of scope (one document, one scale) rather than half-built — see F-8. Multiple documents is the first thing to revisit when restatements matter | — |
+| 2.3.b | Annual only, or annual and quarterly | **CONFIRMED** (delegated) | **Annual only.** Mixing cadences is what rule 1.7 forbids, and quarterly adds seasonality the forecast engine does not model | — |
+| 2.3.c | Text-native only, or scanned too | **CONFIRMED** (delegated) | **Text-native only.** The single largest scope decision here: OCR brings Tesseract, a job queue, and a whole confidence-scoring model (10.8, 10.28) whose scoring function the spec does not define. A scanned PDF is rejected at upload with a clear message rather than silently OCR'd badly | — |
+| 2.3.d | May public filings/XBRL cross-check the PDF | **CONFIRMED** (delegated) | **No.** Consistent with 2.3.a and with keeping egress closed | — |
+| 2.3.e | May external market data be retrieved | **CONFIRMED** (delegated) | **No — manual entry with a cited source.** The engine already requires a source string for every cost-of-capital input (STEP 25–27). An automated fetch would supply the number while weakening the citation | — |
 
 2.3.c materially changes cost and complexity: OCR brings a job queue, a
 Tesseract/OCR dependency, and a whole class of confidence handling (10.8, 10.28).
@@ -79,19 +95,19 @@ Tesseract/OCR dependency, and a whole class of confidence handling (10.8, 10.28)
 
 | ID | Decision | Status | Answer | Blocks |
 |---|---|---|---|---|
-| 2.4.a | Reporting currency | OPEN | — | Rule 1.10; all normalization |
-| 2.4.b | Display unit (units/thousands/millions) | OPEN | — | Rule 1.9; display precision (4.18) |
-| 2.4.c | Fiscal year-end | OPEN | — | Period construction |
-| 2.4.d | Number of historical periods | OPEN | — | Model period generation |
-| 2.4.e | Number of forecast periods | OPEN | — | Forecast horizon, terminal year |
-| 2.4.f | Cadence (annual/quarterly/monthly/mixed) | OPEN | — | Rule 1.7; discount time fractions (16.12) |
-| 2.4.g | FCFF or FCFE | OPEN | *Spec recommends FCFF; confirmation required (2.4.g)* | Section 16 entirely |
-| 2.4.h | Year-end or mid-year discounting | OPEN | — | 16.11–16.14; every PV |
-| 2.4.i | Gordon Growth, exit multiple, or both | OPEN | — | 16.15–16.17, 16.24 |
-| 2.4.j | Leases treated as debt in the bridge | OPEN | — | 16.19; lease schedule (13.5) |
-| 2.4.k | Stock-based compensation treatment | OPEN | — | FCFF bridge, equity schedule |
-| 2.4.l | Minority interest, pensions, associates, investments | OPEN | — | 16.19 bridge lines |
-| 2.4.m | Tax-loss carryforwards and deferred taxes | OPEN | — | Tax schedule (13.6) |
+| 2.4.a | Reporting currency | **CONFIRMED** (delegated) | **Policy: one currency per model, taken from the filing and confirmed at STEP 1. No mixing, ever** (rule 1.10). The currency *value* comes from the filing; there is no default | — |
+| 2.4.b | Display unit | **CONFIRMED** (delegated) | **Policy: as filed.** The engine calculates in the filing's units and states them; it does not convert (see F-8 — 4.6 normalization is unimplemented, and 2.3.a keeps it unnecessary). Display precision: 1 decimal place | — |
+| 2.4.c | Fiscal year-end | **CONFIRMED** (delegated) | **Policy: from the filing, confirmed at STEP 1.** Per-company fact, not a global setting | — |
+| 2.4.d | Number of historical periods | **CONFIRMED** (delegated) | **Policy: every year the filing provides; minimum 2, target 3.** Two is the floor because the first change-in-NWC needs a prior year (STEP 17). STEP 3 still forbids inventing a missing year | — |
+| 2.4.e | Number of forecast periods | **CONFIRMED** (delegated) | **5 years.** The spec's own worked example, and the horizon beyond which annual drivers stop meaning much | — |
+| 2.4.f | Cadence | **CONFIRMED** (delegated) | **Annual**, consistent with 2.3.b | — |
+| 2.4.g | FCFF or FCFE | **CONFIRMED** (delegated) | **FCFF.** The spec's own recommendation, and what the engine implements | — |
+| 2.4.h | Year-end or mid-year discounting | **CONFIRMED** (delegated) | **Year-end.** What STEP 29 specifies and the engine implements. Mid-year is the more defensible convention for a real valuation and is the first thing to revisit; switching is a change to one function plus 16.12's time fractions, which need dated periods the model does not yet have | — |
+| 2.4.i | Gordon Growth, exit multiple, or both | **CONFIRMED** (delegated) | **Gordon Growth only.** Exit multiple needs a sourced comparable set (16.24) that 2.3.e's closed egress cannot supply | — |
+| 2.4.j | Leases treated as debt in the bridge | **CONFIRMED** (delegated) | **Yes, when the filing discloses a lease liability.** Post-IFRS-16/ASC-842 the liability is on the balance sheet; excluding it from the bridge while including the asset would overstate equity value | — |
+| 2.4.k | Stock-based compensation | **CONFIRMED** (delegated) | **Expensed in EBIT, added back as non-cash in CFO, and credited to common equity** — which is exactly what the engine already does. Not treated as a "real" cash cost removed from FCFF: that is a defensible alternative, and it is not the reported treatment | — |
+| 2.4.l | Minority interest, pensions, associates, investments | **CONFIRMED** (delegated) | **Explicit bridge lines, defaulting to zero, printed whether or not they are zero** — already the engine's behaviour, and what 16.19's "do not silently ignore these items" requires | — |
+| 2.4.m | Tax-loss carryforwards and deferred taxes | **CONFIRMED** (delegated) | **Not modelled. Effective tax rate only**, with the basis stated (STEP 16). NOL scheduling needs disclosure depth a single annual filing rarely gives, and a half-modelled NOL is worse than none | — |
 
 The existing Python engine already implements an FCFF, year-end, Gordon-Growth
 model. **That is a prototype default, not a confirmation of 2.4.g/h/i.** It was
@@ -101,14 +117,20 @@ built to the 37-step workflow, before this specification existed.
 
 | ID | Decision | Status | Answer | Blocks |
 |---|---|---|---|---|
-| 2.5.a | Valuation date | OPEN | — | Every discount factor (16.12); rule 1.4 |
-| 2.5.b | Risk-free rate source and observation date | OPEN | — | CostOfEquity (16.6); check 17.23 |
-| 2.5.c | Beta source, type, observation date | OPEN | — | CostOfEquity |
-| 2.5.d | Equity risk premium source and date | OPEN | — | CostOfEquity |
-| 2.5.e | Pre-tax cost of debt source and date | OPEN | — | WACC (16.9) |
-| 2.5.f | Target or current capital structure | OPEN | — | WACC weights |
-| 2.5.g | Terminal growth rate source and justification | OPEN | — | Terminal value (16.15); check 17.24 |
-| 2.5.h | Diluted shares source and measurement date | OPEN | — | Per-share value (16.20); check 17.26 |
+These fix the **source and convention**. Every one still requires a dated,
+cited value at model time, and the engine refuses to run without it — that
+refusal is the point of STEP 25–27 and is not weakened here.
+
+| ID | Decision | Status | Source / convention decided | |
+|---|---|---|---|---|
+| 2.5.a | Valuation date | **CONFIRMED** (delegated) | **The date the model version is released**, recorded on the version and never implied | — |
+| 2.5.b | Risk-free rate | **CONFIRMED** (delegated) | **US Treasury constant-maturity 10-year yield**, observed on the valuation date, cited with that date. Ten-year to match a five-year explicit forecast plus a perpetuity | — |
+| 2.5.c | Beta | **CONFIRMED** (delegated) | **Levered beta, 5-year monthly, against a broad domestic index**, provider and observation date both recorded. Monthly over weekly to damp thin-trading noise | — |
+| 2.5.d | Equity risk premium | **CONFIRMED** (delegated) | **A published implied ERP**, most recent edition, cited with its publication date. Implied over historical: it reflects prices on the valuation date rather than a realised average over a window nobody chose | — |
+| 2.5.e | Pre-tax cost of debt | **CONFIRMED** (delegated) | **The company's own disclosed weighted-average borrowing rate** where the filing gives one; otherwise the yield on comparable-rated debt of similar tenor, with the comparable named | — |
+| 2.5.f | Capital structure | **CONFIRMED** (delegated) | **Current market values**, not book and not a target. 16.8 and STEP 27 both say market; a target structure is a second assumption stacked on the first | — |
+| 2.5.g | Terminal growth | **CONFIRMED** (delegated) | **Justified per model and capped at long-run nominal GDP growth for the reporting currency's economy.** A perpetuity growing faster than the economy eventually is the economy. The engine already enforces WACC > g (STEP 31); the cap is the modeller's discipline above it | — |
+| 2.5.h | Diluted shares | **CONFIRMED** (delegated) | **The diluted weighted-average share count from the EPS note**, or the cover-page count where more recent, with the measurement date recorded (STEP 35) | — |
 
 None of these are derivable from a filing. All require an external, dated source.
 
@@ -116,10 +138,10 @@ None of these are derivable from a filing. All require an external, dated source
 
 | ID | Decision | Status | Answer | Blocks |
 |---|---|---|---|---|
-| 2.6.a | Required exports (XLSX/CSV/PDF/JSON) | OPEN | — | Phase 14 scope |
-| 2.6.b | Retention period for PDFs and extracted data | OPEN | — | 20.17; storage lifecycle |
-| 2.6.c | May an administrator permanently delete data | OPEN | — | 20.18; deletion flow |
-| 2.6.d | Backup and restore policy | OPEN | — | 20.17; Phase 15 |
+| 2.6.a | Required exports | **CONFIRMED** (delegated) | **All four, in this order: JSON, CSV, XLSX, then PDF.** JSON first because 21.5's versioned schema is what makes an export reproducible; the PDF report is the most presentation work for the least verification value | — |
+| 2.6.b | Retention | **CONFIRMED** (delegated) | **Indefinite until the owner deletes.** Single user, private, own data — a retention clock would delete the owner's own work to satisfy a policy nobody imposed | — |
+| 2.6.c | May an administrator permanently delete data | **CONFIRMED** (delegated) | **Yes**, with the explicit confirmation 20.18 requires. The owner is the only user; a delete they cannot perform is data they cannot control | — |
+| 2.6.d | Backup and restore | **CONFIRMED** (delegated) | **Nightly encrypted snapshot of database and object storage, 30-day retention, restore verified quarterly.** An untested backup is not a backup | — |
 
 ---
 
@@ -430,5 +452,13 @@ Buildable now, because it depends on no OPEN decision:
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
 
-Blocked until answered: all of Phase 17, authentication and RBAC, OCR,
-deployment, retention, and every numeric market assumption in 2.5.
+Nothing is blocked on a Section 2 decision any more. What remains unbuilt is
+unbuilt for want of work, not for want of an answer.
+
+Two things are still genuinely open, and neither is a Section 2 row:
+
+- **F-4** — Section 17 assigns a severity to none of its thirty checks.
+  `validation-policy.md` proposes twenty-six and labels each a proposal. Release
+  gating (Phase 13 item 137) cannot run on a proposal.
+- **F-5** — Section 9 requires `scenario_id` and defines no Scenario entity.
+  That is a specification amendment, not an implementation choice.

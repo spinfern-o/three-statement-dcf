@@ -14,7 +14,12 @@ with **what is decidable now** versus **what is blocked** on decision 2.2.a
 > live options. Requirements below marked "blocked on 2.2.a" are unblocked —
 > those marked blocked on **2.2.b–d** are not, and those remain open.
 >
-> The three immediate consequences, from the specification's own wording:
+> **2.2.b–d are also now answered** (2026-09-16): single user, authentication
+> required, one role. So 20.6's RBAC is **N/A** rather than deferred, and the
+> reviewer/approver in 14.x is the same person as the author. Rows below that
+> read "blocked on 2.2.b–d" are resolved by that answer.
+>
+> The three immediate consequences of 2.2.a, from the specification's own wording:
 > **3.2.d resolves to PostgreSQL** (SQLite is permitted "only for a documented
 > single-user local prototype"); **20.2 binds** (written "for hosted
 > deployments"); and **Phase 17 deployment is unblocked**.
@@ -46,7 +51,7 @@ Private hosted is the confirmed answer; that column governs.
 | **Adversary** | Anyone with the machine | Anyone on the network, plus other tenants | Anyone on the internet |
 | **20.2** encryption at rest / in transit | Filesystem + OS disk encryption; no transit | **Required** (TLS, encrypted storage) | **Required**, plus HSTS and certificate management |
 | **20.3** secret manager | `.env` on the machine may be adequate | A real secret manager | A real secret manager, plus rotation |
-| **20.6** RBAC | Likely N/A (**OPEN 2.2.b**) | Required if multi-user | Required |
+| **20.6** RBAC | N/A | **N/A — 2.2.b is single user** | Required |
 | **20.7** cross-model authorization | N/A if one user owns everything | **Required** | **Required**, and the most likely place to get it wrong |
 | **20.14** rate limiting | Little purpose | Required | Required, and must survive abuse |
 | **3.2.d** database | SQLite acceptable (documented single-user prototype) | **PostgreSQL** | **PostgreSQL** |
@@ -168,8 +173,8 @@ The *shape* is fixed by 10.1 (MIME **signature**, not filename) and by the
 touches the file.
 
 The *numbers* are **OPEN** — a limit depends on what documents are in scope
-(**OPEN 2.3.a, 2.3.b, 2.3.c**; a scanned annual report is far larger than a
-text-native one) and on the deployment's resources (**OPEN 2.2.a**). Choosing a
+(2.3.a one filing per model version, 2.3.b annual only, 2.3.c text-native only; a scanned annual report is far larger than a
+text-native one) and on the deployment's resources (2.2.a: private hosted). Choosing a
 number now would be a guess presented as a policy.
 
 ### 20.9 — Scan uploads before processing
@@ -213,10 +218,10 @@ rather than of a deployment:
 | Class | Where it bites here |
 |---|---|
 | Path traversal | Filenames from PDFs and uploads (20.11) |
-| SSRF | `Assumption.source_url_optional` and any external market-data fetch — **OPEN (2.3.d, 2.3.e)** for whether outbound requests exist at all |
+| SSRF | 2.3.d and 2.3.e both say **no outbound requests**, so the attack surface does not exist by decision. `Assumption.source_url_optional` records a URL a human consulted; nothing fetches it. Revisit the moment anything does |
 | Injection | Every parameterized query; never string-built SQL |
 | XSS | Company names, raw line-item labels and reviewer notes are all attacker-influenced text rendered in the UI |
-| CSRF | Every mutation, if cookie-based sessions are used — **OPEN (2.2.c)** |
+| CSRF | Every mutation, if cookie-based sessions are used. 2.2.c: authentication **is** required, so this applies once the session mechanism is chosen |
 | IDOR | Same requirement as 20.7 |
 | Formula injection | 20.13, below |
 

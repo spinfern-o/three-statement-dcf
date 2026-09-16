@@ -48,17 +48,21 @@ Conventions that apply to every table:
 | `id` | id | Y | — | 9.1; actor reference for 9.14 `actor_id` |
 | `name` | string | Y | — | Audit legibility (20.15); "model owner" on 7.1.c |
 | `email` | string | Y | — | Identity; 2.2.c authentication |
-| `role` | enum | OPEN (2.2.d) | — | 20.6 RBAC; 2.2.d names owner/analyst/reviewer/read-only as the candidate set |
+| `role` | enum | Y | `owner` | 2.2.d: **one role**. Single-valued, because 2.2.b is single user and 20.6 applies RBAC only if multi-user |
 | `created_at` | timestamp | Y | UTC | Audit |
 | `disabled_at` | timestamp | N | UTC | Soft deactivation; keeps 9.14 actor references resolvable after a user leaves |
 
 **Engine counterpart: none.** There is no user, no actor, and no notion of
 who did anything. Assumptions carry a free-text `source` string but no owner.
 
-**OPEN (2.2.b)** — single user or multi-user. If single-user, this entity may
-collapse to a constant and `role` disappears. **OPEN (2.2.c)** — if
+**Resolved (2026-09-16).** 2.2.b is **single user**, so this entity collapses to
+a single constant row and `role` is single-valued. 2.2.c is **authentication
+required** — the credential exists even though there is only one identity
+behind it, because 2.2.a puts confidential filings behind a network endpoint.
+Retained for the audit trail, where 10.33 needs an actor even when there is
+only ever one. Historical note: **if**
 authentication is not required, there are no credentials to model and `email`
-becomes a label rather than an identifier. **OPEN (2.2.d)** — the role
+becomes a label rather than an identifier. 2.2.d is answered — the role
 enumeration. The specification lists four candidate roles in 2.2.d but does
 not confirm them; writing them into a schema would be answering the decision.
 
@@ -120,7 +124,7 @@ because `model/` is out of scope for this document.
 | `page_count` | integer | Y | pages | 10.5; 20.8 page-count limits |
 | `reporting_period_start` | date | Y | — | 10.10; rule 1.7 (never mix annual/quarterly/YTD/TTM) |
 | `reporting_period_end` | date | Y | — | 10.10; rule 1.7 |
-| `filing_type` | enum | OPEN (2.3.b) | — | 10.10. The permitted set depends on whether quarterly filings are in scope |
+| `filing_type` | enum | Y | `annual` | 10.10. 2.3.b is **annual only**, so the set is single-valued today; it widens if quarterly comes into scope |
 | `reporting_currency` | ISO 4217 code | Y | — | 10.10; rule 1.10 |
 | `displayed_scale` | enum `units\|thousands\|millions` | Y | — | 10.10; rule 1.9; STEP 1 |
 | `audited_status` | enum `audited\|unaudited\|reviewed\|unknown` | Y | — | 10.10; STEP 1 |
@@ -294,7 +298,7 @@ them, as [`README.md`](../README.md) already warns.
 | Missing | Specification | Consequence today |
 |---|---|---|
 | `goodwill`, `intangibles` | 12.2.e | No intangibles schedule (13.3) and therefore no check 17.12 |
-| `lease_liabilities` | 12.2.i | Blocked on **OPEN (2.4.j)** — whether leases are debt in the bridge |
+| `lease_liabilities` | 12.2.i | Required. 2.4.j: leases **are** debt in the bridge when the filing discloses a liability. Not yet implemented — `EquityBridge` has no lease field |
 | `minority_interest` (balance sheet) | 12.2.k | Exists only as an equity-bridge input in `dcf.py`, not as a balance-sheet account |
 | `ebitda` | 12.1.f | No line. 12.1.f makes EBITDA conditional on a visible bridge, and the 37-step workflow never defines one. Recorded already in [`decision-ledger.md`](decision-ledger.md) F-1 as outstanding against 4.16 |
 | Operating expense **by disclosed category** | 12.1.d | The engine has a single `operating_expenses` line |
@@ -355,8 +359,8 @@ requirement that the aggregation be shown.
 | `name` | string | Y | — | 7.1.a |
 | `version_number` | integer | Y | — | 18.9 (preserve the prior calculated model version) |
 | `status` | enum | Y | — | 7.1.b; Phase 2 item 24 (lifecycle states) — see below |
-| `valuation_date` | date | Y | — | 16.8, 16.12; **OPEN (2.5.a)** for any real model |
-| `reporting_currency` | ISO 4217 code | Y | — | rule 1.10; **OPEN (2.4.a)** |
+| `valuation_date` | date | Y | — | 16.8, 16.12. 2.5.a: the date the model version is released, recorded explicitly. Not yet present in the engine |
+| `reporting_currency` | ISO 4217 code | Y | — | rule 1.10. 2.4.a: one currency per model, taken from the filing and confirmed at STEP 1 |
 | `calculation_scale` | enum | Y | — | 4.6 base unit for calculation; distinct from display scale (2.4.b, 4.18) |
 | `created_by` | id → 9.1 | Y | — | Audit |
 | `created_at` | timestamp | Y | UTC | 21.7 |
@@ -404,7 +408,7 @@ nothing.
 | `end_date` | date | Y | — | 16.12 |
 | `label` | string | Y | — | 15.2; 8.x widget "period/scenario" requirement |
 | `actual_or_estimate` | enum `A\|E` | Y | — | 15.2 ("Label all periods A for actual or E for estimate"); 7.8.d; STEP 12 |
-| `cadence` | enum `annual\|quarterly\|monthly` | OPEN (2.4.f) | — | rule 1.7; 2.4.f |
+| `cadence` | enum `annual\|quarterly\|monthly` | Y | `annual` | rule 1.7. 2.4.f: **annual**, so single-valued today |
 | `sort_order` | integer | Y | — | Deterministic period ordering |
 
 **Engine counterpart: `Periods`** in
@@ -447,7 +451,7 @@ cannot become one without dates. See
 | `unit` | enum `ratio\|percent\|days\|currency\|shares\|multiple\|years` | Y | — | 14.4.b; **18.12 unit checking** |
 | `source_type` | enum | Y | — | 14.3 — the six permitted values are fixed by the specification |
 | `source_document_id_optional` | id → 9.3 | N | — | 14.4.f |
-| `source_url_optional` | string | N | — | 14.4.f; **OPEN (2.3.e)** whether external retrieval is permitted at all |
+| `source_url_optional` | string | N | — | 14.4.f. 2.3.e: external retrieval is **not** permitted, so this records a URL a human consulted, never one the system fetched |
 | `source_date` | date | Y | — | 14.4.g; check 17.23 for WACC components |
 | `rationale` | text | Y | — | 14.4.h |
 | `owner` | id → 9.1 | Y | — | 14.4.i |
@@ -638,7 +642,7 @@ it into PASS is precisely the failure rule 1.14 is about. See
 | Field | Type | Req | Unit / scale | Serves |
 |---|---|---|---|---|
 | `id` | id | Y | — | 9.14 |
-| `actor_id` | id → 9.1 | Y | — | 10.33; **OPEN (2.2.b)** — meaningless as an identity in single-user mode, but still required as a column |
+| `actor_id` | id → 9.1 | Y | the owner | 10.33; constant in single-user mode (2.2.b), but still required as a column so the trail survives a later multi-user change |
 | `model_version_id` | id → 9.8 | N | — | Null for events before a model exists (e.g. document upload) |
 | `entity_type` | string | Y | — | 9.14 |
 | `entity_id` | id | Y | — | 9.14 |

@@ -28,10 +28,13 @@ is *refused* rather than converted — converting one preserves its error
 instead of removing it. This was finding F-1 in the
 [decision ledger](docs/decision-ledger.md), now resolved.
 
-**37 of 37 Section 2 decisions are still OPEN.** Product name, hosting model,
-authentication, currency, valuation date, and every market assumption are
-unanswered. Specification Section 2 forbids inferring them, so work depending on
-them has not begun.
+**All 37 Section 2 decisions are now answered.** Two by the owner directly
+(private hosted; single user), the rest delegated to the implementing agent and
+recorded with their reasoning in the [decision ledger](docs/decision-ledger.md).
+The delegation covers *policy* — which method, which source, which convention.
+It does not cover *values*: a risk-free rate, a beta, a fiscal year-end and a
+share count are facts about a specific filing on a specific date, and the engine
+still refuses to run without each one supplied and cited.
 
 ## The design premise
 

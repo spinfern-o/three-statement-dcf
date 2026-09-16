@@ -43,7 +43,7 @@ work slower, that is the rule operating correctly.
 | 10.1 | Verify the upload is a PDF **by MIME signature, not filename** | Read the leading bytes. A file named `.pdf` that is not one is rejected at the boundary, before any parser touches it (20.8, 20.11). |
 | 10.2 | Calculate and store a SHA-256 hash | Computed on the bytes as received, before any processing. Stored as `SourceDocument.immutable_hash`. It is the identity of the document for the life of the system. |
 | 10.3 | Refuse exact duplicate uploads unless the user explicitly creates a linked duplicate record | See §3. |
-| 10.4 | Scan the file using the approved security process | **OPEN (2.2.a)** — "the approved security process" does not exist yet, and what it must be depends on the hosting model. See [`security-model.md`](security-model.md) §20.9. |
+| 10.4 | Scan the file using the approved security process | 2.2.a is **private hosted**, so this is a server-side scan before the file is written to storage. The specific scanner is an implementation choice, not a Section 2 decision. See [`security-model.md`](security-model.md) §20.9. |
 | 10.5 | Record filename, byte size, page count, upload timestamp | Filename stored **sanitized** (20.11); the original is retained as data, never used as a path. |
 | 10.12 | Never overwrite an uploaded source document (rule 1.12) | Object storage is write-once. A corrected document is a **new** `SourceDocument`, linked to the old one, never a replacement. |
 
@@ -61,7 +61,7 @@ A file with a *different* hash but the same filename, period and filing type is
 **not** a duplicate. It is a candidate restatement or a revised filing, and it
 goes to §4.
 
-**OPEN (2.3.a)** — whether a company may have multiple PDFs at all. If the
+2.3.a: **one primary filing per model version**, many versions per company. Historical note on the alternative — if the
 answer is one PDF per company, duplicate handling collapses to "refuse", and
 the linked-duplicate path is dead code. If multiple, the linkage model above is
 required. Do not build either branch until this is answered.
@@ -74,13 +74,13 @@ required. Do not build either branch until this is answered.
 |---|---|---|
 | 10.6 | Detect whether each page is text-native, image-only, or mixed | Per page, recorded. Drives which path runs and feeds the confidence model (§7). |
 | 10.7 | Extract embedded text **and coordinates** from text-native pages | Coordinates are not optional — they are what 10.31's highlighted-cell view and `SourceLocation.bounding_box` need. |
-| 10.8 | OCR image-only pages | **OPEN (2.3.c)** — whether scanned PDFs are in scope at all. If text-native only, OCR is not built, and an image-only page is a hard rejection with an explanatory message rather than a silent empty extraction. |
+| 10.8 | OCR image-only pages | 2.3.c: **text-native only**. OCR is not built, and an image-only page is a hard rejection with an explanatory message rather than a silent empty extraction. |
 | 10.9 | Preserve the original page number for **every** text span and table cell | No exceptions. A fact without a page cannot be verified, and acceptance criterion 24.3 requires every extracted value link to a page and location. |
 | 10.25 | Extract values as **raw strings before numeric parsing** | `ReportedFact.raw_value` is the characters as printed. Parsing happens afterwards and separately, and both are retained (see §6). |
 
 **Isolation.** PDF and OCR processing runs outside the web process (20.10) and
 never executes document content (20.11). Extraction jobs that may exceed a
-request timeout run on a queue (3.2.f) — which, per **OPEN (2.3.c)**, may not
+request timeout run on a queue (3.2.f) — which, per 2.3.c (text-native only), may not
 be needed at all if OCR is out of scope.
 
 ---
@@ -127,7 +127,7 @@ UNCONFIRMED state.
 | 10.19 | Detect columns with different dates or periods | A table whose columns are FY2025 and FY2024 must not have its columns transposed or merged. Drives `SourceLocation.column_label_optional`. |
 | 10.22 | Detect continuing versus discontinued operations | Recorded on the fact. Mixing them is a restatement-class error. |
 | 10.23 | Detect consolidated versus segment tables | `ReportedFact.scope`. Rule 1.11 forbids mixing them. |
-| 10.24 | Detect annual, quarterly, YTD and TTM periods | Rule 1.7. **OPEN (2.3.b)** and **OPEN (2.4.f)** determine which of these the model may hold at all. |
+| 10.24 | Detect annual, quarterly, YTD and TTM periods | Rule 1.7. 2.3.b and 2.4.f are both **annual**, so the model holds annual periods only — the others are detected in order to be *rejected*, not stored. |
 
 **Subtotals are not components (rule 1.6).** A table row labelled "Total
 current assets" is a validation target (11.7), not an addend. The engine
@@ -364,7 +364,12 @@ Three constraints on the reviewer's freedom:
   `provenance.Source.line_item` is required and must be the company's own
   wording, and `Figure` cannot be constructed without it.
 
-**Reviewer identity is OPEN (2.2.b, 2.2.d).** Every rule above requires "a
+**Reviewer identity is the owner (2.2.b single user, 2.2.d one role).** The
+reviewer, the approver and the author are the same person, so review is a
+discipline the tool enforces on one user rather than a separation of duties
+between two. That does not weaken the rules — a fact still cannot be verified
+without an explicit act — but it is worth stating plainly rather than implying
+a second pair of eyes exists. Every rule above requires "a
 reviewer"; whether that is a distinct person from the preparer, and whether the
 system can tell them apart, depends on whether this is single- or multi-user
 and on the role model. If single-user, "reviewer note" degrades to "a note",
@@ -390,7 +395,7 @@ These are cross-cutting and belong to no single step, so they are collected.
 There is exactly one `units` value and one `reporting_currency` for the whole
 model, declared on `CompanyProfile`, and no conversion code exists — so mixing
 is unrepresentable rather than prevented. That is genuinely sufficient for a
-single-document model and genuinely insufficient the moment **OPEN (2.3.a)**
+single-document model, which 2.3.a confirms, and genuinely insufficient the moment that
 permits more than one. See [`data-dictionary.md`](data-dictionary.md) §9.8 on
 the unused `Units.multiplier` and the absent 4.6 normalization.
 
@@ -406,7 +411,7 @@ refusals are about *absence*, not about *comparability*.
 | # | Rule | Implemented today |
 |---|---|---|
 | 10.1–10.5 | MIME signature, hash, duplicates, scan, metadata | **No** — no upload path exists |
-| 10.6–10.8 | Page-type detection, text extraction, OCR | **No**; 10.8 blocked on **OPEN (2.3.c)** |
+| 10.6–10.8 | Page-type detection, text extraction, OCR | **No**; 10.8 out of scope by 2.3.c (text-native only) |
 | 10.9 | Preserve page number for every span | **Partial** — `Source.page` exists and is cited, but is **optional** (`int \| None`) where 10.9 and 24.3 require it |
 | 10.10–10.13 | Detect metadata, mark UNCONFIRMED, require confirmation | **Different mechanism** — nothing is detected; `CompanyProfile` refuses blanks instead |
 | 10.14 | Source map for statements and notes | **Yes, in spirit** — `profile.SourceMap`, twelve required sections, `missing()` reports gaps (STEP 2) |

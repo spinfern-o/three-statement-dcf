@@ -363,14 +363,14 @@ than its name suggests.
 
 | Spec | Requirement | Status |
 |---|---|---|
-| **16.12** | "Calculate the exact time fraction from valuation date to cash-flow date" | **Not implemented.** `DCF-T-01` is an ordinal index, not a duration. There is no valuation date (9.8) and no period dates (9.9) anywhere in the engine. Blocked on **OPEN (2.5.a)**, and on adding dates to `Periods`. |
-| **16.11** | Select and document year-end or mid-year discounting | **Year-end only.** `numeric.power()` requires an `int` exponent and raises on anything else, so a half-period exponent cannot be evaluated by the current helper. Blocked on **OPEN (2.4.h)**. |
+| **16.12** | "Calculate the exact time fraction from valuation date to cash-flow date" | **Not implemented.** `DCF-T-01` is an ordinal index, not a duration. There is no valuation date (9.8) and no period dates (9.9) anywhere in the engine. 2.5.a is answered (valuation date = release date), so what remains is implementation: adding dates to `Periods`. |
+| **16.11** | Select and document year-end or mid-year discounting | **Year-end only.** `numeric.power()` requires an `int` exponent and raises on anything else, so a half-period exponent cannot be evaluated by the current helper. 2.4.h: **year-end**, which is what this implements. Mid-year would need a fractional exponent the helper deliberately refuses. |
 | **16.10** | "If preferred stock or another capital class exists, add it explicitly" to WACC | **Not implemented.** `DCF-WACC-01` has two terms, E and D. Preferred stock appears only as an equity-bridge subtraction in `DCF-EQ-01`, which is a different treatment. |
-| **16.19** | "− Lease liabilities if policy treats them as debt" | **No lease line in the bridge.** `EquityBridge` has seven fields and none is leases. Blocked on **OPEN (2.4.j)**. |
-| **16.24** | Exit-multiple terminal value, kept separate and sourced | **Not implemented.** Gordon Growth only. Blocked on **OPEN (2.4.i)**. |
+| **16.19** | "− Lease liabilities if policy treats them as debt" | **No lease line in the bridge.** `EquityBridge` has seven fields and none is leases. 2.4.j: leases **are** debt in the bridge when disclosed, so this is a real gap to implement rather than an open question. |
+| **16.24** | Exit-multiple terminal value, kept separate and sourced | **Not implemented.** Gordon Growth only. 2.4.i: **Gordon Growth only**, so this is out of scope by decision rather than unanswered. |
 | **16.25** | Never average terminal methods without explicit approval | **Vacuously satisfied** — there is only one method to average. |
 | **16.22** | Warn when terminal value exceeds a configurable review threshold | **Not implemented.** `DCF-TVSH-01` computes and prints the share, but there is no threshold and no warning. |
-| **16.5 (2nd ¶)** | Other operating non-cash/investment items in the FCFF bridge "only when explicitly defined, sourced, and shown" | **Not implemented.** `DCF-FCFF-01` has exactly four terms. Notably **stock-based compensation is added back in `CF-CFO-D` but does not appear in FCFF** — a real modelling position, and one that **OPEN (2.4.k)** governs. |
+| **16.5 (2nd ¶)** | Other operating non-cash/investment items in the FCFF bridge "only when explicitly defined, sourced, and shown" | **Not implemented.** `DCF-FCFF-01` has exactly four terms. Notably **stock-based compensation is added back in `CF-CFO-D` but does not appear in FCFF** — a real modelling position, and one that 2.4.k settles: SBC is expensed in EBIT, added back as non-cash in CFO, and credited to equity — it is deliberately not removed again in FCFF. |
 | **16.3** | Operating NWC "using the approved account policy" | **Fixed policy, no approval mechanism.** See `SCH-WC-NWC`. |
 
 ---
