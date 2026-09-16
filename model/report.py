@@ -9,7 +9,7 @@ happens here.
 from __future__ import annotations
 
 from .assumptions import Assumptions, Basis
-from .checks import CheckResult, Status, summarize
+from .checks import CheckResult, Status, Tolerance, summarize
 from .dcf import CostOfCapital, FCFFYear, Valuation
 from .forecast import ForecastResult
 from .profile import CompanyProfile
@@ -171,9 +171,11 @@ def sensitivity_block(grid: list[list[SensitivityCell]], metric: str = "implied_
     return "\n".join(lines)
 
 
-def checks_block(results: list[CheckResult]) -> str:
+def checks_block(results: list[CheckResult], tolerance: Tolerance | None = None) -> str:
     passed, failed, skipped = summarize(results)
     lines = [header("STEP 37 -- FINAL MODEL CHECKS")]
+    if tolerance is not None:
+        lines.append(f"judged at {tolerance.describe()}\n")
     for result in results:
         lines.append(result.line())
     lines.append(rule())

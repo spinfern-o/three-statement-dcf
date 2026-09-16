@@ -83,6 +83,12 @@ Each returns `PASS`, `FAIL`, or `SKIP`. `SKIP` means the check could not run
 because its inputs were absent — it is reported separately from `PASS` and
 never counted as one.
 
+Comparisons use a **relative** tolerance (`checks.Tolerance`, default `1e-9`),
+not an absolute one, because STEP 1 makes the reporting unit the modeller's
+choice and an absolute bound would change strictness with it. `tests/
+test_precision.py` verifies the engine against an independent recomputation and
+across nine orders of magnitude of scale.
+
 ## The complete model flow
 
 As the workflow diagrams it, and as `run_model.py` executes it:
