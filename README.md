@@ -210,7 +210,20 @@ Documentation:
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | The 37 OPEN decisions, and findings F-1 to F-3 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | The 37 OPEN decisions, and findings F-1 to F-10 |
+
+Specification Phase 2 contract documents. These are **definitions for the
+website, not descriptions of the engine** — each one states plainly where the
+engine already does the thing, where it does something different, and where it
+does nothing at all:
+
+| Path | What it is |
+|---|---|
+| [`docs/data-dictionary.md`](docs/data-dictionary.md) | Every entity and field in specification Section 9, cross-referenced against `model/accounts.py` |
+| [`docs/formula-catalog.md`](docs/formula-catalog.md) | Every formula the engine implements, with a stable code, inputs, unit and rounding, plus the Section 16 formulas it does not |
+| [`docs/source-policy.md`](docs/source-policy.md) | Section 10 ingestion and verification as a reviewable policy: what makes a fact verified, and the confidence/reason-code model |
+| [`docs/validation-policy.md`](docs/validation-policy.md) | Checks 17.1–17.30 with codes and severities, mapped against the twelve the engine runs |
+| [`docs/security-model.md`](docs/security-model.md) | Section 20, marked throughout for what is decidable now versus blocked on the hosting decision |
 
 ## Tests
 

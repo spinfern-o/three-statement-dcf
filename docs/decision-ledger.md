@@ -211,6 +211,159 @@ check, so it cannot block a merge. PR #1 merged into `main` with no CI in the
 repository at all. Enabling a required status check is a repository-settings
 action the implementing agent cannot perform.
 
+### F-4 — Section 17 does not assign a severity to any of its thirty checks
+
+**Blocks Phase 13 item 137 (prevent release when CRITICAL/ERROR checks remain).**
+
+Section 17 defines four severity levels and their consequences, then lists
+thirty required checks — and never says which check carries which level.
+Four are forced by rules elsewhere in the specification:
+
+| Check | Severity | Forced by |
+|---|---|---|
+| 17.24 WACC > g | CRITICAL | 16.16 "Block calculation when WACC <= g"; rule 1.18 |
+| 17.26 diluted shares nonzero and sourced | CRITICAL | 16.20 |
+| 17.27 no NaN/Infinity/null released | CRITICAL | 17.27's own wording; 4.4 |
+| 17.28 benchmark meets Section 4 tolerance | ERROR | 4.20 |
+
+The remaining twenty-six are not derivable from the text.
+[`validation-policy.md`](validation-policy.md) §1 proposes an assignment and
+labels every proposed row as a proposal. A release gate cannot be built on a
+proposal, so item 137 is blocked until the owner confirms the mapping.
+
+This is not a Section 2 decision — it is a gap in Section 17 — so it is
+recorded here rather than in the tables above.
+
+### F-5 — Section 9 references a Scenario entity it never defines
+
+`Assumption.scenario_id` (9.10) and `CalculatedValue.scenario_id` (9.12) are
+required fields, and `ValidationResult.scenario_id_optional` (9.13) references
+one, but **Section 9 defines no Scenario entity**. Section 14.6–14.9 describes
+the behaviour it must have — Base/Upside/Downside plus custom, inherited
+assumption lineage on copy, and names that must not imply probability unless
+probability is explicitly modelled and sourced — so the requirements exist and
+the schema row does not.
+
+Section 9 also has nowhere to record the engine's `assumptions.Conflict`
+(STEP 11): two dated sources that disagree, with a mandatory explicit choice
+and rationale. The nearest Section 9 fit is a pair of `Assumption` rows plus an
+`AuditEvent`, which loses the structure that makes the conflict legible.
+
+Neither is answerable by inference. Both need the owner, or an amendment to
+Section 9.
+
+### F-6 — `run_model.py --rel-tol` and `--abs-tol` crash with an unhandled traceback
+
+**Reproducible. [`README.md`](../README.md) documents these flags as the
+supported override mechanism, and they do not work.**
+
+`run_model.py` declares both with `type=float`. `Tolerance.__post_init__` then
+calls `numeric.D()`, which **refuses floats by design** (specification 1.15,
+4.4). The defaults are `Decimal` constants and pass through untouched, so the
+failure appears only when a user actually supplies the flag:
+
+```
+$ python3 run_model.py --inputs tests/fixtures --rel-tol 1e-8
+...
+model.numeric.PrecisionError: Tolerance.rel arrived as a float (1e-08).
+```
+
+The whole report is printed first, then the process dies on an uncaught
+exception after the sensitivity table. The `except ProvenanceError` block in
+`main()` does not cover it, because `PrecisionError` derives from `ValueError`,
+not from `ProvenanceError`.
+
+The fix is one line per flag (`type=str`, letting `D()` parse the decimal
+string — which is what 4.2 asks for anyway). It was **not applied**: the
+session that found it was scoped to documentation only, and `run_model.py` was
+explicitly out of scope.
+
+### F-7 — Three narrower defects found while reading the engine
+
+None was fixed, for the same scope reason. All are verified, not suspected.
+
+**F-7a. `sensitivity._shift_wacc` silently fails when `beta = 0`.**
+The line `implied_erp = (implied_ke - base.risk_free_rate) / base.beta if base.beta else ZERO`
+returns a zero ERP when beta is zero — but with beta zero the cost of equity
+equals the risk-free rate regardless of the ERP, so the target WACC is never
+reached. The `SensitivityCell` is nonetheless labelled with the target WACC it
+did not achieve. Verified by direct construction: a base with `beta = 0` and
+`wacc = 0.039166…` shifted to a target of `0.12` returns a `CostOfCapital`
+whose `.wacc` is still `0.039166…`. Beta of exactly zero is an unusual input;
+the failure is silent, which is the class of thing this repository exists to
+prevent.
+
+**F-7b. `Valuation.tv_share_of_ev`'s None guard is not honoured by its only
+consumer.** The property returns `None` rather than dividing by zero when
+enterprise value is zero (specification 17.27). `report.valuation_block` then
+formats it with `f"{valuation.tv_share_of_ev:.1%}"`, which raises `TypeError`
+on `None`. The guard is correct; the call site defeats it.
+
+**F-7c. Dividends use silent precedence where every comparable driver
+refuses.** `forecast._pick_driver` rejects declaring both a percentage and an
+absolute driver for COGS, opex or CapEx in the same year — STEP 14/18 require
+one stated methodology per line. Dividends do not go through `_pick_driver`:
+declaring both `dividend_payout_ratio` and `dividends_amount` silently prefers
+`dividends_amount`. Inconsistent with the engine's own stated stance, and with
+14.5.
+
+### F-8 — Declared helpers in `model/numeric.py` that nothing calls
+
+Not defects, but they mean two specification requirements have no code path
+behind them despite appearing to.
+
+- **`quantize_for_display`** is the declared 4.9/4.18 display boundary.
+  `model/report.py` formats with Python f-strings instead. The result is the
+  same under the installed context, but the declared helper is unexercised and
+  no test asserts check 17.29's tie between displayed and stored values.
+- **`relative_error`** implements specification 4.10 verbatim. The checks use
+  `Tolerance.close`, a different comparison. **No runtime code measures
+  relative error in the specification's terms**; `tests/test_precision.py`
+  does the equivalent independently.
+
+Similarly, **`profile.Units.multiplier`** is defined and never called anywhere
+in `model/`, `run_model.py` or `tests/`. The engine performs no unit
+normalization, so specification 4.6 (normalize to one base unit while retaining
+the source value) is unimplemented. For a single-document model this is
+indistinguishable in result; it becomes a real gap the moment 2.3.a permits
+more than one PDF per company.
+
+### F-9 — The engine's error messages conflict with 20.16 under hosted deployment
+
+Not a defect today, and worth recording before the website inherits it.
+
+The engine's exceptions are deliberately informative: `D()` prints a refused
+float's exact decimal expansion, `Ledger.require()` names the account, year and
+step, `_balance_check` reports the delta, `RollForward.add_year` prints both
+balances. For a local CLI run by the data's owner this is correct and is most
+of what makes the tool usable.
+
+Several of those messages contain financial values. Specification 20.16
+requires private data be redacted from application errors, so under **OPEN
+(2.2.a)** private-hosted or public, they must not cross the API boundary in
+that form. The resolution is a structured error code plus a redacted message at
+the boundary, with the full diagnostic retained server-side for the authorized
+owner — not a quieter engine. Phase 2 item 23 ("define error codes and
+severity") is where that belongs; it depends on no OPEN decision and has not
+been done.
+
+### F-10 — Two of the twelve STEP 37 checks test the same identity
+
+`checks.run_all_checks` calls `_cashflow_reconciliation` with **identical
+arguments** for both "Forecast cash flow reconciliation" and "Ending cash
+linkage". The panel is faithful to STEP 37, which lists both — but they are one
+identity tested twice, so `12 PASS` is eleven pieces of evidence, not twelve.
+
+Separately, "FCFF matches three-statement forecast" recomputes
+`ForecastResult.fcff_inputs(year)` — the same function `build_fcff` built the
+`FCFFYear` from. It verifies nothing mutated in between; it does not verify
+what 17.22 asks, because there is no independent assembly to disagree with.
+The model's underlying property is real (FCFF genuinely comes from the
+forecast, satisfying 24.9); the check's evidentiary value is weaker than its
+name. See [`validation-policy.md`](validation-policy.md) §3.
+
+---
+
 ---
 
 ## Work that is NOT blocked
@@ -219,10 +372,27 @@ Buildable now, because it depends on no OPEN decision:
 
 - The `Decimal` calculation core and its context policy (Section 4.2–4.9), and
   the independent benchmark implementation (4.15) — resolves F-1.
-- Formula catalog and data dictionary as definitions (Phase 2, items 17–24).
-- Canonical chart of accounts and line-item definitions (11.1).
-- Validation check registry and severity model (Section 17), as declarations.
+- ~~Formula catalog and data dictionary as definitions (Phase 2, items 17–24).~~
+  **Done 2026-09-16** for items 17, 18 and 21:
+  [`data-dictionary.md`](data-dictionary.md),
+  [`formula-catalog.md`](formula-catalog.md),
+  [`source-policy.md`](source-policy.md),
+  [`validation-policy.md`](validation-policy.md),
+  [`security-model.md`](security-model.md).
+  Still outstanding in Phase 2: **item 19** (API schemas), **item 20**
+  (database schema and migrations — needs 3.2.d, which needs 2.2.a),
+  **item 23** (error codes and severity), **item 24** (model lifecycle states
+  and legal transitions — the state *names* are given in 7.1.b, the transition
+  graph is not), and **item 25** (owner review of these contracts).
+- Canonical chart of accounts and line-item definitions (11.1) — the engine's
+  40 codes are catalogued in [`data-dictionary.md`](data-dictionary.md) §9.6,
+  but **no account has a written definition**, which 11.3 mapping review needs.
+- Validation check registry and severity model (Section 17), as declarations —
+  registry written; **severity assignment blocked by F-4**.
 - Design tokens as *named* tokens with contrast-tested candidate values (6.4).
+- Fixing F-6 and F-7a–c, adding a dependency-audit step to CI (3.5.c, 20.20),
+  and printing the Section 25 disclaimer in the CLI report (20.19). None of
+  these depends on an OPEN decision.
 
 Blocked until answered: all of Phase 17, authentication and RBAC, OCR,
 deployment, retention, and every numeric market assumption in 2.5.
