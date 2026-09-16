@@ -8,6 +8,11 @@ htmlcov/
 *.egg-info/
 .DS_Store
 
+# Uploaded filings and extracted records. The store holds the actual PDFs a
+# company sent, which 20.1 classifies confidential; they are evidence, not
+# source code, and they never belong in git.
+var/
+
 # Company inputs you fill in locally. The blank templates ARE tracked;
 # a filled-in copy may contain material non-public information, so keep it
 # out of the repo unless you have decided otherwise.

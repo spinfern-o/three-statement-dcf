@@ -8,18 +8,30 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Not started** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2 and 3 of 17** |
 
 ## Status, stated plainly
 
-**What works today:** a Python calculation engine and a command-line runner. It
-takes transcribed filing data as YAML, builds the historical and forecast
-statements, runs a FCFF DCF, and reports the 37-step workflow's twelve PASS/FAIL
-checks. All arithmetic is exact decimal. 69 tests pass on Python 3.10–3.13.
+**What works today:** two command-line programs, sharing one Decimal core.
 
-**What does not exist yet:** the website. No PDF upload, no extraction, no OCR,
-no browser interface, no exports, no API, no database. `docs/website-build-spec.md`
-describes all of it; none of it is built.
+1. **The calculation engine** (`run_model.py`). Takes verified filing data as
+   YAML, builds the historical and forecast statements, runs a FCFF DCF, and
+   reports the 37-step workflow's thirteen PASS/FAIL checks.
+2. **PDF ingestion** (`ingest_pdf.py`) — specification Phase 3, items 26–38.
+   Takes a filing PDF and produces located, parsed, scored facts: signature
+   validation, SHA-256 custody, write-once storage, page classification,
+   text and table extraction with page geometry, metadata detection in the
+   UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
+   cell rather than guessing.
+
+247 tests pass on Python 3.10–3.13. All arithmetic is exact decimal.
+
+**What does not exist yet:** everything between the two, and the website around
+them. No browser interface, no API, no database, no source-review UI, no
+mapping, no exports. Nothing yet carries an extracted fact into the calculation
+engine — that is the mapping stage, Phase 5. And **no extracted fact is ever
+`VERIFIED`**, because verification requires a reviewer action (Phase 4) and an
+approved mapping (Phase 5).
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
 1.15 and 4.4 prohibit binary floating point here, so the engine runs on
@@ -82,7 +94,19 @@ See a complete worked model, using the fictional test fixture:
 python3 run_model.py --inputs tests/fixtures
 ```
 
-See what it does with missing data:
+Ingest a PDF filing, using the fictional fixture:
+
+```bash
+python3 ingest_pdf.py apps/api/tests/fixtures/text_native_statements.pdf
+```
+
+It reports 50 facts, every one of them blocked, because every metadata field
+starts UNCONFIRMED (10.11). Add `--confirm-metadata` to accept the detected
+values and watch 47 of them clear — what remains is exactly the three cells
+that print an em dash, an en dash and `N/A`, which rule 1.5 says a human must
+resolve.
+
+See what the engine does with missing data:
 
 ```bash
 python3 run_model.py
@@ -208,10 +232,30 @@ fixture agrees with the engine **exactly**, across all 192 compared values.
 | `model/forecast.py` | 12–22 | The projected three statements |
 | `model/dcf.py` | 23–35 | FCFF, CAPM, WACC, terminal value, enterprise and equity value |
 | `model/sensitivity.py` | 36 | The WACC × terminal-growth grid |
-| `model/checks.py` | 9, 37 | The twelve PASS/FAIL checks |
+| `model/checks.py` | 9, 37 | The thirteen PASS/FAIL checks |
 | `model/loader.py` | — | YAML → model objects, failing with the step that requires each field |
 | `model/report.py` | — | Text rendering; no calculation |
 | `run_model.py` | — | CLI |
+
+PDF ingestion (specification Phase 3, items 26–38):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/extraction/signature.py` | 26 | PDF by signature, not filename; version, `%%EOF`, size limit |
+| `apps/api/app/extraction/hashing.py` | 27 | SHA-256 on the bytes as received; duplicate detection |
+| `apps/api/app/extraction/storage.py` | 28, 38 | Write-once content-addressed store; `O_EXCL`, re-hashed after writing |
+| `apps/api/app/extraction/jobs.py` | 29 | The job state machine and its legal transitions |
+| `apps/api/app/extraction/scan.py` | — | Structural scan (10.4): encryption, JavaScript, launch actions |
+| `apps/api/app/extraction/pages.py` | 31 | Text-native / image-only / mixed; image-only **refuses** (2.3.c) |
+| `apps/api/app/extraction/text_native.py` | 30, 33 | Tables, cells, captions, periods, facts |
+| `apps/api/app/extraction/geometry.py` | 32 | Bounding boxes as decimal strings — the one float boundary |
+| `apps/api/app/extraction/metadata.py` | 34 | The ten 10.10 fields, every one UNCONFIRMED |
+| `apps/api/app/extraction/parsing.py` | 35 | Locale, sign, units, and rule 1.5 |
+| `apps/api/app/extraction/reasons.py` | 36 | Blocking and advisory codes; the confidence model |
+| `apps/api/app/extraction/records.py` | 33 | Section 9.3–9.5 and 9.14 entities; metadata confirmation |
+| `apps/api/app/extraction/pipeline.py` | — | The ten steps in the order the policy requires |
+| `apps/api/app/persistence/json_store.py` | 33 | Records to JSON; PostgreSQL (3.2.d) is Phase 15/17 |
+| `ingest_pdf.py` | — | CLI |
 
 Documentation:
 
@@ -219,7 +263,7 @@ Documentation:
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | The 37 OPEN decisions, and findings F-1 to F-10 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-13 |
 
 Specification Phase 2 contract documents. These are **definitions for the
 website, not descriptions of the engine** — each one states plainly where the
@@ -237,10 +281,13 @@ does nothing at all:
 ## Tests
 
 ```bash
-python3 -m pytest tests/ -q
+python3 -m pytest tests/ apps/api/tests/ -q
 ```
 
-69 tests, no network and no API key. Four groups worth knowing about:
+247 tests, no network and no API key. Two trees: `tests/` is the calculation
+engine, `apps/api/tests/` is ingestion.
+
+Four groups in the engine's suite worth knowing about:
 
 - `tests/test_refusals.py` — each of the workflow's "do not" rules, as an
   executable test. These matter most: the engine's value is that it *stops*, and
@@ -258,6 +305,21 @@ python3 -m pytest tests/ -q
   192 values; all agree exactly. The randomized sweep builds 150 further models
   across nine orders of magnitude of reporting scale.
 
+And in the ingestion suite:
+
+- `apps/api/tests/unit/test_parsing.py` — 65 tests on the cell parser, most of
+  them asserting that something did **not** become a zero. A blank, a dash, an
+  em dash and `N/A` each produce `None` with a blocking code, because a zero
+  substituted here would be invisible in every downstream statement.
+- `apps/api/tests/integration/test_pipeline.py` — each refusal against a real
+  PDF, the full extraction of a three-page filing, and item 38: the uploaded
+  bytes are re-hashed after the whole pipeline and still match.
+- `apps/api/tests/fixtures/` — eight generated PDFs, committed, hash-pinned,
+  and rebuildable with `build_fixtures.py`. They cover a text-native filing
+  with em dashes and footnote markers, a comma-decimal filing, a scan, a
+  part-scanned filing, a mixed page, an encrypted file, a truncated file, and a
+  GIF named `.pdf`.
+
 CI runs the suite on Python 3.10, 3.11, 3.12 and 3.13 for every pull request.
 It is **not** a required status check, so it does not block a merge (finding F-3).
 
@@ -267,10 +329,17 @@ It is labeled `FICTIONAL` in every file and is not derived from any filing.
 
 ## Scope
 
-The workflow starts at STEP 1 with a PDF already in hand, and so does the current
-engine. Parsing the PDF is not implemented — transcription is STEP 4's manual,
-page-cited step. Automating it is what `docs/website-build-spec.md` Sections 10
-and 11 specify, with mandatory human review of every extracted value.
+The workflow starts at STEP 1 with a PDF already in hand. `ingest_pdf.py` now
+reads that PDF, but the two halves are **not connected**: extraction produces
+`UNVERIFIED` facts with company line-item wording, and the engine consumes
+verified figures mapped to a canonical chart of accounts. The mapping between
+them, with the human review specification Section 11 requires, is Phase 5.
+Until then, STEP 4 transcription remains manual, and ingestion is a separate
+tool that tells you what a filing says and what about it needs checking.
+
+OCR is deliberately out of scope (decision 2.3.c). A scanned page refuses the
+document rather than being read badly — see finding F-11, which proposes
+narrowing that to scanned pages inside the mapped statement range.
 
 The forecast covers the accounts in `model/accounts.py`. A company needing
 something outside that set — capitalized leases modeled separately, equity method
