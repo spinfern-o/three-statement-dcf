@@ -22,7 +22,7 @@ from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from .accounts import DERIVED, OPTIONAL_IN_DERIVATION, Statement, validate_account
-from .numeric import D, ZERO
+from .numeric import D, ZERO, relative_error
 from .provenance import Figure, ProvenanceError, Source
 
 
@@ -53,10 +53,14 @@ class Discrepancy:
         return self.reported - self.derived
 
     def __str__(self) -> str:
-        return (
-            f"{self.account} {self.year}: reported {self.reported:,.1f} vs "
-            f"derived {self.derived:,.1f} (delta {self.delta:,.1f})"
+        base = (
+            f"{self.account} {self.year}: reported {self.reported:,.4f} vs "
+            f"derived {self.derived:,.4f} (delta {self.delta:,.4f}"
         )
+        # Specification 4.10's relative error, where it is defined (4.12).
+        if self.derived != 0:
+            return base + f", {relative_error(self.reported, self.derived):.6f}%)"
+        return base + ", relative error undefined against zero)"
 
 
 class Ledger:

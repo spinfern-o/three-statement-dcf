@@ -15,7 +15,7 @@ Two documents govern this repository, and they are different things:
 **What works today:** a Python calculation engine and a command-line runner. It
 takes transcribed filing data as YAML, builds the historical and forecast
 statements, runs a FCFF DCF, and reports the 37-step workflow's twelve PASS/FAIL
-checks. All arithmetic is exact decimal. 64 tests pass on Python 3.10–3.13.
+checks. All arithmetic is exact decimal. 69 tests pass on Python 3.10–3.13.
 
 **What does not exist yet:** the website. No PDF upload, no extraction, no OCR,
 no browser interface, no exports, no API, no database. `docs/website-build-spec.md`
@@ -142,7 +142,7 @@ judged at relative 1e-09
 Historical balance sheet balances            PASS 2 year(s) balance
 Forecast balance sheet balances              PASS 5 year(s) balance
 Historical cash flow reconciliation          PASS 1 year(s) reconcile
-Forecast cash flow reconciliation            PASS 5 year(s) reconcile
+Forecast cash flow reconciliation            PASS 15 subtotal(s) match their components
 Net income linkage (IS -> CF)                PASS 6 year(s) tie
 PP&E schedule linkage                        PASS 5 year(s) tie
 Debt schedule linkage                        PASS 5 year(s) tie
@@ -150,10 +150,16 @@ Retained earnings linkage                    PASS 5 year(s) tie
 Ending cash linkage                          PASS 5 year(s) reconcile
 No unintended forecast hardcodes             PASS every forecast cell carries a driver
 WACC > terminal growth rate                  PASS WACC 0.0983 > g 0.0250
-FCFF matches three-statement forecast        PASS 5 year(s) tie to the model
+FCFF matches three-statement forecast        PASS 5 year(s) rebuilt from the statements and tie
+Reported subtotals reconcile (17.10)         PASS every reported subtotal agrees with its components
 ------------------------------------------------------------------------------
-12 PASS   0 FAIL   0 SKIP
+13 PASS   0 FAIL   0 SKIP
 ```
+
+Thirteen, not twelve: STEP 37 lists twelve, and specification 17.10 requires a
+reported-subtotal reconciliation that STEP 37 does not list. Every check tests
+something different — two of the original twelve ran the same comparison with
+identical arguments, so the panel reported twelve results from eleven tests.
 
 `SKIP` is reported separately from `PASS` and deliberately so: a check that could
 not run because its inputs were absent has not verified anything, and a model
@@ -231,12 +237,13 @@ does nothing at all:
 python3 -m pytest tests/ -q
 ```
 
-64 tests, no network and no API key. Four groups worth knowing about:
+69 tests, no network and no API key. Four groups worth knowing about:
 
 - `tests/test_refusals.py` — each of the workflow's "do not" rules, as an
   executable test. These matter most: the engine's value is that it *stops*, and
   a refusal that quietly stopped working would be invisible in the output of an
-  otherwise passing model.
+  otherwise passing model. Also holds the regressions for the post-port bugs,
+  each verified to fail against the code before its fix.
 - `tests/test_model.py` — the arithmetic, plus two tests that deliberately
   corrupt a sound model to confirm the checks report `FAIL` and `SKIP` instead of
   papering over it.

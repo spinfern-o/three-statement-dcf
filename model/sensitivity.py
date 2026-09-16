@@ -77,8 +77,19 @@ def _shift_wacc(base: CostOfCapital, target_wacc: Decimal) -> CostOfCapital:
     we = base.weight_equity
     if we <= 0:
         raise ProvenanceError("Cannot shift WACC with zero equity weight")
+    if base.beta == 0:
+        # With beta zero, CAPM gives cost of equity = risk-free rate whatever
+        # the equity risk premium, so no ERP reaches the target. Returning the
+        # unshifted cost of capital would label the cell with a WACC it does
+        # not have, which is worse than refusing (specification 1.19: never
+        # present a figure as something it is not).
+        raise ProvenanceError(
+            f"Cannot shift WACC to {target_wacc} by solving the equity risk premium: "
+            f"beta is zero, so the cost of equity is the risk-free rate regardless "
+            f"of the premium. Vary the risk-free rate or supply a non-zero beta."
+        )
     implied_ke = (target_wacc - base.weight_debt * base.after_tax_cost_of_debt) / we
-    implied_erp = (implied_ke - base.risk_free_rate) / base.beta if base.beta else ZERO
+    implied_erp = (implied_ke - base.risk_free_rate) / base.beta
     sources = dict(base.sources)
     sources["equity_risk_premium"] = (
         f"{sources.get('equity_risk_premium', '')} [sensitivity: solved so WACC = {target_wacc:.4f}]"

@@ -109,6 +109,60 @@ def _balance_check(name: str, balance: Ledger, years: tuple[str, ...], tol: Tole
     return _ok(name, f"{checked} year(s) balance")
 
 
+def _subtotals_match_components(
+    name: str, cashflow: Ledger, years: tuple[str, ...], tol: Tolerance
+) -> CheckResult:
+    """STEP 7/22: each cash-flow subtotal equals the items beneath it.
+
+    Distinct from the ending-cash linkage below. This one catches a CFO that
+    disagrees with the operating items it is meant to total; that one catches
+    a cash balance that does not follow from the subtotals. Previously both
+    names ran the same comparison, so the panel reported twelve checks while
+    testing eleven things.
+    """
+    breaks, checked = [], 0
+    for year in years:
+        for subtotal, items in (
+            (A.CFO, A.OPERATING_ITEMS),
+            (A.CFI, A.INVESTING_ITEMS),
+            (A.CFF, A.FINANCING_ITEMS),
+        ):
+            reported = cashflow.get(subtotal, year)
+            if reported is None:
+                continue
+            parts = [cashflow.get(item, year) for item in items]
+            if all(part is None for part in parts):
+                continue
+            total = sum((part for part in parts if part is not None), ZERO)
+            checked += 1
+            if not tol.close(reported, total):
+                breaks.append(f"{year} {subtotal}: stated {reported:,.4f} vs items {total:,.4f}")
+    if checked == 0:
+        return _skip(name, "no cash-flow subtotal has components to compare against")
+    if breaks:
+        return _fail(name, "; ".join(breaks))
+    return _ok(name, f"{checked} subtotal(s) match their components")
+
+
+def _reported_subtotals_reconcile(
+    name: str, ledgers: tuple[Ledger, ...], tol: Tolerance
+) -> CheckResult:
+    """Specification 17.10: a reported subtotal must equal its components.
+
+    `Ledger.cross_check` implemented this and nothing called it, so a
+    transcription error that made a filing's own subtotal disagree with its
+    line items never reached the panel. STEP 6 forbids correcting such a
+    difference, so it is reported with its delta and left alone.
+    """
+    breaks = []
+    for ledger in ledgers:
+        for discrepancy in ledger.cross_check(rel_tol=tol.rel, abs_tol=tol.abs):
+            breaks.append(f"{ledger.statement.value}.{discrepancy}")
+    if breaks:
+        return _fail(name, "; ".join(breaks) + " -- extraction or mapping error, do not plug it")
+    return _ok(name, "every reported subtotal agrees with its components")
+
+
 def _cashflow_reconciliation(
     name: str, balance: Ledger, cashflow: Ledger, periods: Periods,
     years: tuple[str, ...], tol: Tolerance,
@@ -173,18 +227,43 @@ def _schedule_linkage(
 
 
 def _fcff_matches_forecast(fcff_years: list[FCFFYear], forecast: ForecastResult, tol: Tolerance) -> CheckResult:
-    """STEP 37: FCFF is built from the forecast, not assembled separately."""
+    """STEP 37: FCFF is built from the forecast, not assembled separately.
+
+    Reads each term straight out of the statements and schedules rather than
+    calling `fcff_inputs`, which is what `build_fcff` itself used. Comparing a
+    function against its own output verified only that nothing mutated in
+    between; this compares the stored FCFF against an independent assembly.
+    """
     name = "FCFF matches three-statement forecast"
-    breaks = []
-    for item in fcff_years:
-        terms = forecast.fcff_inputs(item.year)
-        for field_name, expected in terms.items():
-            actual = getattr(item, {"d_and_a": "d_and_a"}.get(field_name, field_name))
-            if not tol.close(actual, expected):
-                breaks.append(f"{item.year}.{field_name}: {actual:,.4f} vs {expected:,.4f}")
     if not fcff_years:
         return _skip(name, "no FCFF years built")
-    return _fail(name, "; ".join(breaks)) if breaks else _ok(name, f"{len(fcff_years)} year(s) tie to the model")
+    breaks = []
+    for item in fcff_years:
+        year = item.year
+        prior = forecast.periods.prior(year)
+        expected = {
+            "ebit": forecast.income.get(A.EBIT, year),
+            "tax_rate": forecast.taxes.rate(year),
+            "d_and_a": forecast.cashflow.get(A.DEPRECIATION_AMORTIZATION, year),
+            "capex": None if forecast.cashflow.get(A.CAPEX, year) is None
+                     else abs(forecast.cashflow.get(A.CAPEX, year)),
+            "change_in_nwc": forecast.working_capital.change_in_nwc(year, prior),
+        }
+        for field_name, want in expected.items():
+            if want is None:
+                breaks.append(f"{year}.{field_name}: absent from the statements")
+                continue
+            actual = getattr(item, field_name)
+            if not tol.close(actual, want):
+                breaks.append(f"{year}.{field_name}: FCFF holds {actual:,.4f} vs statement {want:,.4f}")
+        # and the assembled FCFF itself
+        if all(v is not None for v in expected.values()):
+            rebuilt = (expected["ebit"] * (D(1) - expected["tax_rate"]) + expected["d_and_a"]
+                       - expected["capex"] - expected["change_in_nwc"])
+            if not tol.close(item.fcff, rebuilt):
+                breaks.append(f"{year}: FCFF {item.fcff:,.4f} vs rebuilt {rebuilt:,.4f}")
+    return _fail(name, "; ".join(breaks)) if breaks else _ok(
+        name, f"{len(fcff_years)} year(s) rebuilt from the statements and tie")
 
 
 def _no_forecast_hardcodes(forecast: ForecastResult) -> CheckResult:
@@ -225,8 +304,8 @@ def run_all_checks(
         _cashflow_reconciliation(
             "Historical cash flow reconciliation", forecast.balance, forecast.cashflow, periods, hist, tol
         ),
-        _cashflow_reconciliation(
-            "Forecast cash flow reconciliation", forecast.balance, forecast.cashflow, periods, fore, tol
+        _subtotals_match_components(
+            "Forecast cash flow reconciliation", forecast.cashflow, fore, tol
         ),
         _net_income_linkage(forecast.income, forecast.cashflow, all_years, tol),
         _schedule_linkage("PP&E schedule linkage", forecast.ppe, forecast.balance, A.PPE_NET, fore, tol),
@@ -240,6 +319,14 @@ def run_all_checks(
         _no_forecast_hardcodes(forecast),
         _wacc_above_growth(valuation),
         _fcff_matches_forecast(fcff_years or [], forecast, tol),
+        # Beyond STEP 37's twelve: specification 17.10, which STEP 37 does not
+        # list but Section 17 requires. Ledger.cross_check existed and nothing
+        # called it.
+        _reported_subtotals_reconcile(
+            "Reported subtotals reconcile (17.10)",
+            (forecast.income, forecast.balance, forecast.cashflow),
+            tol,
+        ),
     ]
     return results
 

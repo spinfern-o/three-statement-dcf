@@ -276,9 +276,21 @@ def build_forecast(
         # -- equity movements ---------------------------------------------
         sbc = revenue * _optional(assumptions, "sbc_pct_revenue", year)
         buybacks = _optional(assumptions, "share_repurchases", year)
-        dividends = _optional(assumptions, "dividend_payout_ratio", year) * max(net_income, ZERO)
-        if assumptions.has("dividends_amount", year):
+        # One stated method per line, as STEP 14/18 require of every other
+        # driver. Declaring both a payout ratio and an amount used to prefer
+        # the amount silently.
+        has_ratio = assumptions.has("dividend_payout_ratio", year)
+        has_amount = assumptions.has("dividends_amount", year)
+        if has_ratio and has_amount:
+            raise ProvenanceError(
+                f"Dividends for {year} have both 'dividend_payout_ratio' and "
+                f"'dividends_amount' declared. One stated methodology per line -- "
+                f"remove one (STEP 10, STEP 14)."
+            )
+        if has_amount:
             dividends = assumptions.get("dividends_amount", year)
+        else:
+            dividends = _optional(assumptions, "dividend_payout_ratio", year) * max(net_income, ZERO)
         retained.add_year(year, prev_re, {"Net Income": net_income}, {"Dividends": dividends})
         ending_re = retained.ending(year)
         ending_common = prev_common + sbc - buybacks
