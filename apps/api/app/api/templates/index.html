@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Documents &middot; {{ product_name }}{% endblock %}
+{% block context %}Portfolio{% endblock %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Source documents</h1>
+
+  {% if not documents %}
+    <div class="card">
+      <h2>Nothing ingested yet</h2>
+      <p class="muted">
+        Ingest a filing first. The review room reads what the extractor
+        produced; it has no upload form of its own yet.
+      </p>
+      <p class="raw">python3 ingest_pdf.py FILING.pdf --store var/sources</p>
+    </div>
+  {% else %}
+  <table>
+    <caption>{{ documents | length }} document(s). Review progress counts reviewer decisions, not verified facts.</caption>
+    <thead>
+      <tr>
+        <th scope="col">Document</th>
+        <th scope="col">Pages</th>
+        <th scope="col">Metadata</th>
+        <th scope="col" class="num">Facts</th>
+        <th scope="col" class="num">Unresolved</th>
+        <th scope="col">Review</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for document, progress in documents %}
+      <tr>
+        <th scope="row">
+          <a href="/documents/{{ document.id }}">{{ document.sanitized_filename }}</a>
+          <div class="raw">{{ document.immutable_hash[:16] }}&hellip;</div>
+        </th>
+        <td class="num">{{ document.page_count }}</td>
+        <td>
+          {% if progress.metadata_confirmed %}
+            <span class="badge badge-success">Confirmed</span>
+          {% else %}
+            <span class="badge badge-warning">Unconfirmed</span>
+            <span class="sr-only">{{ progress.unconfirmed_required | length }} required fields outstanding</span>
+          {% endif %}
+        </td>
+        <td class="num">{{ progress.total }}</td>
+        <td class="num">
+          {% if progress.unresolved %}
+            <span class="badge badge-warning">{{ progress.unresolved }}</span>
+          {% else %}
+            <span class="badge badge-success">0</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="meter" role="img"
+               aria-label="{{ progress.decided }} of {{ progress.total }} facts decided, {{ progress.percent_decided }} percent">
+            <span style="width: {{ progress.percent_decided }}%"></span>
+          </div>
+          <span class="small muted">{{ progress.decided }} / {{ progress.total }} decided</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="card">
+    <h2>What "reviewed" does not mean</h2>
+    <p class="muted small">
+      No fact in this application is <strong>VERIFIED</strong>. Verification is
+      the seven-part conjunction in <code>docs/source-policy.md</code> §9, and
+      its seventh condition is a human-approved mapping to a normalized line
+      item. The mapping stage is Phase 5 and is not built, so a fully reviewed
+      document is reviewed, not verified. The difference is visible on every
+      fact.
+    </p>
+  </div>
+</main>
+{% endif %}
+{% endblock %}

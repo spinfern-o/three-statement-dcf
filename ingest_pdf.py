@@ -8,8 +8,8 @@
 
 This is the ingestion half of the system. It does not build a model: the
 calculation engine begins at STEP 4 with figures a human has verified, and
-`run_model.py` is its entry point. Between the two sits the source review and
-mapping work of Phases 4 and 5, which is not built.
+`run_model.py` is its entry point. Between them sit source review -- built,
+and served by `review_server.py` -- and mapping, which is Phase 5 and is not.
 
 Exit status
     0  extracted
@@ -117,9 +117,10 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"\n{report.rule()}\n"
         f"{len(result.facts)} fact(s) extracted, "
-        f"{len(result.facts_needing_review)} awaiting review. "
-        f"No fact is VERIFIED: that needs the source review of Phase 4 and the\n"
-        f"approved mapping of Phase 5, neither of which is built.\n"
+        f"{len(result.facts_needing_review)} awaiting review.\n"
+        f"Review them in a browser:  python3 review_server.py --store {args.store}\n"
+        f"No fact is VERIFIED: that needs a reviewer action (Phase 4, built) AND an\n"
+        f"approved mapping (Phase 5, not built).\n"
     )
     return 0
 

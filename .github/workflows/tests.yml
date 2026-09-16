@@ -30,6 +30,44 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Run tests
-        # Two trees: tests/ is the calculation engine (the 37-step workflow),
-        # apps/api/tests/ is PDF ingestion (Phase 3 of the website spec).
-        run: python -m pytest tests/ apps/api/tests/ -q
+        # Paths come from pytest.ini: the engine and the website backend.
+        # The browser suite skips here and runs in its own job below.
+        run: python -m pytest -q
+
+  # Item 49 / specification 22.7: the keyboard and screen-reader workflows need
+  # a real browser, so they get one job rather than four. A skip that never
+  # un-skips is not a test, which is why this is not left to the matrix.
+  accessibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run the accessibility suite
+        run: |
+          python -m pytest apps/api/tests/integration/test_accessibility.py \
+            -q --junitxml=accessibility.xml
+
+      - name: Fail if the suite skipped instead of running
+        # A skip that never un-skips is not a test. This job exists to run the
+        # browser workflows, so a green run with zero of them is a failure.
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          suite = ET.parse("accessibility.xml").getroot().find("testsuite")
+          ran = int(suite.get("tests")) - int(suite.get("skipped"))
+          print(f"{ran} accessibility test(s) actually ran")
+          sys.exit(0 if ran > 0 else 1)
+          PY

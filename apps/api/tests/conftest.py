@@ -74,3 +74,35 @@ def extracted(ingest_fixture):
     outcome = ingest_fixture(STATEMENTS)
     assert outcome.accepted, outcome.describe()
     return outcome.result
+
+
+@pytest.fixture
+def stored(ingest_fixture, repository):
+    """The statements fixture, ingested and persisted, ready for review."""
+    outcome = ingest_fixture(STATEMENTS)
+    assert outcome.accepted, outcome.describe()
+    repository.save(outcome.result)
+    return outcome.result
+
+
+@pytest.fixture
+def client(store_root, stored):
+    """A test client over a store that already holds one extraction."""
+    from fastapi.testclient import TestClient
+
+    from apps.api.app.api.main import create_app
+
+    with TestClient(create_app(store_root)) as test_client:
+        test_client.document_id = stored.document.id
+        yield test_client
+
+
+@pytest.fixture
+def empty_client(tmp_path):
+    """A client over a store with nothing in it, for the empty state."""
+    from fastapi.testclient import TestClient
+
+    from apps.api.app.api.main import create_app
+
+    with TestClient(create_app(tmp_path / "empty")) as test_client:
+        yield test_client

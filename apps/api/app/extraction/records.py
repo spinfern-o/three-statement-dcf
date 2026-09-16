@@ -123,6 +123,52 @@ class RawTable:
 
 
 @dataclass(frozen=True)
+class Resolution:
+    """A blocking reason code cleared by a reviewer, with the note that did it.
+
+    source-policy.md §9 condition 4 permits a fact to be verified when "every
+    blocking code it carried has been resolved by a reviewer action with a
+    note". The code is not deleted when that happens -- deleting it would
+    erase the reason the fact needed a human in the first place. It is
+    recorded as resolved, here, with who resolved it and why.
+    """
+
+    code: ReasonCode
+    actor: str
+    note: str
+    at: datetime
+
+    def describe(self) -> str:
+        return f"{self.code.value} resolved by {self.actor}: {self.note}"
+
+
+@dataclass(frozen=True)
+class ReviewDecision:
+    """What a reviewer decided about one fact. 10.32, 10.33.
+
+    `reason` is mandatory everywhere it appears in this codebase, for the same
+    reason: a correction with no stated basis is indistinguishable from a
+    typo six months later.
+    """
+
+    action: str
+    actor: str
+    reason: str
+    at: datetime
+    #: Set on a correction: the value as parsed, before the reviewer changed it.
+    previous_value: Decimal | None = None
+    new_value: Decimal | None = None
+
+    def describe(self) -> str:
+        change = ""
+        if self.action == "correct":
+            before = "(no value)" if self.previous_value is None else str(self.previous_value)
+            after = "(no value)" if self.new_value is None else str(self.new_value)
+            change = f" {before} -> {after}"
+        return f"{self.action}{change} by {self.actor}: {self.reason}"
+
+
+@dataclass(frozen=True)
 class ReportedFact:
     """9.5. One number as the company printed it, plus everything about it."""
 
@@ -137,6 +183,12 @@ class ReportedFact:
     confidence: Confidence
     reason_codes: tuple[ReasonCode, ...] = ()
     verification_status: FactVerificationState = FactVerificationState.UNVERIFIED
+    #: Set by a reviewer correction. `parsed` is NEVER overwritten -- 10.25
+    #: makes the raw string and its parse evidence, and evidence does not get
+    #: edited. `value` below prefers this when it exists.
+    corrected_value: Decimal | None = None
+    resolutions: tuple[Resolution, ...] = ()
+    decision: ReviewDecision | None = None
     period_start: date | None = None
     period_end: date | None = None
     instant_date: date | None = None
@@ -149,8 +201,17 @@ class ReportedFact:
 
     @property
     def value(self) -> Decimal | None:
-        """The parsed number, or None. **None is never zero** (rule 1.5)."""
-        return self.parsed.value
+        """The number to use: a reviewer's correction if there is one, else the
+        parse. **None is never zero** (rule 1.5)."""
+        return self.corrected_value if self.corrected_value is not None else self.parsed.value
+
+    @property
+    def was_corrected(self) -> bool:
+        return self.corrected_value is not None
+
+    @property
+    def resolved_codes(self) -> tuple[ReasonCode, ...]:
+        return tuple(r.code for r in self.resolutions)
 
     @property
     def sign_source(self) -> SignSource:
@@ -158,6 +219,17 @@ class ReportedFact:
 
     @property
     def blocking_codes(self) -> tuple[ReasonCode, ...]:
+        """Blocking codes a reviewer has NOT yet resolved. 10.29, 10.30.
+
+        A resolved code stays on `reason_codes` as the record of what the
+        extraction found; it simply no longer blocks.
+        """
+        resolved = set(self.resolved_codes)
+        return tuple(c for c in self.reason_codes if c.blocking and c not in resolved)
+
+    @property
+    def all_blocking_codes(self) -> tuple[ReasonCode, ...]:
+        """Every blocking code the extraction raised, resolved or not."""
         return tuple(c for c in self.reason_codes if c.blocking)
 
     def describe(self) -> str:
@@ -323,6 +395,11 @@ def confirm_metadata(
         )
         for fact in result.facts
     )
+    withdrawn = sum(
+        1
+        for before, after in zip(result.facts, facts)
+        if before.decision is not None and after.decision is None
+    )
 
     status = (
         DocumentVerificationState.CONFIRMED
@@ -340,6 +417,12 @@ def confirm_metadata(
             detail=(
                 f"{len(facts)} fact(s) re-evaluated after the metadata change (10.35); "
                 f"{sum(1 for f in facts if f.blocking_codes)} still need review"
+                + (
+                    f"; {withdrawn} acceptance(s) withdrawn because the value they "
+                    f"accepted changed"
+                    if withdrawn
+                    else ""
+                )
             ),
         )
     )
@@ -395,7 +478,30 @@ def _refresh_fact(
     )
     if confidence.needs_review(review_threshold):
         codes = _dedupe(codes + (ReasonCode.LOW_CONFIDENCE,))
-    return replace(fact, parsed=reparsed, reason_codes=codes, confidence=confidence)
+
+    updated = replace(fact, parsed=reparsed, reason_codes=codes, confidence=confidence)
+
+    # 10.35, the uncomfortable half. If the re-parse produced a DIFFERENT number
+    # and a reviewer had already accepted the old one, their acceptance was of a
+    # value that no longer exists. Keeping it would leave a fact marked accepted
+    # by someone who never saw what it now says. The acceptance is withdrawn and
+    # the fact goes back to the queue; `confirm_metadata` records how many.
+    #
+    # A *correction* is not withdrawn: the reviewer supplied that number
+    # themselves, and a re-parse of the printed string does not overrule them.
+    if (
+        fact.decision is not None
+        and fact.decision.action == "accept"
+        and reparsed.value != fact.parsed.value
+    ):
+        updated = replace(
+            updated,
+            decision=None,
+            resolutions=(),
+            verification_status=FactVerificationState.UNVERIFIED,
+            reviewer_id=None,
+        )
+    return updated
 
 
 def _dedupe(codes) -> tuple[ReasonCode, ...]:

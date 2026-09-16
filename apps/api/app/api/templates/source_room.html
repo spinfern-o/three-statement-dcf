@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% block title %}Page {{ page }} &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Source room &middot; {{ document.sanitized_filename }} &middot; page {{ page }} of {{ document.page_count }}{% endblock %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Source review</h1>
+
+  {% if error %}
+  <div class="notice notice-error" role="alert">
+    <strong>Refused.</strong> {{ error }}
+  </div>
+  {% endif %}
+  {% if ok %}
+  <div class="notice notice-ok" role="status">{{ ok }}</div>
+  {% endif %}
+
+  <div class="split">
+
+    {# ---- left: the page itself (items 40, 42) ---------------------------- #}
+    <div>
+      <div class="card">
+        <h2 id="page-heading">Page {{ page }}</h2>
+        <p class="small muted">
+          {{ profile.kind.value.replace('_', ' ') if profile else 'unknown' }},
+          {{ profile.character_count if profile else 0 }} characters,
+          {{ profile.image_count if profile else 0 }} image(s){% if profile and profile.geometry.is_rotated %}, rotated {{ profile.geometry.rotation }}&deg;{% endif %}.
+          Boxes mark every value extracted from this page.
+        </p>
+
+        <div class="page-frame">
+          <img src="/documents/{{ document.id }}/pages/{{ page }}/image.png"
+               alt="Page {{ page }} of {{ document.sanitized_filename }}. The extracted values are listed beside this image.">
+          {% if geometry %}
+          <svg viewBox="0 0 {{ geometry.width }} {{ geometry.height }}"
+               preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            {% for fact, location in facts %}
+            <rect id="box-{{ fact.id }}"
+                  class="box-{{ fact.verification_status.value }}"
+                  x="{{ location.bounding_box.x0 }}" y="{{ location.bounding_box.y0 }}"
+                  width="{{ location.bounding_box.width }}" height="{{ location.bounding_box.height }}"></rect>
+            {% endfor %}
+          </svg>
+          {% endif %}
+        </div>
+
+        <p class="small muted" style="margin-top:var(--space-4)">
+          The rendered image is a derivative. The stored PDF is re-hashed every
+          time it is read and is never modified (rule 1.12).
+        </p>
+      </div>
+
+      <nav class="card sidenav" aria-labelledby="pages-heading">
+        <h2 id="pages-heading">Pages</h2>
+        <ul>
+          {% for p in progress.pages %}
+          <li>
+            <a href="/documents/{{ document.id }}/pages/{{ p.page_number }}"
+               {% if p.page_number == page %}aria-current="page"{% endif %}>
+              Page {{ p.page_number }}
+              <span class="small muted">&mdash; {{ p.decided }}/{{ p.total }} decided</span>
+              {% if p.unresolved %}<span class="badge badge-warning">{{ p.unresolved }} unresolved</span>{% endif %}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+
+        <h3 style="margin-top:var(--space-6)">Bookmarks</h3>
+        {% if bookmarks %}
+        <ul>
+          {% for b in bookmarks %}
+          <li>
+            <a href="/documents/{{ document.id }}/pages/{{ b.page_number }}">
+              {{ b.label }} <span class="small muted">&mdash; page {{ b.page_number }}</span>
+            </a>
+            <div class="small muted" style="padding-left:var(--space-3)">{{ b.origin }}, from &ldquo;{{ b.evidence }}&rdquo;</div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="small muted">No table caption on any page names a statement.</p>
+        {% endif %}
+        {% if unmapped %}
+        <p class="small">
+          <span class="badge badge-warning">Not found</span>
+          {{ unmapped | join(', ') }} &mdash; no page carries a table captioned
+          as one. 10.14 wants every statement in the source map.
+        </p>
+        {% endif %}
+      </nav>
+    </div>
+
+    {# ---- right: metadata, progress, and the facts (items 43, 44, 45) ----- #}
+    <div>
+
+      {# --- item 44: metadata confirmation --- #}
+      <section class="card" aria-labelledby="metadata-heading">
+        <h2 id="metadata-heading">Document metadata</h2>
+        <p class="small muted">
+          Detected, never trusted (10.11). Nothing downstream runs until every
+          required field is confirmed or corrected (10.13).
+        </p>
+
+        <table>
+          <caption>
+            {% if progress.metadata_confirmed %}
+              All required fields confirmed.
+            {% else %}
+              {{ progress.unconfirmed_required | length }} required field(s) outstanding.
+            {% endif %}
+          </caption>
+          <thead>
+            <tr><th scope="col">Field</th><th scope="col">Detected</th><th scope="col">State</th><th scope="col">Evidence</th></tr>
+          </thead>
+          <tbody>
+            {% for name, field in document.metadata.fields.items() %}
+            <tr>
+              <th scope="row">{{ name.replace('_', ' ') }}{% if field.required %}<span class="sr-only"> (required)</span>{% endif %}</th>
+              <td>{{ field.value if field.value is not none else '—' }}</td>
+              <td>
+                {% if field.confirmed %}
+                  <span class="badge badge-success">{{ field.state.value }}</span>
+                {% elif field.required %}
+                  <span class="badge badge-warning">unconfirmed</span>
+                {% else %}
+                  <span class="badge badge-neutral">unconfirmed</span>
+                {% endif %}
+              </td>
+              <td class="small muted">
+                {% if field.evidence %}p{{ field.evidence.page_number }} &mdash; {{ field.evidence.detector }}{% else %}not detected{% endif %}
+                {% if field.derived_from %}<br>derived from {{ field.derived_from }}{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        {% if not progress.metadata_confirmed %}
+        <form class="decide" method="post" action="/documents/{{ document.id }}/metadata">
+          <input type="hidden" name="page" value="{{ page }}">
+          <div class="field">
+            <label for="meta-field">Correct one field (leave blank to confirm all detected values)</label>
+            <select id="meta-field" name="field">
+              <option value="">— confirm every detected field —</option>
+              {% for name, field in document.metadata.fields.items() %}
+                {% if not field.confirmed %}<option value="{{ name }}">{{ name.replace('_', ' ') }}</option>{% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="meta-value">Corrected value</label>
+            <input type="text" id="meta-value" name="value" autocomplete="off"
+                   aria-describedby="meta-value-help">
+            <span id="meta-value-help" class="small muted">Leave blank to accept what was detected.</span>
+          </div>
+          <div class="field">
+            <label for="meta-reason">Reason <span aria-hidden="true">*</span></label>
+            <input type="text" id="meta-reason" name="reason" required autocomplete="off"
+                   aria-describedby="meta-reason-help">
+            <span id="meta-reason-help" class="small muted">Required by 10.32. Where did you check it?</span>
+          </div>
+          <div class="actions"><button type="submit" class="primary">Record</button></div>
+        </form>
+        {% endif %}
+      </section>
+
+      {# --- item 48: progress --- #}
+      <section class="card" aria-labelledby="progress-heading">
+        <h2 id="progress-heading">Review progress</h2>
+        <div class="meter" role="img"
+             aria-label="{{ progress.decided }} of {{ progress.total }} facts decided, {{ progress.percent_decided }} percent">
+          <span style="width: {{ progress.percent_decided }}%"></span>
+        </div>
+        <ul class="small" style="margin-top:var(--space-4)">
+          <li>{{ progress.decided }} of {{ progress.total }} decided &mdash;
+              {{ progress.accepted }} accepted, {{ progress.corrected }} corrected, {{ progress.rejected }} rejected</li>
+          <li>{{ progress.unresolved }} still carrying an unresolved blocking code</li>
+          <li>{{ progress.review_complete }} meeting conditions 1&ndash;6 of source-policy.md §9</li>
+          <li><strong>{{ progress.verified }} verified</strong> &mdash; condition 7 is a human-approved
+              mapping, which Phase 5 owns and which is not built</li>
+        </ul>
+      </section>
+
+      {# --- item 43: raw versus parsed, item 45: the actions --- #}
+      <section class="card" aria-labelledby="facts-heading">
+        <h2 id="facts-heading">Extracted values on page {{ page }}</h2>
+        {% if not facts %}
+          <p class="muted">No values were extracted from this page.</p>
+        {% else %}
+        <table>
+          <caption>
+            {{ facts | length }} value(s). &ldquo;Printed&rdquo; is the string as it
+            appears on the page (10.25); &ldquo;parsed&rdquo; is what the
+            deterministic parser made of it.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Line item</th>
+              <th scope="col">Period</th>
+              <th scope="col">Printed</th>
+              <th scope="col" class="num">Parsed</th>
+              <th scope="col" class="num">Confidence</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          {% for fact, location in facts %}
+          <tbody id="fact-{{ fact.id }}">
+            <tr>
+              <th scope="row">
+                {{ fact.raw_label or '(no label)' }}
+                <div class="small muted">page {{ location.page_number }}{% if location.column_label %}, column &ldquo;{{ location.column_label }}&rdquo;{% endif %}</div>
+              </th>
+              <td>{{ fact.period_label }}</td>
+              <td class="raw">{{ fact.raw_value }}</td>
+              <td class="num {% if fact.was_corrected %}total{% endif %}">
+                {% if fact.value is none %}
+                  <span class="muted">no value</span>
+                {% else %}
+                  {{ '{:,}'.format(fact.value) }}{% if fact.was_corrected %}<span class="sr-only"> (corrected by a reviewer)</span>{% endif %}
+                {% endif %}
+              </td>
+              <td class="num">{{ fact.confidence.score }}</td>
+              <td>
+                {% if fact.verification_status.value == 'accepted' or fact.verification_status.value == 'corrected' %}
+                  <span class="badge badge-success">{{ fact.verification_status.value }}</span>
+                {% elif fact.verification_status.value == 'rejected' %}
+                  <span class="badge badge-danger">rejected</span>
+                {% elif fact.blocking_codes %}
+                  <span class="badge badge-warning">needs review</span>
+                {% else %}
+                  <span class="badge badge-neutral">undecided</span>
+                {% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td colspan="6">
+                {% if fact.blocking_codes %}
+                <p class="small"><strong>Blocking:</strong></p>
+                <ul class="reasons">
+                  {% for code in fact.blocking_codes %}
+                  <li><code>{{ code.value }}</code> ({{ code.rule }}) &mdash; {{ code.summary }}</li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+                {% if fact.parsed.note %}<p class="small muted">{{ fact.parsed.note }}</p>{% endif %}
+                {% if fact.decision %}
+                <p class="small"><strong>Decision:</strong> {{ fact.decision.describe() }}
+                   <span class="muted">({{ fact.decision.at.isoformat() }})</span></p>
+                {% endif %}
+                {% if fact.resolutions %}
+                <details>
+                  <summary>{{ fact.resolutions | length }} code(s) resolved</summary>
+                  <ul class="reasons">{% for r in fact.resolutions %}<li>{{ r.describe() }}</li>{% endfor %}</ul>
+                </details>
+                {% endif %}
+
+                <details>
+                  <summary>Why this confidence, and what verification still needs</summary>
+                  <ul class="reasons">
+                    {% for c in fact.confidence.failed %}<li>missing: {{ c.value }}</li>{% endfor %}
+                    {% if not fact.confidence.failed %}<li>all eight evidence conditions hold</li>{% endif %}
+                  </ul>
+                  <ul class="reasons">
+                    {% for gate in gates[fact.id] %}
+                      {% if not gate.met %}<li>condition {{ gate.number }} ({{ gate.owner }}): {{ gate.description }}</li>{% endif %}
+                    {% endfor %}
+                  </ul>
+                </details>
+
+                <form class="decide" method="post" action="/documents/{{ document.id }}/facts/{{ fact.id }}">
+                  <input type="hidden" name="page" value="{{ page }}">
+                  <div class="field">
+                    <label for="reason-{{ fact.id }}">Reason <span aria-hidden="true">*</span></label>
+                    <input type="text" id="reason-{{ fact.id }}" name="reason" required autocomplete="off"
+                           aria-describedby="reason-help-{{ fact.id }}">
+                    <span id="reason-help-{{ fact.id }}" class="small muted">
+                      Required for every decision (10.32, 10.33).
+                    </span>
+                  </div>
+                  <div class="field">
+                    <label for="value-{{ fact.id }}">Corrected value</label>
+                    <input type="text" id="value-{{ fact.id }}" name="value" inputmode="decimal" autocomplete="off"
+                           aria-describedby="value-help-{{ fact.id }}">
+                    <span id="value-help-{{ fact.id }}" class="small muted">
+                      A decimal string, used only by &ldquo;Correct&rdquo;. Never a float (4.2).
+                    </span>
+                  </div>
+                  {#
+                    Accept is first, so it is what Enter submits. That is safe
+                    only because the reason field above is `required`: an
+                    accidental Enter on an empty form submits nothing at all.
+                  #}
+                  <div class="actions">
+                    <button type="submit" name="action" value="accept" class="primary">Accept</button>
+                    <button type="submit" name="action" value="correct">Correct</button>
+                    <button type="submit" name="action" value="reject" class="danger">Reject</button>
+                  </div>
+                </form>
+              </td>
+            </tr>
+          </tbody>
+          {% endfor %}
+        </table>
+        {% endif %}
+      </section>
+
+      {# --- item 47: the audit log --- #}
+      <section class="card" aria-labelledby="audit-heading">
+        <h2 id="audit-heading">Audit log</h2>
+        <p class="small muted">Every acceptance, correction and rejection, with its reason (10.33).</p>
+        <ul class="reasons">
+          {% for event in result.audit[-12:] %}
+          <li><span class="muted">{{ event.at.isoformat(timespec='seconds') }}</span>
+              &mdash; {{ event.actor }} &mdash; <code>{{ event.action }}</code> &mdash; {{ event.detail }}</li>
+          {% endfor %}
+        </ul>
+        {% if result.audit | length > 12 %}
+        <p class="small muted">{{ result.audit | length - 12 }} earlier entries not shown.</p>
+        {% endif %}
+      </section>
+
+    </div>
+  </div>
+</main>
+{% endblock %}

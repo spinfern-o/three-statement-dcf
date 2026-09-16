@@ -13,6 +13,9 @@ htmlcov/
 # source code, and they never belong in git.
 var/
 
+# CI artefacts
+accessibility.xml
+
 # Company inputs you fill in locally. The blank templates ARE tracked;
 # a filled-in copy may contain material non-public information, so keep it
 # out of the repo unless you have decided otherwise.

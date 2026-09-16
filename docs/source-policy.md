@@ -15,13 +15,20 @@ from verification — 11.11 gates the Verified label, so it belongs here.
 geometry, metadata detection in the UNCONFIRMED state, the deterministic
 parser, reason codes and confidence. §12 has the rule-by-rule status.
 
-The *review* half is not. There is no UI, no reviewer action, no mapping and no
-verified fact. Where this document says "the reviewer", it is still describing
-a system to be built (Phase 4). And the calculation engine in
-[`model/`](../model) is unchanged: it begins at STEP 4, with a human having
-already read the PDF and transcribed figures into YAML with a page citation.
-Nothing yet connects extracted facts to that engine — the mapping stage
-between them is Phase 5.
+The *review* half is now implemented too, in
+[`apps/api/app/review/`](../apps/api/app/review) and
+[`apps/api/app/api/`](../apps/api/app/api) (Phase 4, items 39-49): the source
+room, the page viewer with bounding-box overlays, metadata confirmation, and
+accept / correct / reject with a mandatory reason and an audit entry.
+
+**What is still not implemented is the thing this section exists to produce: a
+VERIFIED fact.** §9's conjunction has seven conditions and the seventh is a
+human-approved mapping to a normalized line item. Mapping is Phase 5 and does
+not exist, so every fact this system holds is at most *reviewed*, and the
+application reports zero verified facts on every page rather than rounding
+that up. The calculation engine in [`model/`](../model) is unchanged: it
+begins at STEP 4 with figures a human transcribed, and nothing yet carries an
+extracted fact into it.
 
 ---
 
@@ -450,7 +457,7 @@ the figures and is unchanged by Phase 3.
 | 10.9 | Page number for every span and cell | **Yes**, required — every fact has a `SourceLocation` with a page and a bounding box | **Partial** — `Source.page` is optional where 10.9 requires it |
 | 10.10 | Detect the ten metadata fields | **Yes** — `metadata.py`, plus `filing_type` and `number_locale` | No; `CompanyProfile` refuses blanks instead |
 | 10.11 | Mark detected metadata UNCONFIRMED | **Yes**, without exception | Different mechanism |
-| 10.12–10.13 | Present to a reviewer; require confirmation | **State transition yes, UI no.** `confirm_metadata()` implements 10.13 and 10.35; the reviewer interface is Phase 4 item 44 | n/a |
+| 10.12–10.13 | Present to a reviewer; require confirmation | **Yes.** Every detected field is shown with its page and detector in the source room, and confirmed or corrected through a form that requires a reason. `confirm_metadata()` then re-runs everything downstream (10.35) | n/a |
 | 10.14 | Source map for statements and notes | **Partial** — tables are found and captioned, but a *mapped* source map is Phase 4 | **Yes, in spirit** — `profile.SourceMap`, twelve required sections, `missing()` reports gaps |
 | 10.15 | Repeated headers removed only from normalized data | **Yes** — raw cells kept; repeated header rows flagged and excluded from facts | n/a |
 | 10.16 | Parentheses as negative-sign evidence | **Yes** — the value is negative *and* `"(1,234)"` is retained | n/a |
@@ -467,16 +474,19 @@ the figures and is unchanged by Phase 3.
 | 10.28 | Confidence and reason codes | **Yes** — see §7 and finding F-13 | No |
 | 10.29 | Low confidence forces review | **Yes** — `LOW_CONFIDENCE` below the configured threshold | No |
 | 10.30 | Reconciliation failure forces review | **Codes defined, not raised.** `SUBTOTAL_MISMATCH` and `CROSS_STATEMENT_MISMATCH` need the mapping of Phase 5 before a subtotal has components to compare | The engine's own equivalent runs: `Ledger.cross_check()` is check 17.10 |
-| 10.31 | Highlighted PDF cell beside the fact | **Data yes, UI no** — every fact carries a page and a box | n/a |
-| 10.32 | Correction only with a reviewer note | **Yes for metadata**; fact-level correction is Phase 4 | n/a |
-| 10.33 | Audit every action | **Partial** — `AuditEvent` exists, an entry without a reason raises, and job transitions and metadata confirmations are recorded. Fact-level actions are Phase 4 | No audit log |
+| 10.31 | Highlighted PDF cell beside the fact | **Yes.** The page renders beside its values (6.3.f) with an SVG overlay whose `viewBox` is the page in PDF points, so a highlight cannot drift from the number at any zoom | n/a |
+| 10.32 | Correction only with a reviewer note | **Yes**, for metadata and for facts. An empty reason is refused in the domain, not just in the form, so the API cannot be used to skip it | n/a |
+| 10.33 | Audit every action | **Yes** for everything Phase 4 can do: job transitions, metadata confirmations and corrections, and every accept, correct and reject, each with its reason and each naming the codes it resolved. Split and combine are mapping actions and belong to Phase 5 | No audit log |
 | 10.34 | Lock verified facts in a versioned snapshot | **No** — nothing is verified yet, so there is nothing to lock | No versioning |
-| 10.35 | Re-run dependents after an approved change | **Yes, at the parse level** — confirming metadata re-parses and re-scores every fact | Every run rebuilds the whole model, which is reproducible but not a snapshot |
+| 10.35 | Re-run dependents after an approved change | **Yes, including the uncomfortable half.** Confirming metadata re-parses and re-scores every fact, and *withdraws an acceptance whose value changed* — a reviewer cannot be recorded as having accepted a number that no longer exists. A correction is not withdrawn: the reviewer supplied that number themselves | Every run rebuilds the whole model, which is reproducible but not a snapshot |
 
 **What is still missing, stated plainly:** no fact reaches `VERIFIED`. §9's
-conjunction requires a reviewer action (Phase 4) and an approved mapping
-(Phase 5), and neither exists. Everything Phase 3 produces is `UNVERIFIED` and
-waiting.
+conjunction requires a reviewer action — which Phase 4 now provides — *and* an
+approved mapping, which Phase 5 owns and which does not exist. A fully
+reviewed document is reviewed, not verified, and
+`apps/api/app/review/progress.py` evaluates all seven conditions individually
+so the one that is failing is named rather than averaged away. Rule 1.14 is
+why: an unresolved requirement must never appear as PASS.
 
 ---
 
