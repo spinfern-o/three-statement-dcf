@@ -8,10 +8,9 @@ running to completion on defaults and producing a confident wrong number.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 from . import accounts as A
 from .accounts import Statement
@@ -19,8 +18,10 @@ from .assumptions import Assumptions, Assumption, Basis, Conflict
 from .dcf import CostOfCapital, EquityBridge
 from .profile import REQUIRED_SOURCE_MAP_KEYS, CompanyProfile, Periods, SourceMap, Units
 from .provenance import Figure, ProvenanceError, Source
+from .numeric import D, PrecisionError
 from .schedules import TaxSchedule
 from .statements import Ledger
+from .yaml_exact import load_exact
 
 
 class InputError(ProvenanceError):
@@ -28,10 +29,14 @@ class InputError(ProvenanceError):
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
+    """Parse with numeric scalars preserved as written (specification 4.2).
+
+    `yaml.safe_load` would resolve them to floats here, and no later
+    conversion could recover the digits the file actually contained.
+    """
     if not path.exists():
         raise InputError(f"Input file not found: {path}")
-    with path.open("r", encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
+    data = load_exact(path)
     if data is None:
         raise InputError(f"{path} is empty. Fill in the template before running the model.")
     if not isinstance(data, dict):
@@ -53,10 +58,12 @@ def _section(data: dict, key: str, where: str, step: str) -> dict:
     return value
 
 
-def _num(value: Any, where: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise InputError(f"{where} must be a number, got {value!r}")
-    return float(value)
+def _num(value: Any, where: str) -> Decimal:
+    """Exact Decimal from the text the file contained (4.2, 4.3)."""
+    try:
+        return D(value, what=where)
+    except PrecisionError as exc:
+        raise InputError(str(exc)) from None
 
 
 # --- STEP 1-3 / 12 --------------------------------------------------------
@@ -95,7 +102,7 @@ def load_profile(path: Path) -> tuple[CompanyProfile, SourceMap, Periods]:
         raise InputError(f"source_map.pages has unrecognized key(s): {sorted(unknown)} (STEP 2)")
     source_map = SourceMap(
         document=str(_req(sm_block, "document", "source_map", "STEP 2")),
-        pages={k: (int(v) if v is not None else None) for k, v in pages_block.items()},
+        pages={k: (int(str(v)) if v is not None else None) for k, v in pages_block.items()},
     )
 
     periods_block = _section(data, "periods", str(path), "STEP 3 / STEP 12")
@@ -155,7 +162,11 @@ def load_historical(path: Path, periods: Periods) -> dict[Statement, Ledger]:
                     Figure(
                         value=_num(raw, f"{where}.values.{year}"),
                         year=year,
-                        source=Source(document=document, page=int(page) if page is not None else None, line_item=line_item),
+                        source=Source(
+                            document=document,
+                            page=int(str(page)) if page is not None else None,
+                            line_item=line_item,
+                        ),
                     ),
                 )
 
@@ -267,11 +278,11 @@ def load_valuation(path: Path) -> dict[str, Any]:
     bridge = EquityBridge(
         cash=_num(_req(bridge_block, "cash", "equity_bridge", "STEP 34"), "equity_bridge.cash"),
         debt=_num(_req(bridge_block, "debt", "equity_bridge", "STEP 34"), "equity_bridge.debt"),
-        non_operating_investments=_num(bridge_block.get("non_operating_investments") or 0.0, "non_operating_investments"),
-        minority_interest=_num(bridge_block.get("minority_interest") or 0.0, "minority_interest"),
-        preferred_stock=_num(bridge_block.get("preferred_stock") or 0.0, "preferred_stock"),
-        pension_obligations=_num(bridge_block.get("pension_obligations") or 0.0, "pension_obligations"),
-        other_claims=_num(bridge_block.get("other_claims") or 0.0, "other_claims"),
+        non_operating_investments=_num(bridge_block.get("non_operating_investments") or 0, "non_operating_investments"),
+        minority_interest=_num(bridge_block.get("minority_interest") or 0, "minority_interest"),
+        preferred_stock=_num(bridge_block.get("preferred_stock") or 0, "preferred_stock"),
+        pension_obligations=_num(bridge_block.get("pension_obligations") or 0, "pension_obligations"),
+        other_claims=_num(bridge_block.get("other_claims") or 0, "other_claims"),
     )
 
     shares_block = data.get("shares") or {}

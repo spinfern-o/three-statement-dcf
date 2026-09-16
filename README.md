@@ -15,20 +15,20 @@ Two documents govern this repository, and they are different things:
 **What works today:** a Python calculation engine and a command-line runner. It
 takes transcribed filing data as YAML, builds the historical and forecast
 statements, runs a FCFF DCF, and reports the 37-step workflow's twelve PASS/FAIL
-checks. 61 tests pass on Python 3.10–3.13.
+checks. All arithmetic is exact decimal. 64 tests pass on Python 3.10–3.13.
 
 **What does not exist yet:** the website. No PDF upload, no extraction, no OCR,
 no browser interface, no exports, no API, no database. `docs/website-build-spec.md`
 describes all of it; none of it is built.
 
-**One known defect blocks a claim the specification requires.** The engine uses
-Python `float`. Specification rules 1.15 and 4.4 prohibit binary floating point
-in the authoritative calculation path, so the engine is not yet Section 4
-compliant and no accuracy claim under that section should be made. This is
-tracked as finding F-1 in the [decision ledger](docs/decision-ledger.md), with
-the port to `Decimal` identified as unblocked work.
+**The calculation path uses exact decimal arithmetic.** Specification rules
+1.15 and 4.4 prohibit binary floating point here, so the engine runs on
+`Decimal` under a declared 50-digit `ROUND_HALF_EVEN` context, and a `float`
+is *refused* rather than converted — converting one preserves its error
+instead of removing it. This was finding F-1 in the
+[decision ledger](docs/decision-ledger.md), now resolved.
 
-**37 of 37 Section 2 decisions are OPEN.** Product name, hosting model,
+**37 of 37 Section 2 decisions are still OPEN.** Product name, hosting model,
 authentication, currency, valuation date, and every market assumption are
 unanswered. Specification Section 2 forbids inferring them, so work depending on
 them has not begun.
@@ -171,15 +171,25 @@ change strictness when a filing reports in dollars rather than millions.
 Override with `--rel-tol`; `--abs-tol` sets a floor for accounts legitimately at
 zero. The panel prints whichever tolerance it judged at.
 
-Note the limit of what this establishes. The tests compare the engine against an
-independent recomputation, and both use `float`. That shows the implementation
-matches the specified formulas. It does **not** satisfy specification Section 4,
-which rules out binary floating point on both sides (finding F-1).
+### What "exact" does and does not mean
+
+Decimal is exact for addition, subtraction, multiplication, and any division
+that terminates. It is **not** exact for a division that repeats: `x / 365` is
+rounded at 50 significant digits, so two mathematically equal sums built in a
+different order can differ by one unit in the last place. Measured worst case
+across the randomized sweep is `1E-46` absolute, `3.4e-50` relative.
+
+The tests are written to that distinction: exact equality is asserted where no
+division is involved (the PP&E, debt and retained-earnings schedules), and a
+precision-derived bound where it is. The independent recomputation of the
+fixture agrees with the engine **exactly**, across all 192 compared values.
 
 ## Layout
 
 | Path | Steps | What it does |
 |---|---|---|
+| `model/numeric.py` | — | The Decimal context (50 digits, ROUND_HALF_EVEN); `D()` refuses floats |
+| `model/yaml_exact.py` | — | YAML loader that keeps numeric scalars as written, so parsing cannot lose precision |
 | `model/provenance.py` | 4 | `Figure` and `Source`; no figure without a page and a line item |
 | `model/accounts.py` | 5–7 | The account vocabulary; sign conventions; which subtotals are derivable |
 | `model/profile.py` | 1–3, 12 | Identification, source map, period validation |
@@ -208,7 +218,7 @@ Documentation:
 python3 -m pytest tests/ -q
 ```
 
-61 tests, no network and no API key. Four groups worth knowing about:
+64 tests, no network and no API key. Four groups worth knowing about:
 
 - `tests/test_refusals.py` — each of the workflow's "do not" rules, as an
   executable test. These matter most: the engine's value is that it *stops*, and
@@ -220,9 +230,10 @@ python3 -m pytest tests/ -q
 - `tests/test_end_to_end.py` — the CLI and its exit codes, the no-company-data
   guard on `inputs/`, and a test asserting all 37 steps are referenced in code.
 - `tests/test_precision.py` — `test_independent_recomputation` rebuilds all seven
-  years from the raw YAML in plain arithmetic sharing no code with `model/`, and
-  compares 192 values. The randomized sweep builds 150 further models across nine
-  orders of magnitude of reporting scale.
+  years from the raw YAML with its own loader and its own Decimal construction,
+  sharing no helper with `model/` as specification 4.15 requires, and compares
+  192 values; all agree exactly. The randomized sweep builds 150 further models
+  across nine orders of magnitude of reporting scale.
 
 CI runs the suite on Python 3.10, 3.11, 3.12 and 3.13 for every pull request.
 It is **not** a required status check, so it does not block a merge (finding F-3).

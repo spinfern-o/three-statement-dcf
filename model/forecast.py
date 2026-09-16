@@ -29,8 +29,10 @@ non-zero, so nothing enters the model unnamed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from . import accounts as A
+from .numeric import D, ONE, ZERO
 from .assumptions import Assumptions
 from .profile import Periods
 from .provenance import ProvenanceError
@@ -47,6 +49,11 @@ from .schedules import (
 from .statements import Ledger
 
 
+#: STEP 17 / specification 13.1.e: the day-count convention, stated once
+#: rather than buried as a literal 365 inside three separate formulas.
+DAYS_IN_YEAR = D(365)
+
+
 @dataclass
 class ForecastResult:
     periods: Periods
@@ -58,9 +65,9 @@ class ForecastResult:
     retained_earnings: RollForward
     working_capital: WorkingCapitalSchedule
     taxes: TaxSchedule
-    segment_revenue: dict[str, dict[str, float]] = field(default_factory=dict)
+    segment_revenue: dict[str, dict[str, Decimal]] = field(default_factory=dict)
 
-    def fcff_inputs(self, year: str) -> dict[str, float]:
+    def fcff_inputs(self, year: str) -> dict[str, Decimal]:
         """The four STEP 23 terms, read back out of the built statements."""
         prior = self.periods.prior(year)
         return {
@@ -76,10 +83,10 @@ def _pick_driver(
     assumptions: Assumptions,
     year: str,
     pct_name: str,
-    pct_of: float,
+    pct_of: Decimal,
     amount_name: str,
     label: str,
-) -> tuple[float, str]:
+) -> tuple[Decimal, str]:
     """STEP 14/18: the methodology must be chosen explicitly, not inferred.
 
     An absolute amount and a percentage driver for the same line in the same
@@ -104,7 +111,7 @@ def _pick_driver(
     )
 
 
-def _optional(assumptions: Assumptions, name: str, year: str, default: float = 0.0) -> float:
+def _optional(assumptions: Assumptions, name: str, year: str, default: Decimal = ZERO) -> Decimal:
     """Zero only where zero is the meaningful 'this did not happen' value.
 
     Used for discretionary flows (buybacks, acquisitions, the residual
@@ -120,7 +127,7 @@ def build_forecast(
     historical_cashflow: Ledger,
     assumptions: Assumptions,
     taxes: TaxSchedule,
-    segments: dict[str, float] | None = None,
+    segments: dict[str, Decimal] | None = None,
 ) -> ForecastResult:
     """Build the projected income statement, balance sheet and cash flow."""
 
@@ -167,7 +174,7 @@ def build_forecast(
     prev_cash, prev_common = base_cash, base_common
     prev_other_nca, prev_other_ncl = base_other_nca, base_other_ncl
 
-    segment_revenue: dict[str, dict[str, float]] = {}
+    segment_revenue: dict[str, dict[str, Decimal]] = {}
     prev_segments = dict(segments) if segments else {}
 
     for year in periods.forecast:
@@ -176,10 +183,10 @@ def build_forecast(
 
         # -- STEP 13: revenue ---------------------------------------------
         if prev_segments:
-            total = 0.0
+            total = ZERO
             for name, prior_value in sorted(prev_segments.items()):
                 growth = assumptions.get(f"revenue_growth.{name}", year)
-                value = prior_value * (1.0 + growth)
+                value = prior_value * (ONE + growth)
                 segment_revenue.setdefault(name, {})[year] = value
                 total += value
             prev_segments = {n: segment_revenue[n][year] for n in prev_segments}
@@ -188,7 +195,7 @@ def build_forecast(
         else:
             prior_revenue = income.require(A.REVENUE, prior, "STEP 13 (revenue growth)")
             growth = assumptions.get("revenue_growth", year)
-            revenue = prior_revenue * (1.0 + growth)
+            revenue = prior_revenue * (ONE + growth)
             revenue_basis = f"revenue_growth = {growth:.4f} on {prior} revenue {prior_revenue:,.1f}"
         income.set_forecast(A.REVENUE, year, revenue, revenue_basis)
 
@@ -226,9 +233,9 @@ def build_forecast(
         ending_ppe = ppe.ending(year)
 
         # -- STEP 17: working capital, account by account ------------------
-        ar = days_to_balance(revenue, assumptions.get("dso", year))
-        inventory = days_to_balance(cogs, assumptions.get("inventory_days", year))
-        ap = days_to_balance(cogs, assumptions.get("dpo", year))
+        ar = days_to_balance(revenue, assumptions.get("dso", year), DAYS_IN_YEAR)
+        inventory = days_to_balance(cogs, assumptions.get("inventory_days", year), DAYS_IN_YEAR)
+        ap = days_to_balance(cogs, assumptions.get("dpo", year), DAYS_IN_YEAR)
         other_ca = revenue * assumptions.get("other_current_assets_pct_revenue", year)
         other_cl = revenue * assumptions.get("other_current_liabilities_pct_revenue", year)
         wc.add(WorkingCapitalRow(year, ar, inventory, other_ca, ap, other_cl))
@@ -239,7 +246,7 @@ def build_forecast(
         repayment = _optional(assumptions, "debt_repayment", year)
         debt.add_year(year, prev_debt, {"New Borrowing": issuance}, {"Repayment": repayment})
         ending_debt = debt.ending(year)
-        if ending_debt < -0.01:
+        if ending_debt < 0:
             raise ProvenanceError(
                 f"Debt schedule for {year} repays more than is outstanding "
                 f"(ending debt {ending_debt:,.1f}). Check debt_repayment (STEP 19)."
@@ -269,7 +276,7 @@ def build_forecast(
         # -- equity movements ---------------------------------------------
         sbc = revenue * _optional(assumptions, "sbc_pct_revenue", year)
         buybacks = _optional(assumptions, "share_repurchases", year)
-        dividends = _optional(assumptions, "dividend_payout_ratio", year) * max(net_income, 0.0)
+        dividends = _optional(assumptions, "dividend_payout_ratio", year) * max(net_income, ZERO)
         if assumptions.has("dividends_amount", year):
             dividends = assumptions.get("dividends_amount", year)
         retained.add_year(year, prev_re, {"Net Income": net_income}, {"Dividends": dividends})

@@ -9,6 +9,9 @@ cannot be constructed without its source.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
+
+from .numeric import D, PrecisionError as _PrecisionError
 
 
 class ProvenanceError(ValueError):
@@ -52,15 +55,23 @@ class Figure:
     (STEP 1). No scaling happens here; converting thousands to millions
     silently is exactly the kind of unrecorded transformation the workflow
     forbids.
+
+    `value` is an exact Decimal. A float is refused rather than converted,
+    because converting one preserves its error instead of removing it
+    (specification 1.15, 4.4). Pass the figure as it is written in the
+    filing, as a string.
     """
 
-    value: float
+    value: Decimal
     year: str
     source: Source
 
     def __post_init__(self) -> None:
-        if not isinstance(self.value, (int, float)) or isinstance(self.value, bool):
-            raise ProvenanceError(f"Figure.value must be numeric, got {self.value!r}")
+        try:
+            coerced = D(self.value, what="Figure.value")
+        except _PrecisionError as exc:
+            raise ProvenanceError(str(exc)) from None
+        object.__setattr__(self, "value", coerced)
         if not self.year or not str(self.year).strip():
             raise ProvenanceError("Figure.year is required (STEP 4)")
 

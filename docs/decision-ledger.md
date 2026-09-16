@@ -120,9 +120,15 @@ None of these are derivable from a filing. All require an external, dated source
 
 Recorded here because they change what can truthfully be claimed.
 
-### F-1 — The existing engine uses binary floating point, which the spec prohibits
+### F-1 — RESOLVED (2026-09-16). The engine now uses exact decimal arithmetic
 
-**Severity: blocks any claim of Section 4 compliance.**
+**Was: blocks any claim of Section 4 compliance. Now: closed.**
+
+The calculation path was ported to `Decimal`. `grep` now finds zero
+`float()` coercions in `model/` and 132 `Decimal` references. What follows
+is the original finding, kept for the record, then the resolution.
+
+#### Original finding
 
 Rules 1.15 and 4.4 prohibit binary floating point in the authoritative
 calculation engine. The merged Python engine in `model/` uses Python `float`
@@ -143,10 +149,53 @@ float. They establish that the implementation matches the specified formulas;
 they do **not** establish Section 4 compliance, because Section 4.4 rules out
 the arithmetic on both sides.
 
-Resolution required: port the authoritative calculation path to `Decimal` under
-a declared context (4.7: ≥28 significant digits; 4.8: ROUND_HALF_EVEN), keeping
-the existing tests as a behavioural regression net. Until then, no Section 4
-claim may be made. See 4.20.
+#### Resolution
+
+The authoritative path is now `Decimal` end to end.
+
+- `model/numeric.py` declares the context: 50 significant digits (4.7 requires
+  at least 28), `ROUND_HALF_EVEN` (4.8), and traps on `InvalidOperation`,
+  `DivisionByZero` and `Overflow` so a NaN or Infinity can never reach a
+  released value (17.27, 18.13).
+- `D()` **refuses** floats rather than converting them. Converting a float
+  preserves its error instead of removing it, so a port that accepted floats
+  would look compliant and not be. This is the same "refuse rather than
+  default" stance the rest of the codebase takes.
+- `model/yaml_exact.py` was necessary and is the subtle part. PyYAML resolves
+  a numeric scalar to a float *during parsing*, so `yaml.safe_load` had
+  already destroyed the value before any conversion could run. Numeric
+  scalars are now preserved as the text the file contained, satisfying 4.2's
+  requirement that monetary inputs be handled as decimal strings at the
+  boundary.
+- The context is installed on import in `model/__init__.py`. This was found
+  the hard way: `power()` ran inside an explicit 50-digit context while the
+  division around it ran at Python's default 28, so a discount factor was
+  computed at one precision and divided at another. Mixed precision is the
+  exact class of error this port removes.
+
+**Limit of the claim, stated precisely.** Decimal is exact for addition,
+subtraction, multiplication, and any division that terminates. It is *not*
+exact for a division that repeats: `x / 365` and `x / 6` are rounded at 50
+significant digits, so two mathematically equal sums built in a different
+order can differ by one unit in the last place. The measured worst case
+across the randomized sweep is **1E-46 absolute, 3.4e-50 relative** — forty
+orders of magnitude inside the 0.0001% contract, and far below any real
+modelling error. `tests/test_precision.py` asserts exact equality where no
+division is involved (the PP&E, debt and retained-earnings schedules) and a
+precision-derived bound where it is.
+
+Verification, per 4.15–4.16: `test_independent_recomputation` rebuilds all
+seven years with its own loader and its own Decimal construction — sharing no
+helper with the engine, as 4.15 requires — and compares 192 values. All agree
+**exactly**. `test_randomized_identity_sweep` covers 150 further models across
+nine orders of magnitude. `test_no_float_survives_in_the_calculation_path`
+asserts every released value is a `Decimal`.
+
+Still outstanding for full Section 4 coverage: 4.16 names EBITDA, CFO/CFI/CFF
+and change-in-NWC among the benchmarked outputs; the benchmark covers
+CFO/CFI/CFF and change-in-NWC but the model has no EBITDA line, because the
+37-step workflow never defines one (12.1.f makes it conditional on a visible
+bridge).
 
 ### F-2 — Section 26's design observations could not be independently verified
 

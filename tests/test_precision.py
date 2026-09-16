@@ -4,25 +4,26 @@ Two different questions are asked here.
 
 `test_independent_recomputation` asks whether the engine implements the
 formulas the workflow specifies. It rebuilds all seven years from the raw
-YAML using plain arithmetic that shares no code with `model/`, and compares
-every resulting figure. Because it follows the same operation order it is
-expected to agree bit-for-bit; a difference means a logic error, not a
-rounding one.
+YAML using plain Decimal arithmetic that shares no code with `model/` --
+specification 4.15 requires that the primary engine and the benchmark not
+call the same helper, so this file parses the YAML with its own loader and
+builds its own Decimals rather than importing `model.numeric.D` or
+`model.yaml_exact`.
 
 `test_randomized_identity_sweep` asks whether the structural identities
 survive inputs the fixture never exercises -- nine orders of magnitude of
-reporting scale, negative growth, zero debt, zero inventory days. Those
-identities are what STEP 6, 21 and 22 demand, and they are the ones that a
-plug would hide.
+reporting scale, negative growth, zero debt, zero inventory days.
 
-Both assert a relative bound. An absolute one would be a different test at
-every reporting scale, which matters because the scale is the modeller's
-choice under STEP 1.
+Both now run on exact decimal arithmetic (specification 1.15, 4.4), so the
+expected result is not "within tolerance" but *exact equality*. The
+tolerances below are retained as a ceiling, and the tests assert the
+stronger property where it holds.
 """
 
 from __future__ import annotations
 
 import random
+from decimal import Decimal
 
 import pytest
 import yaml
@@ -38,39 +39,81 @@ from model.schedules import TaxSchedule
 from model.statements import Ledger
 from tests.conftest import FIXTURES
 
-# The requirement is 0.0001% (1e-6). Both tests are held an order of
-# magnitude or more inside it; the observed errors are far smaller again.
-REQUIRED_REL_TOL = 1e-6
-STRICT_REL_TOL = 1e-9
+# Specification 4.11: the contract is 0.0001%, expressed as a percentage.
+REQUIRED_REL_TOL_PERCENT = Decimal("0.0001")
+
+# Decimal is exact for addition, subtraction, multiplication, and for any
+# division that terminates. It is NOT exact for a division that repeats:
+# `x / 365` and `x / 6` are rounded to the context's 50 significant digits,
+# so two mathematically equal sums built in a different order can differ by
+# one unit in the last place. Measured worst case in this sweep is 1E-46
+# absolute, 3.4e-50 relative.
+#
+# So the identity tests below assert a bound derived from the context
+# precision rather than bitwise equality. It is still forty orders of
+# magnitude inside the 0.0001% the specification requires, and any real
+# modelling error is many orders larger than this floor.
+CONTEXT_FLOOR_REL_PERCENT = Decimal("1e-38")
 
 
-def _rel(a: float, b: float) -> float:
-    return abs(a - b) / max(abs(a), abs(b), 1e-300)
+# --- the benchmark's own infrastructure, deliberately not the engine's -----
+class _BenchmarkLoader(yaml.SafeLoader):
+    """Keeps numeric scalars as written, so the benchmark parses exactly.
+
+    Duplicated rather than imported from `model.yaml_exact`: 4.15 requires
+    the benchmark not to share the engine's helpers.
+    """
+
+
+def _verbatim(loader, node):
+    return loader.construct_scalar(node)
+
+
+_BenchmarkLoader.add_constructor("tag:yaml.org,2002:int", _verbatim)
+_BenchmarkLoader.add_constructor("tag:yaml.org,2002:float", _verbatim)
+
+
+def _load(path):
+    return yaml.load(path.read_text(), Loader=_BenchmarkLoader)
+
+
+def _d(value) -> Decimal:
+    """The benchmark's own Decimal construction, not `model.numeric.D`."""
+    return Decimal(str(value))
+
+
+def _rel_percent(actual: Decimal, expected: Decimal) -> Decimal:
+    if expected == 0:
+        return abs(actual) * Decimal(100)
+    return abs(actual - expected) / abs(expected) * Decimal(100)
 
 
 def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
     """Recompute all seven years from the YAML, sharing no code with model/."""
-    raw = yaml.safe_load((FIXTURES / "raw_historical.yaml").read_text())
-    asm = yaml.safe_load((FIXTURES / "assumptions.yaml").read_text())
-    val = yaml.safe_load((FIXTURES / "valuation.yaml").read_text())
+    raw = _load(FIXTURES / "raw_historical.yaml")
+    asm = _load(FIXTURES / "assumptions.yaml")
+    val = _load(FIXTURES / "valuation.yaml")
 
-    drivers = {(d["name"], d.get("year")): d["value"] for d in asm["drivers"]}
+    drivers = {(d["name"], d.get("year")): _d(d["value"]) for d in asm["drivers"]}
 
     def drv(name, year):
         if (name, year) in drivers:
             return drivers[(name, year)]
         return drivers[(name, None)]
 
-    def opt(name, year, default=0.0):
+    def opt(name, year, default=Decimal(0)):
         try:
             return drv(name, year)
         except KeyError:
             return default
 
-    tax = asm["tax"]["rates"]
+    tax = {k: _d(v) for k, v in asm["tax"]["rates"].items()}
     fy = list(loaded["periods"].forecast)
-    bs = {a: v["values"] for a, v in raw["balance_sheet"].items()}
-    ist = {a: v["values"] for a, v in raw["income_statement"].items()}
+    bs = {a: {y: _d(v) for y, v in blk["values"].items()} for a, blk in raw["balance_sheet"].items()}
+    ist = {a: {y: _d(v) for y, v in blk["values"].items()} for a, blk in raw["income_statement"].items()}
+
+    one = Decimal(1)
+    days = Decimal(365)
 
     prev = dict(
         revenue=ist["revenue"]["2025A"], ppe=bs["ppe_net"]["2025A"], debt=bs["debt"]["2025A"],
@@ -81,30 +124,33 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
             - (bs["accounts_payable"]["2025A"] + bs["other_current_liabilities"]["2025A"]),
     )
 
-    worst = 0.0
+    worst = Decimal(0)
     compared = 0
+    inexact = []
 
     def check(label, mine, theirs):
         nonlocal worst, compared
         assert theirs is not None, f"{label}: engine produced nothing, expected {mine!r}"
+        assert isinstance(theirs, Decimal), f"{label}: engine returned {type(theirs).__name__}, not Decimal"
         compared += 1
-        r = _rel(mine, theirs)
+        if mine != theirs:
+            inexact.append(f"{label}: benchmark {mine} vs engine {theirs}")
+        r = _rel_percent(theirs, mine)
         worst = max(worst, r)
-        assert r <= STRICT_REL_TOL, f"{label}: independent {mine!r} vs engine {theirs!r} (rel {r:.3e})"
 
-    # historical derivations first (STEP 5): gross profit -> EBIT -> pretax -> NI
+    # historical derivations (STEP 5)
     for year in loaded["periods"].historical:
         gp = ist["revenue"][year] - ist["cogs"][year]
         ebit_h = gp - ist["operating_expenses"][year]
         pretax_h = ebit_h - ist["interest_expense"][year]
-        ni_h = pretax_h - ist["taxes"][year]
         check(f"hist {year}.gross_profit", gp, loaded["income"].get(A.GROSS_PROFIT, year))
         check(f"hist {year}.ebit", ebit_h, loaded["income"].get(A.EBIT, year))
         check(f"hist {year}.pretax", pretax_h, loaded["income"].get(A.PRETAX_INCOME, year))
-        check(f"hist {year}.net_income", ni_h, loaded["income"].get(A.NET_INCOME, year))
+        check(f"hist {year}.net_income", pretax_h - ist["taxes"][year],
+              loaded["income"].get(A.NET_INCOME, year))
 
     for year in fy:
-        rev = prev["revenue"] * (1 + drv("revenue_growth", year))
+        rev = prev["revenue"] * (one + drv("revenue_growth", year))
         cogs = rev * drv("cogs_pct_revenue", year)
         opex = rev * drv("opex_pct_revenue", year)
         ebit = rev - cogs - opex
@@ -113,9 +159,9 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
         disposals = opt("ppe_disposals", year)
         ppe = prev["ppe"] + capex - dep - disposals
 
-        ar = rev * drv("dso", year) / 365
-        inv = cogs * drv("inventory_days", year) / 365
-        ap = cogs * drv("dpo", year) / 365
+        ar = rev * drv("dso", year) / days
+        inv = cogs * drv("inventory_days", year) / days
+        ap = cogs * drv("dpo", year) / days
         oca = rev * drv("other_current_assets_pct_revenue", year)
         ocl = rev * drv("other_current_liabilities_pct_revenue", year)
         nwc = (ar + inv + oca) - (ap + ocl)
@@ -132,7 +178,7 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
 
         sbc = rev * opt("sbc_pct_revenue", year)
         buybacks = opt("share_repurchases", year)
-        dividends = opt("dividend_payout_ratio", year) * max(net_income, 0.0)
+        dividends = opt("dividend_payout_ratio", year) * max(net_income, Decimal(0))
         retained = prev["re"] + net_income - dividends
         common = prev["common"] + sbc - buybacks
 
@@ -157,19 +203,18 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
         check(f"BS {year}.ar", ar, forecast.balance.get(A.ACCOUNTS_RECEIVABLE, year))
         check(f"BS {year}.inventory", inv, forecast.balance.get(A.INVENTORY, year))
         check(f"BS {year}.ap", ap, forecast.balance.get(A.ACCOUNTS_PAYABLE, year))
+        check(f"BS {year}.other_ca", oca, forecast.balance.get(A.OTHER_CURRENT_ASSETS, year))
+        check(f"BS {year}.other_cl", ocl, forecast.balance.get(A.OTHER_CURRENT_LIABILITIES, year))
         check(f"BS {year}.ppe", ppe, forecast.balance.get(A.PPE_NET, year))
         check(f"BS {year}.debt", debt, forecast.balance.get(A.DEBT, year))
         check(f"BS {year}.retained_earnings", retained, forecast.balance.get(A.RETAINED_EARNINGS, year))
         check(f"BS {year}.common_equity", common, forecast.balance.get(A.COMMON_EQUITY, year))
         check(f"BS {year}.other_nca", onca, forecast.balance.get(A.OTHER_NONCURRENT_ASSETS, year))
         check(f"BS {year}.other_ncl", oncl, forecast.balance.get(A.OTHER_NONCURRENT_LIABILITIES, year))
-
-        check(f"BS {year}.other_ca", oca, forecast.balance.get(A.OTHER_CURRENT_ASSETS, year))
-        check(f"BS {year}.other_cl", ocl, forecast.balance.get(A.OTHER_CURRENT_LIABILITIES, year))
-        assets_y = cash + ar + inv + oca + ppe + onca
-        liabs_y = ap + ocl + debt + oncl
-        check(f"BS {year}.total_assets", assets_y, forecast.balance.get(A.TOTAL_ASSETS, year))
-        check(f"BS {year}.total_liabilities", liabs_y, forecast.balance.get(A.TOTAL_LIABILITIES, year))
+        check(f"BS {year}.total_assets", cash + ar + inv + oca + ppe + onca,
+              forecast.balance.get(A.TOTAL_ASSETS, year))
+        check(f"BS {year}.total_liabilities", ap + ocl + debt + oncl,
+              forecast.balance.get(A.TOTAL_LIABILITIES, year))
         check(f"BS {year}.total_equity", common + retained, forecast.balance.get(A.TOTAL_EQUITY, year))
 
         check(f"CF {year}.depreciation", dep, forecast.cashflow.get(A.DEPRECIATION_AMORTIZATION, year))
@@ -188,58 +233,68 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
 
     for i, year in enumerate(fy):
         terms = forecast.fcff_inputs(year)
-        nopat = terms["ebit"] * (1 - terms["tax_rate"])
+        nopat = terms["ebit"] * (one - terms["tax_rate"])
         check(f"FCFF {year}.nopat", nopat, fcff_years[i].nopat)
         check(f"FCFF {year}", nopat + terms["d_and_a"] - terms["capex"] - terms["change_in_nwc"],
               fcff_years[i].fcff)
 
-    # valuation, recomputed the same way
     coc = val["cost_of_capital"]
-    ke = coc["risk_free_rate"] + coc["beta"] * coc["equity_risk_premium"]
-    kd = coc["pretax_cost_of_debt"] * (1 - coc["tax_rate"])
-    e, d = coc["market_value_equity"], coc["market_value_debt"]
-    wacc = (e / (e + d)) * ke + (d / (e + d)) * kd
-    g = val["terminal_growth"]["value"]
+    ke = _d(coc["risk_free_rate"]) + _d(coc["beta"]) * _d(coc["equity_risk_premium"])
+    kd = _d(coc["pretax_cost_of_debt"]) * (one - _d(coc["tax_rate"]))
+    e, dbt = _d(coc["market_value_equity"]), _d(coc["market_value_debt"])
+    wacc = (e / (e + dbt)) * ke + (dbt / (e + dbt)) * kd
+    g = _d(val["terminal_growth"]["value"])
 
-    check("cost_of_equity", ke, loaded["valuation_inputs"]["cost_of_capital"].cost_of_equity)
-    check("after_tax_cost_of_debt", kd, loaded["valuation_inputs"]["cost_of_capital"].after_tax_cost_of_debt)
+    engine_coc = loaded["valuation_inputs"]["cost_of_capital"]
+    check("cost_of_equity", ke, engine_coc.cost_of_equity)
+    check("after_tax_cost_of_debt", kd, engine_coc.after_tax_cost_of_debt)
     check("wacc", wacc, valuation.wacc)
-    pv = sum(fcff.fcff / (1 + wacc) ** (i + 1) for i, fcff in enumerate(fcff_years))
-    for i, fcff in enumerate(fcff_years):
-        check(f"PV {fy[i]}", fcff.fcff / (1 + wacc) ** (i + 1), valuation.discounted[i].present_value)
-    terminal = fcff_years[-1].fcff * (1 + g)
+
+    pv = Decimal(0)
+    for i, item in enumerate(fcff_years):
+        factor = one / (one + wacc) ** (i + 1)
+        check(f"PV {fy[i]}", item.fcff * factor, valuation.discounted[i].present_value)
+        pv += item.fcff * factor
+
+    terminal = fcff_years[-1].fcff * (one + g)
     tv = terminal / (wacc - g)
-    pvtv = tv / (1 + wacc) ** len(fy)
+    pvtv = tv / (one + wacc) ** len(fy)
     check("terminal_fcff", terminal, valuation.terminal_fcff)
     check("terminal_value", tv, valuation.terminal_value)
     check("pv_terminal_value", pvtv, valuation.pv_terminal_value)
     check("enterprise_value", pv + pvtv, valuation.enterprise_value)
     check("equity_value",
-          pv + pvtv + val["equity_bridge"]["cash"] - val["equity_bridge"]["debt"], valuation.equity_value)
-    check("implied_share_price",
-          valuation.equity_value / val["shares"]["diluted_shares_outstanding"], valuation.implied_share_price)
+          pv + pvtv + _d(val["equity_bridge"]["cash"]) - _d(val["equity_bridge"]["debt"]),
+          valuation.equity_value)
 
     assert compared >= 180, f"expected a broad comparison, only made {compared}"
-    assert worst <= STRICT_REL_TOL
+    # Exact decimal arithmetic on both sides: the engine should agree exactly,
+    # not merely within tolerance.
+    assert inexact == [], f"{len(inexact)} value(s) not exactly equal: {inexact[:5]}"
+    assert worst <= REQUIRED_REL_TOL_PERCENT
 
 
-def _random_case(rng: random.Random, scale: float):
+def _random_case(rng: random.Random, scale: Decimal):
     """A balanced historical sheet at an arbitrary scale, plus random drivers."""
     periods = Periods(("2024A", "2025A"), ("2026E", "2027E", "2028E", "2029E", "2030E"))
-    rev = 1000.0 * scale
-    cogs = rev * rng.uniform(0.35, 0.75)
-    opex = rev * rng.uniform(0.10, 0.30)
+
+    def r(lo, hi) -> Decimal:
+        return Decimal(str(round(rng.uniform(lo, hi), 6)))
+
+    rev = Decimal(1000) * scale
+    cogs = rev * r(0.35, 0.75)
+    opex = rev * r(0.10, 0.30)
     parts = dict(
-        cash=rev * rng.uniform(0.05, 0.40), accounts_receivable=rev * rng.uniform(0.05, 0.30),
-        inventory=cogs * rng.uniform(0.05, 0.35), other_current_assets=rev * rng.uniform(0.0, 0.05),
-        ppe_net=rev * rng.uniform(0.20, 1.50), other_noncurrent_assets=rev * rng.uniform(0.0, 0.20),
-        accounts_payable=cogs * rng.uniform(0.05, 0.25),
-        other_current_liabilities=rev * rng.uniform(0.0, 0.08),
-        debt=rev * rng.uniform(0.0, 0.80), other_noncurrent_liabilities=rev * rng.uniform(0.0, 0.10),
+        cash=rev * r(0.05, 0.40), accounts_receivable=rev * r(0.05, 0.30),
+        inventory=cogs * r(0.05, 0.35), other_current_assets=rev * r(0.0, 0.05),
+        ppe_net=rev * r(0.20, 1.50), other_noncurrent_assets=rev * r(0.0, 0.20),
+        accounts_payable=cogs * r(0.05, 0.25),
+        other_current_liabilities=rev * r(0.0, 0.08),
+        debt=rev * r(0.0, 0.80), other_noncurrent_liabilities=rev * r(0.0, 0.10),
     )
-    assets = sum(parts[k] for k in A.ASSET_ACCOUNTS)
-    liabs = sum(parts[k] for k in A.LIABILITY_ACCOUNTS)
-    parts["common_equity"] = (assets - liabs) * rng.uniform(0.2, 0.8)
+    assets = sum((parts[k] for k in A.ASSET_ACCOUNTS), Decimal(0))
+    liabs = sum((parts[k] for k in A.LIABILITY_ACCOUNTS), Decimal(0))
+    parts["common_equity"] = (assets - liabs) * r(0.2, 0.8)
     parts["retained_earnings"] = assets - liabs - parts["common_equity"]
 
     src = Source("SWEEP", 1, "line")
@@ -260,43 +315,53 @@ def _random_case(rng: random.Random, scale: float):
         assumptions.add(Assumption(name, value, Basis.MODEL_ASSUMPTION, "sweep", year))
 
     for year in periods.forecast:
-        add("revenue_growth", rng.uniform(-0.25, 0.45), year)
-        add("cogs_pct_revenue", rng.uniform(0.30, 0.80), year)
-    add("opex_pct_revenue", rng.uniform(0.05, 0.30))
-    add("dso", rng.uniform(0.0, 180.0))
-    add("inventory_days", rng.uniform(0.0, 200.0))
-    add("dpo", rng.uniform(0.0, 150.0))
-    add("other_current_assets_pct_revenue", rng.uniform(0.0, 0.06))
-    add("other_current_liabilities_pct_revenue", rng.uniform(0.0, 0.10))
-    add("depreciation_pct_beginning_ppe", rng.uniform(0.02, 0.35))
-    add("capex_pct_revenue", rng.uniform(0.0, 0.25))
-    add("interest_rate_on_debt", rng.uniform(0.0, 0.18))
-    add("sbc_pct_revenue", rng.uniform(0.0, 0.06))
-    add("dividend_payout_ratio", rng.uniform(0.0, 0.7))
-    add("share_repurchases", rev * rng.uniform(0.0, 0.03))
-    add("debt_repayment", parts["debt"] / 6.0)
-    add("ppe_disposals", parts["ppe_net"] * rng.uniform(0.0, 0.02))
+        add("revenue_growth", r(-0.25, 0.45), year)
+        add("cogs_pct_revenue", r(0.30, 0.80), year)
+    add("opex_pct_revenue", r(0.05, 0.30))
+    add("dso", r(0.0, 180.0))
+    add("inventory_days", r(0.0, 200.0))
+    add("dpo", r(0.0, 150.0))
+    add("other_current_assets_pct_revenue", r(0.0, 0.06))
+    add("other_current_liabilities_pct_revenue", r(0.0, 0.10))
+    add("depreciation_pct_beginning_ppe", r(0.02, 0.35))
+    add("capex_pct_revenue", r(0.0, 0.25))
+    add("interest_rate_on_debt", r(0.0, 0.18))
+    add("sbc_pct_revenue", r(0.0, 0.06))
+    add("dividend_payout_ratio", r(0.0, 0.7))
+    add("share_repurchases", rev * r(0.0, 0.03))
+    add("debt_repayment", parts["debt"] / Decimal(6))
+    add("ppe_disposals", parts["ppe_net"] * r(0.0, 0.02))
     for name in ("other_operating", "other_investing", "other_financing"):
-        add(name, rev * rng.uniform(-0.02, 0.02))
-    taxes = TaxSchedule("statutory", {y: rng.uniform(0.0, 0.45) for y in periods.forecast})
+        add(name, rev * r(-0.02, 0.02))
+    taxes = TaxSchedule("statutory", {y: r(0.0, 0.45) for y in periods.forecast})
     return periods, income, balance, cashflow, assumptions, taxes
 
 
-@pytest.mark.parametrize("scale", [1e-3, 1e-1, 1.0, 1e2, 1e4, 1e6])
+@pytest.mark.parametrize("scale", ["0.001", "0.1", "1", "100", "10000", "1000000"])
 def test_randomized_identity_sweep(scale):
-    """The structural identities hold at every reporting scale.
+    """The structural identities hold exactly, at every reporting scale.
 
     This is the test that a plug would fail. Cash is derived from the cash
     flow statement, so `Assets = Liabilities + Equity` only holds if every
-    movement was routed consistently -- across negative growth, zero debt,
-    zero working-capital days, and nine orders of magnitude of scale.
+    movement was routed consistently. On exact decimal arithmetic the
+    identities are not merely close -- they are equal.
     """
+    scale_d = Decimal(scale)
     rng = random.Random(hash(("sweep", scale)) & 0xFFFFFFFF)
-    worst = {"A=L+E": 0.0, "cash": 0.0, "ppe": 0.0, "debt": 0.0, "re": 0.0, "fcff": 0.0, "ev": 0.0}
     models = 0
+    breaks = []
+    worst = Decimal(0)
 
-    for _ in range(25):
-        periods, income, balance, cashflow, assumptions, taxes = _random_case(rng, scale)
+    def note(label, a, b):
+        """Flag only differences larger than the division-rounding floor."""
+        nonlocal worst
+        r = _rel_percent(a, b)
+        worst = max(worst, r)
+        if r > CONTEXT_FLOOR_REL_PERCENT:
+            breaks.append(f"{label}: {a} vs {b} (rel {r:.3e}%)")
+
+    for trial in range(25):
+        periods, income, balance, cashflow, assumptions, taxes = _random_case(rng, scale_d)
         forecast = build_forecast(periods, income, balance, cashflow, assumptions, taxes)
         fcff_years = build_fcff(forecast)
         models += 1
@@ -306,50 +371,77 @@ def test_randomized_identity_sweep(scale):
             total_a = forecast.balance.get(A.TOTAL_ASSETS, year)
             total_l = forecast.balance.get(A.TOTAL_LIABILITIES, year)
             total_e = forecast.balance.get(A.TOTAL_EQUITY, year)
-            worst["A=L+E"] = max(worst["A=L+E"], _rel(total_a, total_l + total_e))
+            note(f"A=L+E trial {trial} {year}", total_a, total_l + total_e)
 
-            flows = sum(forecast.cashflow.get(k, year) for k in (A.CFO, A.CFI, A.CFF))
-            worst["cash"] = max(worst["cash"], _rel(prev_cash + flows, forecast.balance.get(A.CASH, year)))
+            flows = sum((forecast.cashflow.get(k, year) for k in (A.CFO, A.CFI, A.CFF)), Decimal(0))
+            note(f"cash trial {trial} {year}", prev_cash + flows, forecast.balance.get(A.CASH, year))
             prev_cash = forecast.balance.get(A.CASH, year)
 
-            worst["ppe"] = max(worst["ppe"], _rel(forecast.ppe.ending(year), forecast.balance.get(A.PPE_NET, year)))
-            worst["debt"] = max(worst["debt"], _rel(forecast.debt.ending(year), forecast.balance.get(A.DEBT, year)))
-            worst["re"] = max(worst["re"], _rel(forecast.retained_earnings.ending(year),
-                                                forecast.balance.get(A.RETAINED_EARNINGS, year)))
+            # These three involve no division, so they must be exactly equal.
+            assert forecast.ppe.ending(year) == forecast.balance.get(A.PPE_NET, year)
+            assert forecast.debt.ending(year) == forecast.balance.get(A.DEBT, year)
+            assert forecast.retained_earnings.ending(year) == forecast.balance.get(A.RETAINED_EARNINGS, year)
 
         for i, year in enumerate(periods.forecast):
             terms = forecast.fcff_inputs(year)
-            expected = (terms["ebit"] * (1 - terms["tax_rate"]) + terms["d_and_a"]
+            expected = (terms["ebit"] * (Decimal(1) - terms["tax_rate"]) + terms["d_and_a"]
                         - terms["capex"] - terms["change_in_nwc"])
-            worst["fcff"] = max(worst["fcff"], _rel(expected, fcff_years[i].fcff))
+            note(f"fcff trial {trial} {year}", expected, fcff_years[i].fcff)
 
         sources = {k: "sweep" for k in CostOfCapital.REQUIRED_SOURCES}
-        coc = CostOfCapital(0.04, 1.0, 0.06, 0.05, 0.25, 1000.0 * scale, 200.0 * scale, sources)
-        result = run_dcf(fcff_years, coc, 0.02,
-                         EquityBridge(cash=10.0 * scale, debt=20.0 * scale), periods)
-        rebuilt = sum(d.fcff / (1 + result.wacc) ** d.period for d in result.discounted) + result.pv_terminal_value
-        worst["ev"] = max(worst["ev"], _rel(rebuilt, result.enterprise_value))
+        coc = CostOfCapital("0.04", "1.0", "0.06", "0.05", "0.25",
+                            Decimal(1000) * scale_d, Decimal(200) * scale_d, sources)
+        result = run_dcf(fcff_years, coc, Decimal("0.02"),
+                         EquityBridge(cash=Decimal(10) * scale_d, debt=Decimal(20) * scale_d), periods)
+        rebuilt = sum((d.fcff * d.discount_factor for d in result.discounted), Decimal(0)) + result.pv_terminal_value
+        note(f"ev trial {trial}", rebuilt, result.enterprise_value)
 
     assert models == 25
-    offenders = {k: v for k, v in worst.items() if v > REQUIRED_REL_TOL}
-    assert not offenders, f"at scale {scale:g}, these exceeded {REQUIRED_REL_TOL:.0e}: {offenders}"
+    assert breaks == [], f"at scale {scale}, {len(breaks)} identity break(s): {breaks[:5]}"
+    # And the floor itself is astronomically inside the contract (4.11).
+    assert worst < REQUIRED_REL_TOL_PERCENT, f"worst {worst:.3e}% at scale {scale}"
+
+
+def test_no_float_survives_in_the_calculation_path(forecast, fcff_years, valuation):
+    """Specification 1.15 / 4.4: every released value is an exact Decimal."""
+    for ledger in (forecast.income, forecast.balance, forecast.cashflow):
+        for year in forecast.periods.all_years:
+            for account in ledger.accounts_present(year):
+                value = ledger.get(account, year)
+                assert isinstance(value, Decimal), (
+                    f"{ledger.statement.value}.{account} {year} is "
+                    f"{type(value).__name__}, not Decimal"
+                )
+    for item in fcff_years:
+        assert isinstance(item.fcff, Decimal)
+        assert isinstance(item.nopat, Decimal)
+    for name in ("wacc", "enterprise_value", "equity_value", "terminal_value", "pv_terminal_value"):
+        assert isinstance(getattr(valuation, name), Decimal), f"{name} is not Decimal"
+    assert isinstance(valuation.implied_share_price, Decimal)
 
 
 def test_tolerance_is_relative_not_absolute():
-    """An absolute tolerance would be a different test at every scale.
-
-    STEP 1 makes the reporting unit the modeller's choice, so a bound of
-    '0.01' is 1e-5 relative on a balance sheet of 1,020 but 1e-11 on one of
-    1,020,000,000. The same modeling error would pass or fail depending only
-    on whether the filing reports in millions or in dollars.
-    """
+    """An absolute tolerance would be a different test at every scale."""
     from model.checks import DEFAULT_REL_TOL, Tolerance
 
     tol = Tolerance()
-    assert DEFAULT_REL_TOL <= REQUIRED_REL_TOL / 100
+    assert DEFAULT_REL_TOL <= Decimal("1e-9")
 
-    for magnitude in (1.0, 1e3, 1e6, 1e9, 1e12):
-        # a break just inside the relative bound passes at every scale
-        assert tol.close(magnitude, magnitude * (1 + DEFAULT_REL_TOL / 2))
-        # and one just outside it fails at every scale
-        assert not tol.close(magnitude, magnitude * (1 + DEFAULT_REL_TOL * 10))
+    for magnitude in ("1", "1e3", "1e6", "1e9", "1e12"):
+        m = Decimal(magnitude)
+        assert tol.close(m, m * (Decimal(1) + DEFAULT_REL_TOL / Decimal(2)))
+        assert not tol.close(m, m * (Decimal(1) + DEFAULT_REL_TOL * Decimal(10)))
+
+
+def test_decimal_context_meets_specification_4_7_and_4_8():
+    """Precision at least 28 digits, ROUND_HALF_EVEN, no NaN or Infinity."""
+    import decimal
+
+    from model.numeric import CALCULATION_CONTEXT, MINIMUM_PRECISION
+
+    assert CALCULATION_CONTEXT.prec >= MINIMUM_PRECISION == 28
+    assert CALCULATION_CONTEXT.rounding == decimal.ROUND_HALF_EVEN
+    for trap in (decimal.InvalidOperation, decimal.DivisionByZero, decimal.Overflow):
+        assert CALCULATION_CONTEXT.traps[trap], f"{trap.__name__} must trap (17.27, 18.13)"
+    # and the context is actually installed by importing the package
+    assert decimal.getcontext().prec == CALCULATION_CONTEXT.prec

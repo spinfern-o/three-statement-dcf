@@ -17,10 +17,27 @@ those refusals in code rather than relying on discipline:
   checks.py      the twelve PASS/FAIL checks (STEP 9, 37)
 """
 
+from .numeric import use_calculation_context as _use_calculation_context
+
+# Install the 50-digit ROUND_HALF_EVEN context (specification 4.7, 4.8) for
+# this thread at import time.
+#
+# This is deliberate, and it is load-bearing. Python's decimal context is
+# thread-local and defaults to 28 digits, so without it some operations ran
+# inside an explicit 50-digit context while the arithmetic around them ran
+# at 28 -- a discount factor computed at one precision and divided at
+# another. Mixed precision is precisely the class of error this port exists
+# to remove, so the context is set once, for the whole package, rather than
+# wrapped around individual call sites where one could be missed.
+#
+# Code that calls the engine from a worker thread must call
+# `model.numeric.use_calculation_context()` on that thread.
+_use_calculation_context()
+
 __all__ = [
     "accounts", "assumptions", "checks", "dcf", "forecast",
-    "loader", "profile", "provenance", "report", "schedules",
-    "sensitivity", "statements",
+    "loader", "numeric", "profile", "provenance", "report", "schedules",
+    "sensitivity", "statements", "yaml_exact",
 ]
 
 __version__ = "0.1.0"
