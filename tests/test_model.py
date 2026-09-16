@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import math
+from decimal import Decimal
 
 import pytest
 
 import model.accounts as A
+from model.numeric import D
 from model.checks import Status, run_all_checks
 from model.statements import Ledger
 
@@ -15,18 +17,18 @@ from model.statements import Ledger
 def test_absent_line_stays_absent(loaded):
     """STEP 5: an unreported line is None, never 0.0."""
     income = loaded["income"]
-    assert income.get(A.COGS, "2025A") == 580.0
+    assert income.get(A.COGS, "2025A") == D("580")
     # The fixture reports no gross_profit line; it is DERIVED, not transcribed.
     assert income.origin_of(A.GROSS_PROFIT, "2025A") == "derived"
-    assert income.get(A.GROSS_PROFIT, "2025A") == pytest.approx(420.0)
+    assert income.get(A.GROSS_PROFIT, "2025A") == D("420")
 
 
 def test_derived_cascade(loaded):
     """revenue -> gross profit -> EBIT -> pretax -> net income."""
     income = loaded["income"]
-    assert income.get(A.EBIT, "2025A") == pytest.approx(170.0)
-    assert income.get(A.PRETAX_INCOME, "2025A") == pytest.approx(140.0)
-    assert income.get(A.NET_INCOME, "2025A") == pytest.approx(106.4)
+    assert income.get(A.EBIT, "2025A") == D("170")
+    assert income.get(A.PRETAX_INCOME, "2025A") == D("140")
+    assert income.get(A.NET_INCOME, "2025A") == D("106.4")
 
 
 def test_reported_subtotals_agree_with_components(loaded):
@@ -42,21 +44,21 @@ def test_cross_check_detects_a_contradiction():
 
     ledger = Ledger(Statement.INCOME, ("2025A",))
     src = Source("10-K", 40, "line")
-    for account, value in [(A.REVENUE, 1000.0), (A.COGS, 580.0), (A.GROSS_PROFIT, 500.0)]:
+    for account, value in [(A.REVENUE, "1000"), (A.COGS, "580"), (A.GROSS_PROFIT, "500")]:
         ledger.set_reported(account, "2025A", Figure(value, "2025A", src))
     breaks = ledger.cross_check()
     assert len(breaks) == 1
     assert breaks[0].account == A.GROSS_PROFIT
-    assert breaks[0].delta == pytest.approx(80.0)
+    assert breaks[0].delta == D("80")
     # and it is left alone
-    assert ledger.get(A.GROSS_PROFIT, "2025A") == 500.0
+    assert ledger.get(A.GROSS_PROFIT, "2025A") == D("500")
 
 
 # --- STEP 13-22: the forecast ---------------------------------------------
 def test_revenue_compounds_from_the_last_actual(forecast, loaded):
     base = loaded["income"].get(A.REVENUE, "2025A")
     growth = loaded["assumptions"].get("revenue_growth", "2026E")
-    assert forecast.income.get(A.REVENUE, "2026E") == pytest.approx(base * (1 + growth))
+    assert forecast.income.get(A.REVENUE, "2026E") == base * (D(1) + growth)
 
 
 def test_ebit_excludes_financing(forecast):
@@ -65,7 +67,7 @@ def test_ebit_excludes_financing(forecast):
         revenue = forecast.income.get(A.REVENUE, year)
         cogs = forecast.income.get(A.COGS, year)
         opex = forecast.income.get(A.OPERATING_EXPENSES, year)
-        assert forecast.income.get(A.EBIT, year) == pytest.approx(revenue - cogs - opex)
+        assert forecast.income.get(A.EBIT, year) == revenue - cogs - opex
 
 
 def test_depreciation_is_not_capex(forecast):
@@ -73,7 +75,7 @@ def test_depreciation_is_not_capex(forecast):
     for year in forecast.periods.forecast:
         dep = forecast.cashflow.get(A.DEPRECIATION_AMORTIZATION, year)
         capex = abs(forecast.cashflow.get(A.CAPEX, year))
-        assert not math.isclose(dep, capex, rel_tol=1e-9)
+        assert dep != capex
 
 
 def test_ppe_schedule_rolls_forward(forecast, loaded):
@@ -81,10 +83,10 @@ def test_ppe_schedule_rolls_forward(forecast, loaded):
     prior = loaded["balance"].get(A.PPE_NET, "2025A")
     for year in forecast.periods.forecast:
         row = forecast.ppe.rows[year]
-        assert row.beginning == pytest.approx(prior)
+        assert row.beginning == prior
         expected = row.beginning + row.additions["CapEx"] - row.reductions["Depreciation"] - row.reductions["Disposals"]
-        assert row.ending == pytest.approx(expected)
-        assert forecast.balance.get(A.PPE_NET, year) == pytest.approx(row.ending)
+        assert row.ending == expected
+        assert forecast.balance.get(A.PPE_NET, year) == row.ending
         prior = row.ending
 
 
@@ -93,7 +95,7 @@ def test_interest_is_linked_to_the_debt_schedule(forecast, loaded):
     rate = loaded["assumptions"].get("interest_rate_on_debt", "2026E")
     for year in forecast.periods.forecast:
         beginning_debt = forecast.debt.beginning(year)
-        assert forecast.income.get(A.INTEREST_EXPENSE, year) == pytest.approx(beginning_debt * rate)
+        assert forecast.income.get(A.INTEREST_EXPENSE, year) == beginning_debt * rate
 
 
 def test_working_capital_is_built_account_by_account(forecast, loaded):
@@ -103,11 +105,11 @@ def test_working_capital_is_built_account_by_account(forecast, loaded):
         row = forecast.working_capital.rows[year]
         revenue = forecast.income.get(A.REVENUE, year)
         cogs = forecast.income.get(A.COGS, year)
-        assert row.accounts_receivable == pytest.approx(revenue * assumptions.get("dso", year) / 365)
-        assert row.inventory == pytest.approx(cogs * assumptions.get("inventory_days", year) / 365)
-        assert row.accounts_payable == pytest.approx(cogs * assumptions.get("dpo", year) / 365)
+        assert row.accounts_receivable == revenue * assumptions.get("dso", year) / D(365)
+        assert row.inventory == cogs * assumptions.get("inventory_days", year) / D(365)
+        assert row.accounts_payable == cogs * assumptions.get("dpo", year) / D(365)
         # NWC excludes cash and debt
-        assert row.nwc == pytest.approx(row.operating_current_assets - row.operating_current_liabilities)
+        assert row.nwc == row.operating_current_assets - row.operating_current_liabilities
 
 
 def test_nwc_excludes_cash_and_debt(forecast):
@@ -117,7 +119,7 @@ def test_nwc_excludes_cash_and_debt(forecast):
     cash = forecast.balance.get(A.CASH, year)
     debt = forecast.balance.get(A.DEBT, year)
     assert cash > 0 and debt > 0
-    assert row.nwc != pytest.approx(row.nwc + cash)
+    assert row.nwc != row.nwc + cash
     assert all(acct not in (A.CASH, A.DEBT) for acct in A.OPERATING_CURRENT_ASSETS + A.OPERATING_CURRENT_LIABILITIES)
 
 
@@ -127,7 +129,7 @@ def test_balance_sheet_balances_every_forecast_year(forecast):
         assets = forecast.balance.get(A.TOTAL_ASSETS, year)
         liabilities = forecast.balance.get(A.TOTAL_LIABILITIES, year)
         equity = forecast.balance.get(A.TOTAL_EQUITY, year)
-        assert assets == pytest.approx(liabilities + equity, abs=1e-6), f"{year} out of balance"
+        assert assets == liabilities + equity, f"{year} out of balance"
 
 
 def test_ending_cash_comes_from_the_cash_flow_statement(forecast):
@@ -136,16 +138,16 @@ def test_ending_cash_comes_from_the_cash_flow_statement(forecast):
     for year in periods.forecast:
         prior = periods.prior(year)
         begin = forecast.balance.get(A.CASH, prior)
-        flows = sum(forecast.cashflow.get(k, year) for k in (A.CFO, A.CFI, A.CFF))
-        assert forecast.balance.get(A.CASH, year) == pytest.approx(begin + flows, abs=1e-6)
+        flows = sum((forecast.cashflow.get(k, year) for k in (A.CFO, A.CFI, A.CFF)), D(0))
+        assert forecast.balance.get(A.CASH, year) == begin + flows
 
 
 def test_retained_earnings_rolls_forward(forecast):
     for year in forecast.periods.forecast:
         row = forecast.retained_earnings.rows[year]
         net_income = forecast.income.get(A.NET_INCOME, year)
-        assert row.additions["Net Income"] == pytest.approx(net_income)
-        assert forecast.balance.get(A.RETAINED_EARNINGS, year) == pytest.approx(row.ending)
+        assert row.additions["Net Income"] == net_income
+        assert forecast.balance.get(A.RETAINED_EARNINGS, year) == row.ending
 
 
 def test_every_forecast_cell_has_a_driver(forecast):
@@ -163,52 +165,50 @@ def test_every_forecast_cell_has_a_driver(forecast):
 def test_fcff_formula(fcff_years):
     """FCFF = EBIT x (1 - t) + D&A - CapEx - Change in NWC."""
     for item in fcff_years:
-        expected = item.ebit * (1 - item.tax_rate) + item.d_and_a - item.capex - item.change_in_nwc
-        assert item.fcff == pytest.approx(expected)
+        expected = item.ebit * (D(1) - item.tax_rate) + item.d_and_a - item.capex - item.change_in_nwc
+        assert item.fcff == expected
 
 
 def test_fcff_is_read_back_out_of_the_model(fcff_years, forecast):
     """STEP 37: FCFF matches the three-statement forecast."""
     for item in fcff_years:
         terms = forecast.fcff_inputs(item.year)
-        assert item.ebit == pytest.approx(terms["ebit"])
-        assert item.d_and_a == pytest.approx(terms["d_and_a"])
-        assert item.capex == pytest.approx(terms["capex"])
-        assert item.change_in_nwc == pytest.approx(terms["change_in_nwc"])
+        assert item.ebit == terms["ebit"]
+        assert item.d_and_a == terms["d_and_a"]
+        assert item.capex == terms["capex"]
+        assert item.change_in_nwc == terms["change_in_nwc"]
 
 
 def test_capm_and_wacc(loaded):
     coc = loaded["valuation_inputs"]["cost_of_capital"]
-    assert coc.cost_of_equity == pytest.approx(0.042 + 1.10 * 0.055)
-    assert coc.after_tax_cost_of_debt == pytest.approx(0.055 * (1 - 0.24))
+    assert coc.cost_of_equity == D("0.042") + D("1.10") * D("0.055")
+    assert coc.after_tax_cost_of_debt == D("0.055") * (D(1) - D("0.24"))
     expected = coc.weight_equity * coc.cost_of_equity + coc.weight_debt * coc.after_tax_cost_of_debt
-    assert coc.wacc == pytest.approx(expected)
-    assert coc.weight_equity + coc.weight_debt == pytest.approx(1.0)
+    assert coc.wacc == expected
+    assert coc.weight_equity + coc.weight_debt == D(1)
 
 
 def test_discounting_and_terminal_value(valuation, fcff_years):
     """STEP 29-32."""
     for item in valuation.discounted:
-        assert item.discount_factor == pytest.approx(1 / (1 + valuation.wacc) ** item.period)
-        assert item.present_value == pytest.approx(item.fcff * item.discount_factor)
+        assert item.discount_factor == D(1) / (D(1) + valuation.wacc) ** item.period
+        assert item.present_value == item.fcff * item.discount_factor
     assert [d.period for d in valuation.discounted] == [1, 2, 3, 4, 5]
 
-    assert valuation.terminal_fcff == pytest.approx(fcff_years[-1].fcff * (1 + valuation.terminal_growth))
-    assert valuation.terminal_value == pytest.approx(
+    assert valuation.terminal_fcff == fcff_years[-1].fcff * (D(1) + valuation.terminal_growth)
+    assert valuation.terminal_value == (
         valuation.terminal_fcff / (valuation.wacc - valuation.terminal_growth)
     )
-    assert valuation.pv_terminal_value == pytest.approx(
-        valuation.terminal_value / (1 + valuation.wacc) ** 5
-    )
+    assert valuation.pv_terminal_value == valuation.terminal_value / (D(1) + valuation.wacc) ** 5
 
 
 def test_enterprise_and_equity_value(valuation):
     """STEP 33-35."""
-    assert valuation.enterprise_value == pytest.approx(valuation.pv_explicit + valuation.pv_terminal_value)
-    assert valuation.equity_value == pytest.approx(
+    assert valuation.enterprise_value == valuation.pv_explicit + valuation.pv_terminal_value
+    assert valuation.equity_value == (
         valuation.enterprise_value + valuation.bridge.cash - valuation.bridge.debt
     )
-    assert valuation.implied_share_price == pytest.approx(valuation.equity_value / valuation.diluted_shares)
+    assert valuation.implied_share_price == valuation.equity_value / valuation.diluted_shares
 
 
 def test_bridge_lists_every_item_even_at_zero(valuation):
@@ -237,7 +237,7 @@ def test_sensitivity_grid(loaded, fcff_years):
     vi = loaded["valuation_inputs"]
     grid = sensitivity_grid(
         fcff_years, vi["cost_of_capital"], vi["equity_bridge"], loaded["periods"],
-        wacc_values=[0.06, 0.08], growth_values=[0.02, 0.07],
+        wacc_values=[D("0.06"), D("0.08")], growth_values=[D("0.02"), D("0.07")],
         diluted_shares=vi["diluted_shares"], shares_source=vi["shares_source"],
     )
     assert len(grid) == 2 and len(grid[0]) == 2
@@ -261,8 +261,8 @@ def test_a_broken_balance_sheet_fails_rather_than_being_plugged(forecast, fcff_y
 
     broken = copy.deepcopy(forecast)
     year = broken.periods.forecast[0]
-    broken.balance.set_forecast(A.CASH, year, broken.balance.get(A.CASH, year) + 50.0, "deliberate corruption")
-    broken.balance.set_derived(A.TOTAL_ASSETS, year, broken.balance.get(A.TOTAL_ASSETS, year) + 50.0, "corrupted")
+    broken.balance.set_forecast(A.CASH, year, broken.balance.get(A.CASH, year) + D("50"), "deliberate corruption")
+    broken.balance.set_derived(A.TOTAL_ASSETS, year, broken.balance.get(A.TOTAL_ASSETS, year) + D("50"), "corrupted")
 
     results = run_all_checks(broken, fcff_years, valuation)
     by_name = {r.name: r for r in results}

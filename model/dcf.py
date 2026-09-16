@@ -13,8 +13,10 @@ values as explicit, separately sourced inputs.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from .forecast import ForecastResult
+from .numeric import D, ONE, ZERO, power
 from .profile import Periods
 from .provenance import ProvenanceError
 
@@ -24,19 +26,19 @@ class FCFFYear:
     """STEP 24: one forecast year's free cash flow to the firm."""
 
     year: str
-    ebit: float
-    tax_rate: float
-    d_and_a: float
-    capex: float
-    change_in_nwc: float
+    ebit: Decimal
+    tax_rate: Decimal
+    d_and_a: Decimal
+    capex: Decimal
+    change_in_nwc: Decimal
 
     @property
-    def nopat(self) -> float:
+    def nopat(self) -> Decimal:
         """STEP 16: NOPAT = EBIT x (1 - Tax Rate)."""
-        return self.ebit * (1.0 - self.tax_rate)
+        return self.ebit * (ONE - self.tax_rate)
 
     @property
-    def fcff(self) -> float:
+    def fcff(self) -> Decimal:
         """STEP 23: NOPAT + D&A - CapEx - Change in NWC."""
         return self.nopat + self.d_and_a - self.capex - self.change_in_nwc
 
@@ -69,13 +71,13 @@ def build_fcff(forecast: ForecastResult) -> list[FCFFYear]:
 class CostOfCapital:
     """STEP 25-28. Every input is externally sourced and separately stated."""
 
-    risk_free_rate: float
-    beta: float
-    equity_risk_premium: float
-    pretax_cost_of_debt: float
-    tax_rate: float
-    market_value_equity: float
-    market_value_debt: float
+    risk_free_rate: Decimal
+    beta: Decimal
+    equity_risk_premium: Decimal
+    pretax_cost_of_debt: Decimal
+    tax_rate: Decimal
+    market_value_equity: Decimal
+    market_value_debt: Decimal
     sources: dict[str, str] = field(default_factory=dict)
 
     REQUIRED_SOURCES = (
@@ -88,6 +90,9 @@ class CostOfCapital:
     )
 
     def __post_init__(self) -> None:
+        for name in ("risk_free_rate", "beta", "equity_risk_premium", "pretax_cost_of_debt",
+                     "tax_rate", "market_value_equity", "market_value_debt"):
+            object.__setattr__(self, name, D(getattr(self, name), what=f"CostOfCapital.{name}"))
         if self.market_value_equity <= 0:
             raise ProvenanceError(
                 "market_value_equity must be positive. STEP 27: use market values -- "
@@ -95,7 +100,7 @@ class CostOfCapital:
             )
         if self.market_value_debt < 0:
             raise ProvenanceError("market_value_debt cannot be negative (STEP 27)")
-        if not 0.0 <= self.tax_rate < 1.0:
+        if not 0 <= self.tax_rate < 1:
             raise ProvenanceError(f"tax_rate must be a decimal in [0, 1), got {self.tax_rate!r}")
         missing = [k for k in self.REQUIRED_SOURCES if not self.sources.get(k, "").strip()]
         if missing:
@@ -106,29 +111,29 @@ class CostOfCapital:
             )
 
     @property
-    def cost_of_equity(self) -> float:
+    def cost_of_equity(self) -> Decimal:
         """STEP 25 (CAPM): Rf + Beta x ERP."""
         return self.risk_free_rate + self.beta * self.equity_risk_premium
 
     @property
-    def after_tax_cost_of_debt(self) -> float:
+    def after_tax_cost_of_debt(self) -> Decimal:
         """STEP 26: pre-tax cost of debt x (1 - tax rate)."""
-        return self.pretax_cost_of_debt * (1.0 - self.tax_rate)
+        return self.pretax_cost_of_debt * (ONE - self.tax_rate)
 
     @property
-    def total_capital(self) -> float:
+    def total_capital(self) -> Decimal:
         return self.market_value_equity + self.market_value_debt
 
     @property
-    def weight_equity(self) -> float:
+    def weight_equity(self) -> Decimal:
         return self.market_value_equity / self.total_capital
 
     @property
-    def weight_debt(self) -> float:
+    def weight_debt(self) -> Decimal:
         return self.market_value_debt / self.total_capital
 
     @property
-    def wacc(self) -> float:
+    def wacc(self) -> Decimal:
         """STEP 28: E/(D+E) x Ke + D/(D+E) x Kd x (1 - t)."""
         return self.weight_equity * self.cost_of_equity + self.weight_debt * self.after_tax_cost_of_debt
 
@@ -148,12 +153,12 @@ class DiscountedYear:
     """STEP 29 requires these four shown separately, not collapsed."""
 
     year: str
-    fcff: float
+    fcff: Decimal
     period: int
-    discount_factor: float
+    discount_factor: Decimal
 
     @property
-    def present_value(self) -> float:
+    def present_value(self) -> Decimal:
         return self.fcff * self.discount_factor
 
 
@@ -161,15 +166,20 @@ class DiscountedYear:
 class EquityBridge:
     """STEP 34. Non-operating items are listed, never silently ignored."""
 
-    cash: float
-    debt: float
-    non_operating_investments: float = 0.0
-    minority_interest: float = 0.0
-    preferred_stock: float = 0.0
-    pension_obligations: float = 0.0
-    other_claims: float = 0.0
+    cash: Decimal
+    debt: Decimal
+    non_operating_investments: Decimal = ZERO
+    minority_interest: Decimal = ZERO
+    preferred_stock: Decimal = ZERO
+    pension_obligations: Decimal = ZERO
+    other_claims: Decimal = ZERO
 
-    def apply(self, enterprise_value: float) -> float:
+    def __post_init__(self) -> None:
+        for name in ("cash", "debt", "non_operating_investments", "minority_interest",
+                     "preferred_stock", "pension_obligations", "other_claims"):
+            object.__setattr__(self, name, D(getattr(self, name), what=f"EquityBridge.{name}"))
+
+    def apply(self, enterprise_value: Decimal) -> Decimal:
         return (
             enterprise_value
             + self.cash
@@ -181,7 +191,7 @@ class EquityBridge:
             - self.other_claims
         )
 
-    def lines(self) -> list[tuple[str, float]]:
+    def lines(self) -> list[tuple[str, Decimal]]:
         return [
             ("+ Cash", self.cash),
             ("- Debt", -self.debt),
@@ -197,45 +207,51 @@ class EquityBridge:
 class Valuation:
     periods: Periods
     discounted: list[DiscountedYear]
-    terminal_growth: float
-    wacc: float
-    terminal_fcff: float
-    terminal_value: float
-    pv_terminal_value: float
-    enterprise_value: float
-    equity_value: float
+    terminal_growth: Decimal
+    wacc: Decimal
+    terminal_fcff: Decimal
+    terminal_value: Decimal
+    pv_terminal_value: Decimal
+    enterprise_value: Decimal
+    equity_value: Decimal
     bridge: EquityBridge
-    diluted_shares: float | None
+    diluted_shares: Decimal | None
     shares_source: str | None
 
     @property
-    def pv_explicit(self) -> float:
-        return sum(d.present_value for d in self.discounted)
+    def pv_explicit(self) -> Decimal:
+        return sum((d.present_value for d in self.discounted), ZERO)
 
     @property
-    def implied_share_price(self) -> float | None:
+    def implied_share_price(self) -> Decimal | None:
         """STEP 35. None when the company is not public / shares not supplied."""
         if self.diluted_shares is None:
             return None
         return self.equity_value / self.diluted_shares
 
     @property
-    def tv_share_of_ev(self) -> float:
-        return self.pv_terminal_value / self.enterprise_value if self.enterprise_value else float("nan")
+    def tv_share_of_ev(self) -> Decimal | None:
+        """None rather than NaN when enterprise value is zero (17.27)."""
+        if self.enterprise_value == 0:
+            return None
+        return self.pv_terminal_value / self.enterprise_value
 
 
 def run_dcf(
     fcff_years: list[FCFFYear],
     cost_of_capital: CostOfCapital,
-    terminal_growth: float,
+    terminal_growth: Decimal,
     bridge: EquityBridge,
     periods: Periods,
-    diluted_shares: float | None = None,
+    diluted_shares: Decimal | None = None,
     shares_source: str | None = None,
 ) -> Valuation:
     """STEP 29-35."""
 
     wacc = cost_of_capital.wacc
+    terminal_growth = D(terminal_growth, what="terminal_growth")
+    if diluted_shares is not None:
+        diluted_shares = D(diluted_shares, what="diluted_shares")
 
     # STEP 31: "The model must satisfy: WACC > Terminal Growth Rate."
     if wacc <= terminal_growth:
@@ -261,18 +277,18 @@ def run_dcf(
                 year=item.year,
                 fcff=item.fcff,
                 period=t,
-                discount_factor=1.0 / ((1.0 + wacc) ** t),
+                discount_factor=ONE / power(ONE + wacc, t),
             )
         )
 
     # STEP 30-32: terminal cash flow, terminal value, and its present value
-    terminal_fcff = fcff_years[-1].fcff * (1.0 + terminal_growth)
+    terminal_fcff = fcff_years[-1].fcff * (ONE + terminal_growth)
     terminal_value = terminal_fcff / (wacc - terminal_growth)
     final_period = periods.discount_period(periods.terminal_year)
-    pv_terminal_value = terminal_value / ((1.0 + wacc) ** final_period)
+    pv_terminal_value = terminal_value / power(ONE + wacc, final_period)
 
     # STEP 33-34
-    enterprise_value = sum(d.present_value for d in discounted) + pv_terminal_value
+    enterprise_value = sum((d.present_value for d in discounted), ZERO) + pv_terminal_value
     equity_value = bridge.apply(enterprise_value)
 
     return Valuation(

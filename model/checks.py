@@ -14,9 +14,11 @@ one that fails honestly.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import Enum
 
 from . import accounts as A
+from .numeric import D, ZERO
 from .dcf import FCFFYear, Valuation
 from .forecast import ForecastResult
 from .profile import Periods
@@ -33,22 +35,26 @@ from .statements import Ledger
 # magnitude put the worst observed drift at 3.4e-13 relative. The default
 # below leaves three orders of headroom above that while staying a thousand
 # times stricter than 0.0001%.
-DEFAULT_REL_TOL = 1e-9
+DEFAULT_REL_TOL = D("1e-9")
 
 # Absolute floor, for accounts legitimately at or near zero, where relative
 # error is undefined. Zero by default: STEP 6 says a balance sheet that does
 # not balance is an error to find, not a difference to absorb. Raise it
 # deliberately (and visibly -- the report prints it) if a filing's own
 # rounding, rather than the model, is what breaks a historical check.
-DEFAULT_ABS_TOL = 0.0
+DEFAULT_ABS_TOL = ZERO
 
 
 @dataclass(frozen=True)
 class Tolerance:
-    rel: float = DEFAULT_REL_TOL
-    abs: float = DEFAULT_ABS_TOL
+    rel: Decimal = DEFAULT_REL_TOL
+    abs: Decimal = DEFAULT_ABS_TOL
 
-    def close(self, a: float, b: float) -> bool:
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "rel", D(self.rel, what="Tolerance.rel"))
+        object.__setattr__(self, "abs", D(self.abs, what="Tolerance.abs"))
+
+    def close(self, a: Decimal, b: Decimal) -> bool:
         return abs(a - b) <= max(self.rel * max(abs(a), abs(b)), self.abs)
 
     def describe(self) -> str:
@@ -115,7 +121,7 @@ def _cashflow_reconciliation(
             continue
         begin = balance.get(A.CASH, prior)
         end = balance.get(A.CASH, year)
-        cfo, cfi, cff = (cashflow.get(k, year) for k in (A.CFO, A.CFI, A.CFF))
+        cfo, cfi, cff = (cashflow.get(k, year) for k in (A.CFO, A.CFI, A.CFF))  # noqa: E501
         if None in (begin, end, cfo, cfi, cff):
             continue
         checked += 1

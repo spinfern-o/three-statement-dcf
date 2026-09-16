@@ -14,8 +14,10 @@ and an unresolved conflict is a hard error, not a warning.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from enum import Enum
 
+from .numeric import D, PrecisionError
 from .provenance import ProvenanceError
 
 
@@ -38,7 +40,7 @@ class Basis(str, Enum):
 @dataclass(frozen=True)
 class Assumption:
     name: str
-    value: float
+    value: Decimal
     basis: Basis
     source: str
     year: str | None = None
@@ -57,8 +59,10 @@ class Assumption:
                 f"Assumption {self.name!r} has no source. STEP 10: every forecast "
                 "assumption must have a visible source or explanation."
             )
-        if not isinstance(self.value, (int, float)) or isinstance(self.value, bool):
-            raise ProvenanceError(f"Assumption {self.name!r}: value must be numeric, got {self.value!r}")
+        try:
+            object.__setattr__(self, "value", D(self.value, what=f"Assumption {self.name!r} value"))
+        except PrecisionError as exc:
+            raise ProvenanceError(str(exc)) from None
 
     @property
     def key(self) -> tuple[str, str | None]:
@@ -121,7 +125,7 @@ class Assumptions:
     def add_conflict(self, conflict: Conflict) -> None:
         self.conflicts.append(conflict)
 
-    def get(self, name: str, year: str | None = None) -> float:
+    def get(self, name: str, year: str | None = None) -> Decimal:
         """Year-specific value if present, else the all-years value.
 
         Raises when neither exists. There is no fallback default -- a driver

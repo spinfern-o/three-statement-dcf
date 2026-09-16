@@ -19,14 +19,16 @@ unintended hardcode in a forecast year.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from decimal import Decimal
 
 from .accounts import DERIVED, OPTIONAL_IN_DERIVATION, Statement, validate_account
+from .numeric import D, ZERO
 from .provenance import Figure, ProvenanceError, Source
 
 
 @dataclass(frozen=True)
 class Cell:
-    value: float
+    value: Decimal
     origin: str  # "reported" | "derived" | "forecast"
     source: Source | None = None
     basis: str | None = None  # for derived/forecast: how it was produced
@@ -43,11 +45,11 @@ class Discrepancy:
 
     account: str
     year: str
-    reported: float
-    derived: float
+    reported: Decimal
+    derived: Decimal
 
     @property
-    def delta(self) -> float:
+    def delta(self) -> Decimal:
         return self.reported - self.derived
 
     def __str__(self) -> str:
@@ -82,7 +84,7 @@ class Ledger:
             )
         self._cells[(account, year)] = Cell(figure.value, "reported", figure.source)
 
-    def set_forecast(self, account: str, year: str, value: float, basis: str) -> None:
+    def set_forecast(self, account: str, year: str, value: Decimal, basis: str) -> None:
         """STEP 13-22: a driver-produced value. `basis` names the driver."""
         validate_account(self.statement, account)
         self._check_year(year)
@@ -91,23 +93,23 @@ class Ledger:
                 f"Forecast {account} {year} needs a stated basis. "
                 "STEP 10: never hide assumptions inside formulas."
             )
-        self._cells[(account, year)] = Cell(float(value), "forecast", None, basis)
+        self._cells[(account, year)] = Cell(D(value, what=f"{account} {year}"), "forecast", None, basis)
 
-    def set_derived(self, account: str, year: str, value: float, basis: str) -> None:
+    def set_derived(self, account: str, year: str, value: Decimal, basis: str) -> None:
         validate_account(self.statement, account)
         self._check_year(year)
-        self._cells[(account, year)] = Cell(float(value), "derived", None, basis)
+        self._cells[(account, year)] = Cell(D(value, what=f"{account} {year}"), "derived", None, basis)
 
     # -- reading ----------------------------------------------------------
     def cell(self, account: str, year: str) -> Cell | None:
         return self._cells.get((account, year))
 
-    def get(self, account: str, year: str) -> float | None:
-        """Value, or None if the company does not report it. Never 0.0."""
+    def get(self, account: str, year: str) -> Decimal | None:
+        """Value, or None if the company does not report it. Never zero."""
         cell = self._cells.get((account, year))
         return None if cell is None else cell.value
 
-    def require(self, account: str, year: str, step: str) -> float:
+    def require(self, account: str, year: str, step: str) -> Decimal:
         value = self.get(account, year)
         if value is None:
             raise ProvenanceError(
@@ -127,12 +129,12 @@ class Ledger:
         return None if cell is None else cell.origin
 
     # -- derivation and cross-checking (STEP 9) ---------------------------
-    def _try_derive(self, account: str, year: str) -> float | None:
+    def _try_derive(self, account: str, year: str) -> Decimal | None:
         rule = DERIVED.get(account)
         if rule is None:
             return None
         plus, minus = rule
-        total = 0.0
+        total = ZERO
         contributed = False
         for term in plus:
             v = self.get(term, year)
@@ -177,7 +179,7 @@ class Ledger:
                         changed = True
         return filled
 
-    def cross_check(self, rel_tol: float = 1e-6, abs_tol: float = 0.0) -> list[Discrepancy]:
+    def cross_check(self, rel_tol: Decimal | str = "1e-6", abs_tol: Decimal | str = "0") -> list[Discrepancy]:
         """STEP 9: where a subtotal is BOTH reported and derivable, compare.
 
         A mismatch means an extraction or mapping error. It is surfaced, not
@@ -189,6 +191,8 @@ class Ledger:
         company's rounding rather than a mapping error. Tighten it with
         `rel_tol` if the filing reports to full precision.
         """
+        rel = D(rel_tol, what="cross_check rel_tol")
+        absolute = D(abs_tol, what="cross_check abs_tol")
         out: list[Discrepancy] = []
         for year in self.years:
             for account in DERIVED:
@@ -198,7 +202,7 @@ class Ledger:
                 derived = self._try_derive(account, year)
                 if derived is None:
                     continue
-                if abs(cell.value - derived) > max(rel_tol * max(abs(cell.value), abs(derived)), abs_tol):
+                if abs(cell.value - derived) > max(rel * max(abs(cell.value), abs(derived)), absolute):
                     out.append(Discrepancy(account, year, cell.value, derived))
         return out
 

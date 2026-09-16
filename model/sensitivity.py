@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from decimal import Decimal
 
 from .dcf import CostOfCapital, EquityBridge, FCFFYear, run_dcf
+from .numeric import D, ZERO
 from .profile import Periods
 from .provenance import ProvenanceError
 
 
 @dataclass(frozen=True)
 class SensitivityCell:
-    wacc: float
-    terminal_growth: float
-    enterprise_value: float | None
-    equity_value: float | None
-    implied_share_price: float | None
+    wacc: Decimal
+    terminal_growth: Decimal
+    enterprise_value: Decimal | None
+    equity_value: Decimal | None
+    implied_share_price: Decimal | None
     note: str = ""
 
 
@@ -24,9 +26,9 @@ def sensitivity_grid(
     base_cost_of_capital: CostOfCapital,
     bridge: EquityBridge,
     periods: Periods,
-    wacc_values: list[float],
-    growth_values: list[float],
-    diluted_shares: float | None = None,
+    wacc_values: list[Decimal],
+    growth_values: list[Decimal],
+    diluted_shares: Decimal | None = None,
     shares_source: str | None = None,
 ) -> list[list[SensitivityCell]]:
     """Rows are WACC, columns are terminal growth.
@@ -37,6 +39,9 @@ def sensitivity_grid(
 
     if not wacc_values or not growth_values:
         raise ProvenanceError("STEP 36 requires at least one WACC and one terminal growth value")
+
+    wacc_values = [D(w, what="sensitivity wacc") for w in wacc_values]
+    growth_values = [D(g, what="sensitivity terminal_growth") for g in growth_values]
 
     grid: list[list[SensitivityCell]] = []
     for w in wacc_values:
@@ -62,7 +67,7 @@ def sensitivity_grid(
     return grid
 
 
-def _shift_wacc(base: CostOfCapital, target_wacc: float) -> CostOfCapital:
+def _shift_wacc(base: CostOfCapital, target_wacc: Decimal) -> CostOfCapital:
     """Produce a CostOfCapital whose .wacc is exactly `target_wacc`.
 
     The grid varies the discount rate as a rate, which is what STEP 36 asks
@@ -73,7 +78,7 @@ def _shift_wacc(base: CostOfCapital, target_wacc: float) -> CostOfCapital:
     if we <= 0:
         raise ProvenanceError("Cannot shift WACC with zero equity weight")
     implied_ke = (target_wacc - base.weight_debt * base.after_tax_cost_of_debt) / we
-    implied_erp = (implied_ke - base.risk_free_rate) / base.beta if base.beta else 0.0
+    implied_erp = (implied_ke - base.risk_free_rate) / base.beta if base.beta else ZERO
     sources = dict(base.sources)
     sources["equity_risk_premium"] = (
         f"{sources.get('equity_risk_premium', '')} [sensitivity: solved so WACC = {target_wacc:.4f}]"
