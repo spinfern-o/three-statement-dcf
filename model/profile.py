@@ -27,6 +27,20 @@ class Units(str, Enum):
 
     @property
     def multiplier(self) -> int:
+        """Scale factor to the base currency unit.
+
+        Specification 4.6 requires normalizing every value to one base unit
+        while retaining the source unit for exact reconstruction. That is NOT
+        implemented: the engine holds a single document whose figures share
+        one scale (STEP 1), so it calculates in the reporting units as filed
+        and never converts.
+
+        This multiplier is therefore correct and unused. It exists because
+        normalization becomes necessary the moment decision 2.3.a permits
+        more than one source document, or 2.4.a a second currency, and a
+        wrong multiplier discovered at that point would be a 1000x error.
+        `tests/test_model.py` pins the values.
+        """
         return {"dollars": 1, "thousands": 1_000, "millions": 1_000_000}[self.value]
 
 

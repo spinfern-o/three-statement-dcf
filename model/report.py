@@ -9,7 +9,10 @@ happens here.
 from __future__ import annotations
 
 from .assumptions import Assumptions, Basis
+from decimal import Decimal
+
 from .checks import CheckResult, Status, Tolerance, summarize
+from .numeric import quantize_for_display
 from .dcf import CostOfCapital, FCFFYear, Valuation
 from .forecast import ForecastResult
 from .profile import CompanyProfile
@@ -30,8 +33,13 @@ def _row(label: str, values: list[str], label_width: int = 30, col: int = 12) ->
     return f"{label:<{label_width}}" + "".join(f"{v:>{col}}" for v in values)
 
 
-def _fmt(value: float | None) -> str:
-    return "--" if value is None else f"{value:,.1f}"
+def _fmt(value: Decimal | None, places: int = 1) -> str:
+    """Round for display only, through the declared boundary (4.9, 4.18).
+
+    The stored value keeps full precision; this is the single place a
+    statement figure is reduced for presentation.
+    """
+    return "--" if value is None else f"{quantize_for_display(value, places):,.{places}f}"
 
 
 def statement_block(title: str, ledger, accounts: tuple[str, ...], years: tuple[str, ...]) -> str:
@@ -135,7 +143,11 @@ def valuation_block(valuation: Valuation) -> str:
         f"PV of terminal value (STEP 32)    {valuation.pv_terminal_value:>16,.1f}",
         rule(),
         f"ENTERPRISE VALUE (STEP 33)        {valuation.enterprise_value:>16,.1f}",
-        f"  terminal value is {valuation.tv_share_of_ev:.1%} of enterprise value",
+        (
+            "  terminal value share of enterprise value: undefined (enterprise value is zero)"
+            if valuation.tv_share_of_ev is None
+            else f"  terminal value is {valuation.tv_share_of_ev:.1%} of enterprise value"
+        ),
         "",
         "STEP 34 -- bridge to equity value:",
     ]

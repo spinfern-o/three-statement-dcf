@@ -176,7 +176,7 @@ def load_historical(path: Path, periods: Periods) -> dict[Statement, Ledger]:
 
 
 # --- STEP 10-11 / 16 ------------------------------------------------------
-def load_assumptions(path: Path, periods: Periods) -> tuple[Assumptions, TaxSchedule, dict[str, float]]:
+def load_assumptions(path: Path, periods: Periods) -> tuple[Assumptions, TaxSchedule, dict[str, Decimal]]:
     data = _load_yaml(path)
     assumptions = Assumptions()
 

@@ -21,7 +21,7 @@ def run_cli(*args: str) -> subprocess.CompletedProcess:
 def test_cli_runs_the_fixture_clean():
     result = run_cli("--inputs", str(FIXTURES))
     assert result.returncode == 0, result.stderr
-    assert "12 PASS   0 FAIL   0 SKIP" in result.stdout
+    assert "13 PASS   0 FAIL   0 SKIP" in result.stdout
     for step in ("STEP 1-3", "STEP 10", "STEP 23-24", "STEP 25-28", "STEP 29-35", "STEP 36", "STEP 37"):
         assert step in result.stdout, f"{step} section missing from the report"
 
