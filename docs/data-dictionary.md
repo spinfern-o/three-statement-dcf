@@ -555,9 +555,43 @@ behaviour (Base/Upside/Downside plus custom, inherited lineage on copy, names
 that must not imply probability unless probability is modelled and sourced),
 so the requirements exist; the schema row does not.
 
-This is a gap in the specification, not a decision, and it is recorded as a
-finding in [`decision-ledger.md`](decision-ledger.md) rather than resolved
-here.
+This is a gap in the specification, not a decision, and it is recorded as
+finding **F-5** in [`decision-ledger.md`](decision-ledger.md).
+
+**Phase 9 designed the entity, because item 92 requires it.** The design is in
+[`apps/api/app/assumptions/scenarios.py`](../apps/api/app/assumptions/scenarios.py),
+built from the behaviour 14.6–14.9 constrains, with every choice listed in
+F-5 for the owner to overrule. As a Section 9 row it would read:
+
+| Field | Type | Req | Serves |
+|---|---|---|---|
+| `id` | id | Y | the `scenario_id` 9.10, 9.12 and 9.13 already reference |
+| `model_version_id` | id → 9.8 | Y | a scenario belongs to one model version |
+| `name` | string | Y | 14.9 — refused if it implies probability without one being modelled and sourced |
+| `parent_id_optional` | id → Scenario | N | 14.7. Null only for the root; every other scenario varies from one |
+| `description` | text | N | what this variant is for |
+| `probability_optional` | decimal(string) | N | 14.9's escape clause. Required, with its source and date, before a likelihood-implying name is permitted |
+| `probability_source_optional` | string | N | 14.9 — "explicitly modeled **and sourced**" |
+| `probability_date_optional` | date | N | 14.9; the same reasoning as 14.4.g |
+| `created_by`, `created_at` | — | Y | audit, as 9.8 and 9.10 |
+
+Inheritance is **by lineage, not by copy**: a child holds only its overrides,
+and resolution walks up the chain. An `Assumption` in a child scenario records
+`inherited_from` and `overrides` so the value it departs from stays reachable
+(14.7). Copying the parent's values instead would make the child's provenance
+a snapshot that goes stale the moment the parent is corrected.
+
+**What the Phase 9 record supplies against the divergences above.** The nine
+rows marked **Divergence** or **Absent** in the 9.10 comparison are all
+answered by
+[`apps/api/app/assumptions/schema.py`](../apps/api/app/assumptions/schema.py):
+all six of 14.3's source types (mapped back onto the engine's three so STEP
+10's grouping survives), a structured `Evidence` with document, page, URL,
+date and measured-over periods, a required `rationale`, a declared `unit` from
+the same vocabulary the formula engine checks against (18.12), all five of
+14.2's statuses, and owner, reviewer, timestamps and scenario. The engine's
+own `Assumption` is unchanged — `engine_basis` narrows the fuller record back
+down to it, so there is still exactly one place a number enters the forecast.
 
 ---
 

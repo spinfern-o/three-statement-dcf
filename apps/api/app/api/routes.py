@@ -20,6 +20,8 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+from model.numeric import D, PrecisionError
+
 from ..extraction.records import confirm_metadata
 from ..mapping.actions import (
     approve_all,
@@ -37,6 +39,20 @@ from model.accounts import Statement
 from ..mapping.checks import all_findings, apply_findings
 from ..mapping.normalized import normalize, periods as ledger_periods, statement_of_fact
 from ..mapping.sets import MappingError
+from ..assumptions.gate import evaluate as evaluate_gate
+from ..assumptions.impact import preview as preview_change
+from ..assumptions.proposals import propose_from_schedules, unproposable
+from ..assumptions.schema import AssumptionError, Status
+from ..assumptions.scenarios import BASE, ScenarioError
+from ..assumptions.store import ScenarioStore
+from ..assumptions.views import (
+    optional_rows,
+    required_rows,
+    scenario_rows,
+    status_choices,
+)
+from ..assumptions.workflow import WorkflowError, transition
+from ..formula.catalog import derivation_formulas, ledger_environment
 from ..formula.views import formula_report
 from ..schedules.build import build_schedules
 from ..schedules.checks import run_schedule_checks
@@ -577,3 +593,216 @@ def formulas(request: Request, document_id: str, error: str = ""):
             "error": error,
         },
     )
+
+
+# --- items 89-96: the assumptions screen (7.7) ------------------------------
+
+#: The forecast periods this system plans for. `export.py` already fixes five
+#: (FORECAST_YEARS), and the gate has to ask about each one separately: a
+#: driver scoped to 2026E alone is missing from the other four.
+def _forecast_periods(built) -> "tuple[str, ...]":
+    from ..statements.export import FORECAST_YEARS
+
+    last = int(built.years[-1][:4]) if built.years else 0
+    return tuple(f"{last + offset}E" for offset in range(1, FORECAST_YEARS + 1))
+
+
+def _scenario_store(request: Request) -> ScenarioStore:
+    return ScenarioStore(request.app.state.storage_root)
+
+
+def _assumptions_back(document_id: str, scenario_id: str, **flash) -> RedirectResponse:
+    query = urlencode({"scenario_id": scenario_id, **{k: v for k, v in flash.items() if v}})
+    return RedirectResponse(
+        f"/documents/{document_id}/assumptions?{query}", status_code=303
+    )
+
+
+def _assumptions_context(request: Request, document_id: str, scenario_id: str):
+    """Everything the screen needs, or the reason there is nothing to show."""
+    result = _load(request, document_id)
+    try:
+        built = build_statements(result, strict=False)
+    except BuildError as exc:
+        return result, None, str(exc)
+    return result, built, ""
+
+
+@router.get("/documents/{document_id}/assumptions", response_class=HTMLResponse)
+def assumptions(
+    request: Request,
+    document_id: str,
+    scenario_id: str = BASE,
+    error: str = "",
+    ok: str = "",
+):
+    """7.7 Assumptions: the drivers, their evidence, and the 14.1 gate."""
+    result, built, blocked = _assumptions_context(request, document_id, scenario_id)
+    if blocked:
+        return _templates(request).TemplateResponse(
+            request=request, name="assumptions.html",
+            context={
+                "document": result.document, "result": result, "blocked": blocked,
+                "error": error, "ok": ok, "scenario_id": scenario_id,
+            },
+        )
+
+    scenarios = _scenario_store(request).load(document_id, owner=_actor(request))
+    periods = _forecast_periods(built)
+    rows = required_rows(scenarios, scenario_id)
+    # The status form needs the legal moves for each row's own assumption.
+    rows = tuple(
+        _with_statuses(row) for row in rows
+    )
+    schedules = build_schedules(built)
+
+    return _templates(request).TemplateResponse(
+        request=request, name="assumptions.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "blocked": "",
+            "scenario_id": scenario_id,
+            "scenario_rows": scenario_rows(scenarios),
+            "required_rows": rows,
+            "satisfied_count": sum(1 for row in rows if row.is_satisfied),
+            "optional_rows": optional_rows(scenarios, scenario_id),
+            "proposals": propose_from_schedules(schedules, owner=_actor(request)),
+            "unmeasurable": unproposable(schedules),
+            "gate": evaluate_gate(scenarios, scenario_id, periods),
+            "periods": periods,
+            "editable_codes": sorted(scenarios.resolve(scenario_id)),
+            "impact": request.app.state.last_impact.pop(document_id, None)
+            if hasattr(request.app.state, "last_impact") else None,
+            "error": error,
+            "ok": ok,
+        },
+    )
+
+
+class _RowWithStatuses:
+    """A view row plus the statuses its assumption may legally move to."""
+
+    def __init__(self, row, statuses):
+        self._row = row
+        self.statuses = statuses
+
+    def __getattr__(self, name):
+        return getattr(self._row, name)
+
+
+def _with_statuses(row):
+    return _RowWithStatuses(
+        row, status_choices(row.assumption) if row.assumption is not None else ()
+    )
+
+
+@router.post("/documents/{document_id}/assumptions/accept")
+def accept_proposal(
+    request: Request,
+    document_id: str,
+    scenario_id: str = Form(BASE),
+    code: str = Form(...),
+):
+    """7.7.a: take a measured historical driver into the scenario, as a Draft."""
+    result, built, blocked = _assumptions_context(request, document_id, scenario_id)
+    if blocked:
+        return _assumptions_back(document_id, scenario_id, error=blocked)
+
+    proposals = propose_from_schedules(
+        build_schedules(built), owner=_actor(request)
+    )
+    match = next((p for p in proposals if p.assumption.code == code), None)
+    if match is None:
+        return _assumptions_back(
+            document_id, scenario_id,
+            error=f"{code!r} is not a driver the schedules measured.",
+        )
+
+    store = _scenario_store(request)
+    scenarios = store.load(document_id, owner=_actor(request))
+    try:
+        from dataclasses import replace
+
+        scenarios = scenarios.with_assumption(
+            replace(match.assumption, scenario_id=scenario_id)
+        )
+    except (AssumptionError, ScenarioError) as exc:
+        return _assumptions_back(document_id, scenario_id, error=str(exc))
+    store.save(document_id, scenarios)
+    return _assumptions_back(
+        document_id, scenario_id,
+        ok=f"{code} added as a Draft. It cannot be forecast on until reviewed (14.1).",
+    )
+
+
+@router.post("/documents/{document_id}/assumptions/{code}/status")
+def change_status(
+    request: Request,
+    document_id: str,
+    code: str,
+    scenario_id: str = Form(BASE),
+    to: str = Form(...),
+    reviewer: str = Form(""),
+    reason: str = Form(""),
+):
+    """Item 95: a status change, with an actor and a written reason."""
+    store = _scenario_store(request)
+    scenarios = store.load(document_id, owner=_actor(request))
+    resolved = scenarios.resolve(scenario_id).get(code)
+    if resolved is None or resolved.from_scenario != scenario_id:
+        return _assumptions_back(
+            document_id, scenario_id,
+            error=f"{code!r} is not an assumption {scenario_id!r} holds of its own.",
+        )
+    try:
+        moved, _change = transition(
+            resolved.assumption, Status(to),
+            actor=_actor(request), reason=reason, reviewer=reviewer,
+        )
+    except (WorkflowError, ValueError) as exc:
+        return _assumptions_back(document_id, scenario_id, error=str(exc))
+
+    store.save(document_id, scenarios.with_assumption(moved))
+    return _assumptions_back(
+        document_id, scenario_id, ok=f"{code} is now {moved.status.value}."
+    )
+
+
+@router.post("/documents/{document_id}/assumptions/preview")
+def preview_assumption(
+    request: Request,
+    document_id: str,
+    scenario_id: str = Form(BASE),
+    code: str = Form(...),
+    value: str = Form(...),
+):
+    """14.8: show what a change would do, WITHOUT doing it.
+
+    The impact is held for exactly one render and then dropped. Storing it
+    would make it a saved thing, which is the opposite of what 14.8 asks for.
+    """
+    result, built, blocked = _assumptions_context(request, document_id, scenario_id)
+    if blocked:
+        return _assumptions_back(document_id, scenario_id, error=blocked)
+
+    scenarios = _scenario_store(request).load(document_id, owner=_actor(request))
+    formulas = derivation_formulas()
+    environment, _ = ledger_environment(built.ledgers, built.years[-1])
+
+    try:
+        impact = preview_change(
+            formulas=formulas,
+            base_environment=environment,
+            scenarios=scenarios,
+            scenario_id=scenario_id,
+            code=code,
+            proposed=D(value, what=f"proposed {code}"),
+        )
+    except (KeyError, PrecisionError, ValueError) as exc:
+        return _assumptions_back(document_id, scenario_id, error=str(exc))
+
+    if not hasattr(request.app.state, "last_impact"):
+        request.app.state.last_impact = {}
+    request.app.state.last_impact[document_id] = impact
+    return _assumptions_back(document_id, scenario_id)

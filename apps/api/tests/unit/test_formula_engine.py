@@ -351,3 +351,27 @@ def test_a_unit_error_is_refused_even_when_gaps_are_tolerated():
     ))
     with pytest.raises(u.UnitError):
         calculate(broken, money(revenue="100"), strict=False)
+
+
+def test_a_division_by_zero_is_a_data_state_not_a_defect():
+    """4.12: a measure against zero is UNDEFINED, which is a state a figure
+    can legitimately be in.
+
+    `gross_profit / revenue` is a correct formula, and a company with no
+    revenue has no gross margin. Not strict, that is reported with its reason;
+    strict, it refuses, because an export must not move on a figure nobody has.
+    """
+    margin = FormulaSet((
+        FormulaDefinition(
+            code="M", target="gross_margin", expression="gross_profit / revenue",
+            output_unit="ratio", definition="gross profit over revenue",
+        ),
+    ))
+    environment = money(gross_profit="0", revenue="0")
+
+    tolerant = calculate(margin, environment, strict=False)
+    assert tolerant.value("gross_margin") is None
+    assert "division by zero" in tolerant.unavailable["gross_margin"]
+
+    with pytest.raises(DivisionByZeroRefused):
+        calculate(margin, environment, strict=True)

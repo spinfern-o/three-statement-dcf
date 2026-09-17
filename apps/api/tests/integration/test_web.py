@@ -618,3 +618,196 @@ def test_the_formulas_page_shows_a_fingerprint_per_period(
     body = client.get(f"/documents/{client.document_id}/formulas").text
     assert "Calculation fingerprint" in body
     assert body.count("<code>") >= 3
+
+
+# --- items 89-96: the assumptions screen (7.7) ------------------------------
+
+def _assumptions(client, **params):
+    from urllib.parse import urlencode
+
+    query = f"?{urlencode(params)}" if params else ""
+    return client.get(f"/documents/{client.document_id}/assumptions{query}")
+
+
+def test_the_assumptions_page_explains_itself_before_anything_is_mapped(client):
+    response = _assumptions(client)
+    assert response.status_code == 200
+    assert "Nothing to show yet" in response.text
+
+
+def test_the_assumptions_page_lists_every_required_driver_even_when_empty(
+    three_statement_client,
+):
+    """14.5 and 7.7.e: a driver missing from the screen is a driver nobody decided."""
+    body = _assumptions(three_statement_client).text
+    for code in ("revenue_growth", "dso", "inventory_days", "dpo",
+                 "interest_rate_on_debt", "depreciation_pct_beginning_ppe",
+                 "tax_rate"):
+        assert code in body, f"{code} is not on the assumptions screen"
+    assert "nothing entered" in body
+
+
+def test_the_gate_says_no_while_the_drivers_are_empty(three_statement_client):
+    body = _assumptions(three_statement_client).text
+    assert "May the forecast calculate? (14.1)" in body
+    assert "not supplied" in body
+
+
+def test_the_historical_drivers_are_measured_and_offered(three_statement_client):
+    """7.7.a, from the Section 13 schedules rather than re-derived."""
+    body = _assumptions(three_statement_client).text
+    assert "Historical driver analysis (7.7.a)" in body
+    assert "59.9" in body and "77.9" in body and "63.3" in body
+    assert "schedule 13.1" in body
+    assert "2025A" in body, "each proposal cites the periods it measured"
+
+
+def test_a_driver_no_schedule_can_measure_is_named_not_omitted(
+    three_statement_client,
+):
+    body = _assumptions(three_statement_client).text
+    assert "no schedule can measure" in body
+    assert "not evidence about the next period" in body
+
+
+def test_accepting_a_proposal_stores_it_as_a_draft(three_statement_client):
+    client = three_statement_client
+    response = client.post(
+        f"/documents/{client.document_id}/assumptions/accept",
+        data={"scenario_id": "base", "code": "dso"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "added as a Draft" in response.text
+    assert "cannot be forecast on until reviewed" in response.text
+    # And it is now on the screen with its measured value and its status.
+    body = _assumptions(client).text
+    assert "Historical Driver" in body
+    assert "measured over 2024A, 2025A" in body
+
+
+def test_a_draft_cannot_be_approved_without_passing_through_review(
+    three_statement_client,
+):
+    client = three_statement_client
+    client.post(
+        f"/documents/{client.document_id}/assumptions/accept",
+        data={"scenario_id": "base", "code": "dso"}, follow_redirects=True,
+    )
+    response = client.post(
+        f"/documents/{client.document_id}/assumptions/dso/status",
+        data={"scenario_id": "base", "to": "Approved", "reviewer": "larry",
+              "reason": "looks fine"},
+        follow_redirects=True,
+    )
+    assert "cannot go from Draft to Approved" in response.text
+    assert "four statuses and a decoration" in response.text
+
+
+def test_a_status_change_without_a_reason_is_refused(three_statement_client):
+    client = three_statement_client
+    client.post(
+        f"/documents/{client.document_id}/assumptions/accept",
+        data={"scenario_id": "base", "code": "dpo"}, follow_redirects=True,
+    )
+    response = client.post(
+        f"/documents/{client.document_id}/assumptions/dpo/status",
+        data={"scenario_id": "base", "to": "Reviewed", "reviewer": "larry",
+              "reason": ""},
+        follow_redirects=True,
+    )
+    assert "needs a written reason" in response.text
+
+
+def test_reviewing_a_driver_moves_it_and_survives_a_reload(three_statement_client):
+    client = three_statement_client
+    client.post(
+        f"/documents/{client.document_id}/assumptions/accept",
+        data={"scenario_id": "base", "code": "inventory_days"}, follow_redirects=True,
+    )
+    response = client.post(
+        f"/documents/{client.document_id}/assumptions/inventory_days/status",
+        data={"scenario_id": "base", "to": "Reviewed", "reviewer": "larry",
+              "reason": "checked against the 13.1 schedule"},
+        follow_redirects=True,
+    )
+    assert "is now Reviewed" in response.text
+    assert "Reviewed" in _assumptions(client).text
+
+
+def test_previewing_a_change_shows_the_impact_and_saves_nothing(
+    three_statement_client,
+):
+    """14.8. The screen must move; the model must not."""
+    client = three_statement_client
+    client.post(
+        f"/documents/{client.document_id}/assumptions/accept",
+        data={"scenario_id": "base", "code": "tax_rate"}, follow_redirects=True,
+    )
+    before = _assumptions(client).text
+
+    response = client.post(
+        f"/documents/{client.document_id}/assumptions/preview",
+        data={"scenario_id": "base", "code": "tax_rate", "value": "0.30"},
+        follow_redirects=True,
+    )
+    assert "0.25 -&gt; 0.30" in response.text
+    # The formula registry currently holds only the historical derivations, so
+    # no forecast formula reads a driver yet and the honest answer is that
+    # nothing moves. Saying so is the point -- a driver nothing reads is
+    # usually a driver that is misnamed.
+    assert "Nothing in the calculation reads it" in response.text
+
+    # The stored value is untouched: reloading shows the old number, and the
+    # preview is gone because it was never saved.
+    after = _assumptions(client).text
+    assert "0.25 -&gt; 0.30" not in after
+    assert before.count("0.25") == after.count("0.25")
+
+
+def test_a_float_shaped_preview_value_is_still_an_exact_decimal(
+    three_statement_client,
+):
+    """4.2: decimal strings at the boundary, all the way from the form."""
+    client = three_statement_client
+    client.post(
+        f"/documents/{client.document_id}/assumptions/accept",
+        data={"scenario_id": "base", "code": "tax_rate"}, follow_redirects=True,
+    )
+    response = client.post(
+        f"/documents/{client.document_id}/assumptions/preview",
+        data={"scenario_id": "base", "code": "tax_rate", "value": "0.1"},
+        follow_redirects=True,
+    )
+    assert "0.25 -&gt; 0.1" in response.text
+
+
+def test_a_nonsense_preview_value_is_refused_with_a_message(
+    three_statement_client,
+):
+    client = three_statement_client
+    client.post(
+        f"/documents/{client.document_id}/assumptions/accept",
+        data={"scenario_id": "base", "code": "tax_rate"}, follow_redirects=True,
+    )
+    response = client.post(
+        f"/documents/{client.document_id}/assumptions/preview",
+        data={"scenario_id": "base", "code": "tax_rate", "value": "thirty percent"},
+        follow_redirects=True,
+    )
+    assert "not a valid decimal number" in response.text
+
+
+def test_the_assumptions_page_keeps_the_accessibility_contract(
+    three_statement_client,
+):
+    body = _assumptions(three_statement_client).text
+    assert body.count("<caption>") >= 3
+    assert '<th scope="col"' in body and '<th scope="row"' in body
+    assert 'class="table-scroll" tabindex="0" role="region"' in body
+    assert "{{" not in body
+    # Every form control the screen renders has a label bound to it.
+    import re
+
+    for control_id in re.findall(r'<(?:input|select)[^>]*id="([^"]+)"', body):
+        assert f'for="{control_id}"' in body, f"{control_id} has no label"
