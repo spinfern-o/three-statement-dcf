@@ -7,7 +7,7 @@
 {%- endmacro %}
 
 {% macro money(value) -%}
-  {% if value is none %}<span class="muted">&mdash;</span>{% else %}{{ "{:,.0f}".format(value) }}{% endif %}
+  {% if value is none %}<span class="muted">&mdash;</span>{% else %}<span{% if value | tooltip %} title="{{ value | tooltip }}"{% endif %}>{{ value | money }}</span>{% endif %}
 {%- endmacro %}
 
 {% block body %}
@@ -137,7 +137,7 @@
           <td class="num">{{ money(row.change_in_nwc) }}</td>
           <td class="num total">{{ money(row.fcff) }}</td>
           <td class="num">{{ row.period }}</td>
-          <td class="num">{{ "%.6f"|format(row.discount_factor) }}</td>
+          <td class="num"><span{% if row.discount_factor | tooltip("factor") %} title="{{ row.discount_factor | tooltip("factor") }}"{% endif %}>{{ row.discount_factor | factor }}</span></td>
           <td class="num total">{{ money(row.present_value) }}</td>
         </tr>
         {% endfor %}
@@ -201,13 +201,13 @@
       <caption>Enterprise value by WACC (rows) and terminal growth (columns)</caption>
       <thead>
         <tr><th scope="col">WACC \ g</th>
-          {% for g in grid.growth_values %}<th scope="col" class="num">{{ "%.4f"|format(g) }}</th>{% endfor %}
+          {% for g in grid.growth_values %}<th scope="col" class="num">{{ g | ratio }}</th>{% endfor %}
         </tr>
       </thead>
       <tbody>
         {% for row in grid.rows %}
         <tr>
-          <th scope="row">{{ "%.4f"|format(grid.wacc_values[loop.index0]) }}</th>
+          <th scope="row">{{ grid.wacc_values[loop.index0] | ratio }}</th>
           {% for cell in row %}
           <td class="num">
             {% if cell.note %}<span class="muted" title="{{ cell.note }}">n/a</span>

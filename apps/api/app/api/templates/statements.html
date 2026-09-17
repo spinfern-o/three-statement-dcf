@@ -94,7 +94,7 @@
           {% for cell in row.cells %}
           <td class="num {% if row.item.is_subtotal %}total{% endif %}">
             {% if cell.value is none %}<span class="muted">&mdash;</span>
-            {% else %}{{ '{:,}'.format(cell.value) }}{% endif %}
+            {% else %}<span{% if cell.value | tooltip %} title="{{ cell.value | tooltip }}"{% endif %}>{{ cell.value | money }}</span>{% endif %}
           </td>
           <td class="num small muted">
             {% if cell.common_size is none %}
@@ -130,7 +130,7 @@
                     <td class="raw">{{ cell.reported or '—' }}</td>
                     <td class="num">
                       {% if cell.value is none %}<span class="muted">absent</span>
-                      {% else %}{{ '{:,}'.format(cell.value) }}{% endif %}
+                      {% else %}<span{% if cell.value | tooltip %} title="{{ cell.value | tooltip }}"{% endif %}>{{ cell.value | money }}</span>{% endif %}
                     </td>
                     <td class="small">
                       {% set sources = citations.get((row.item.canonical_code, cell.year), []) %}

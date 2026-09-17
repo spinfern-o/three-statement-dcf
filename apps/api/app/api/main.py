@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ..core.config import IngestionConfig
+from ..display import FILTERS as DISPLAY_FILTERS
 from ..extraction.storage import SourceStore
 from ..persistence.json_store import JsonDocumentRepository
 from .routes import router
@@ -45,6 +46,10 @@ def create_app(storage_root: str | Path, *, actor: str = "owner") -> FastAPI:
     templates.env.globals.update(
         product_name=PRODUCT_NAME, owner=OWNER, footer=FOOTER
     )
+    # 4.18, 4.19 and 21.8: one display precision, registered once, so a
+    # template cannot reach a different formatter by accident and an export
+    # cannot disagree with the page it claims to equal.
+    templates.env.filters.update(DISPLAY_FILTERS)
 
     app.state.storage_root = root
     app.state.config = IngestionConfig(storage_root=str(root))

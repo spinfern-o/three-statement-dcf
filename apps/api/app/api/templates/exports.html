@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Exports &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Exports &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% macro region(label) -%}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Reports and exports</h1>
+
+  <p class="muted">
+    Every file below is built from the same gathered model, so 21.8 holds by
+    construction rather than by coincidence: a figure that differs between two
+    formats would have to differ from itself.
+  </p>
+
+  {# --- 21.3 and 21.7: what identifies this export ----------------------- #}
+  <section class="card" aria-labelledby="version-heading">
+    <h2 id="version-heading">What this export is (21.3, 21.7)</h2>
+    <dl class="small">
+      <dt>Model version</dt>
+      <dd class="raw">{{ model.version_id }}</dd>
+      <dt>Generated at</dt>
+      <dd>{{ model.generated_at }}</dd>
+      <dt>Scenario</dt>
+      <dd>{{ model.scenario_id }}</dd>
+      <dt>Reporting currency and displayed scale</dt>
+      <dd>
+        {{ model.currency or "not detected" }}
+        {% if model.units %}in {{ model.units }}{% endif %}
+      </dd>
+      <dt>Valuation date</dt>
+      <dd>{{ model.valuation_date or "no valuation was built" }}</dd>
+    </dl>
+    <p class="small muted">
+      The version is a digest of what this model contains &mdash; the document,
+      the mapping, the scenario and every assumption &mdash; not a counter. The
+      same model exported twice a week apart reads the same version, and one
+      changed digit changes it.
+    </p>
+    {% call region("What the model version was computed from") %}
+    <table>
+      <caption>Each component, in the order it was hashed</caption>
+      <thead><tr><th scope="col">Component</th><th scope="col">Value</th></tr></thead>
+      <tbody>
+        {% for name, value in model.version_components %}
+        <tr><th scope="row">{{ name }}</th><td class="raw small">{{ value }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- 7.11.a-c: the downloads ------------------------------------------ #}
+  <section class="card" aria-labelledby="downloads-heading">
+    <h2 id="downloads-heading">Downloads (7.11)</h2>
+    <dl>
+      {% for key, label, clause, description in downloads %}
+      <dt>
+        {% if key == "workbook" %}
+        <a href="/documents/{{ document.id }}/exports/model.xlsx?scenario_id={{ scenario_id }}">{{ label }}</a>
+        {% elif key == "report" %}
+        <a href="/documents/{{ document.id }}/exports/report.pdf?scenario_id={{ scenario_id }}">{{ label }}</a>
+        {% elif key == "json" %}
+        <a href="/documents/{{ document.id }}/exports/model.json?scenario_id={{ scenario_id }}">{{ label }}</a>
+        {% else %}
+        {{ label }}
+        {% endif %}
+        <span class="badge badge-neutral">{{ clause }}</span>
+      </dt>
+      <dd class="small">{{ description }}</dd>
+      {% endfor %}
+    </dl>
+    <p class="small">
+      The JSON validates against
+      <a href="/documents/{{ document.id }}/exports/schema.json">schema version
+      {{ schema_version }}</a>, published so a consumer can check this export
+      rather than trust it (21.5).
+    </p>
+  </section>
+
+  {# --- 7.11.d, e: the two reports that already exist -------------------- #}
+  <section class="card" aria-labelledby="reports-heading">
+    <h2 id="reports-heading">Source-to-output and calculation reports (7.11.d, 7.11.e)</h2>
+    <p class="small">
+      Both live on the
+      <a href="/documents/{{ document.id }}/diagnostics">diagnostics screen</a>
+      and are not duplicated here. The lineage panel answers 7.11.d for any
+      line, in either direction; the benchmark panel answers 7.11.e by naming
+      what the suite covers rather than claiming a result this process does not
+      observe (4.20).
+    </p>
+  </section>
+
+  {# --- 21.1: what is in the workbook, and what is empty ----------------- #}
+  <section class="card" aria-labelledby="tabs-heading">
+    <h2 id="tabs-heading">The sixteen tables (21.1)</h2>
+    {% call region("Export tables") %}
+    <table>
+      <caption>
+        Every tab 21.1 names is present. One that could not be built is present
+        and empty with its reason, because an omitted tab reads as nothing to
+        report.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Table</th>
+          <th scope="col" class="num">Rows</th>
+          <th scope="col">CSV</th>
+          <th scope="col">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for table in tables %}
+        <tr>
+          <th scope="row">{{ table.title }}</th>
+          <td class="num">{{ table.rows | length }}</td>
+          <td>
+            <a href="/documents/{{ document.id }}/exports/{{ table.name }}.csv?scenario_id={{ scenario_id }}">{{ table.name }}.csv</a>
+          </td>
+          <td class="small">
+            {% if table.unavailable %}
+            <span class="badge badge-warning">empty</span> {{ table.note }}
+            {% else %}
+            <span class="badge badge-success">built</span> {{ table.note }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    <p class="small muted">
+      Column definitions are in <span class="raw">{{ dictionary }}</span>, which
+      every CSV names in its own header (21.4).
+    </p>
+  </section>
+
+  {# --- item 139: what the injection defence touched --------------------- #}
+  <section class="card" aria-labelledby="neutralized-heading">
+    <h2 id="neutralized-heading">Cells neutralized for CSV (139)</h2>
+    {% if neutralized %}
+    <p class="small">
+      {{ neutralized | length }} text cell(s) begin with a character a
+      spreadsheet runs as a formula, and are prefixed with an apostrophe in the
+      CSV. They are listed because a reader who finds an apostrophe in their
+      data is owed the reason.
+    </p>
+    {% call region("Neutralized cells") %}
+    <table>
+      <thead><tr><th scope="col">Table</th><th scope="col">Original text</th></tr></thead>
+      <tbody>
+        {% for name, text in neutralized %}
+        <tr><th scope="row">{{ name }}</th><td class="raw small">{{ text }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    {% else %}
+    <p class="small muted">
+      None. No text cell in this model begins with <span class="raw">=</span>,
+      <span class="raw">+</span>, <span class="raw">-</span> or
+      <span class="raw">@</span>.
+    </p>
+    {% endif %}
+    <p class="small muted">
+      Numeric cells are never prefixed. Every negative figure begins with a
+      minus sign, and a defence that quoted them would turn each one into text
+      that sums to zero &mdash; plausible on the page and wrong.
+    </p>
+  </section>
+
+  {# --- 21.6's limitations, on the screen as well as in the report ------- #}
+  <section class="card" aria-labelledby="limits-heading">
+    <h2 id="limits-heading">What these exports do not say (21.6)</h2>
+    <ul class="small">
+      {% for line in model.limitations %}
+      <li>{{ line }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+</main>
+{% endblock %}

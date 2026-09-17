@@ -48,6 +48,12 @@ from ..diagnostics.lineage import trace, traceable_lines
 from ..diagnostics.release import checklist, readiness
 from ..diagnostics.run import evaluate as run_diagnostics
 from ..dashboard.charts import line_chart
+from ..exports.csv_export import DICTIONARY, neutralized_cells, table_to_csv
+from ..exports.gather import gather
+from ..exports.json_export import schema_json, to_json
+from ..exports.pdf_export import to_bytes as pdf_bytes
+from ..exports.schema import SCHEMA_VERSION
+from ..exports.xlsx_export import to_bytes as xlsx_bytes
 from ..dashboard.navigation import nav_items
 from ..dashboard.standing import standing_for
 from ..assumptions.impact import preview as preview_change
@@ -1244,3 +1250,143 @@ def _trace_target(raw: str, traceable) -> "tuple[str, str]":
         _, code, period = traceable[0]
         return code, period
     return "", ""
+
+
+# --- items 138-144: the four exports, and the 7.11 screen -------------------
+
+#: What each download is, in the words a reader needs to choose between them.
+#: 7.11.a-e, mapped onto the four formats 2.6.a fixed plus the two reports
+#: that already exist elsewhere rather than being built twice.
+DOWNLOADS = (
+    (
+        "workbook", "Full model workbook (.xlsx)", "7.11.a",
+        "All sixteen tabs 21.1 lists. Hardcodes and calculated figures are "
+        "distinguishable by named style as well as by colour (21.2), and any "
+        "value a spreadsheet number cannot hold exactly carries its exact "
+        "value in a cell note.",
+    ),
+    (
+        "report", "PDF valuation report (.pdf)", "7.11.b",
+        "21.6's nine sections: valuation date, source coverage, assumptions, "
+        "forecast, DCF, sensitivities, checks, limitations and model version.",
+    ),
+    (
+        "json", "Normalized data (.json)", "7.11.c",
+        "Every table, validated against a published versioned schema on the "
+        "way out (21.5). Numbers are decimal strings, because a JSON number is "
+        "a float to most parsers and would lose the exact value.",
+    ),
+    (
+        "csv", "Normalized data (.csv, one file per table)", "7.11.c",
+        "Each table as its own CSV, with the data-dictionary reference in its "
+        "header (21.4). A text cell a spreadsheet would run as a formula is "
+        "neutralized; a negative number is not.",
+    ),
+)
+
+
+def _export_model(request: Request, document_id: str, scenario_id: str):
+    result = _load(request, document_id)
+    scenarios = _scenario_store(request).load(document_id, owner=_actor(request))
+    return gather(result, scenarios if scenarios.assumptions else None, scenario_id)
+
+
+def _download_name(model, extension: str) -> str:
+    """A filename carrying the model version, so two downloads cannot be confused.
+
+    A reader with `export.xlsx` and `export (1).xlsx` in their downloads folder
+    has no way to tell which model each one is, and 21.7's whole point is that
+    they should.
+    """
+    stem = (model.company or model.document_id).replace(" ", "-")
+    safe = "".join(c for c in stem if c.isalnum() or c in "-_")[:48] or "model"
+    return f"{safe}-{model.scenario_id}-{model.version_id[5:5 + 12]}.{extension}"
+
+
+@router.get("/documents/{document_id}/exports", response_class=HTMLResponse)
+def exports(request: Request, document_id: str, scenario_id: str = BASE):
+    """7.11 Reports and Exports."""
+    model = _export_model(request, document_id, scenario_id)
+    result = _load(request, document_id)
+    return _templates(request).TemplateResponse(
+        request=request, name="exports.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "model": model,
+            "scenario_id": scenario_id,
+            "downloads": DOWNLOADS,
+            "tables": model.tables,
+            "neutralized": neutralized_cells(model),
+            "schema_version": SCHEMA_VERSION,
+            "dictionary": DICTIONARY,
+        },
+    )
+
+
+@router.get("/documents/{document_id}/exports/model.json")
+def export_json_download(request: Request, document_id: str, scenario_id: str = BASE):
+    model = _export_model(request, document_id, scenario_id)
+    return Response(
+        content=to_json(model),
+        media_type="application/json",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{_download_name(model, "json")}"'
+        },
+    )
+
+
+@router.get("/documents/{document_id}/exports/schema.json")
+def export_schema(request: Request, document_id: str):
+    """21.5's schema, published so a consumer can validate us themselves."""
+    _load(request, document_id)  # 404 for a document that does not exist
+    return Response(content=schema_json(), media_type="application/json")
+
+
+@router.get("/documents/{document_id}/exports/{table_name}.csv")
+def export_table_csv(
+    request: Request, document_id: str, table_name: str, scenario_id: str = BASE
+):
+    model = _export_model(request, document_id, scenario_id)
+    try:
+        table = model.table(table_name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no table {table_name!r}")
+    return Response(
+        content=table_to_csv(model, table),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{table_name}-'
+                f'{model.version_id[5:5 + 12]}.csv"'
+        },
+    )
+
+
+@router.get("/documents/{document_id}/exports/model.xlsx")
+def export_workbook(request: Request, document_id: str, scenario_id: str = BASE):
+    model = _export_model(request, document_id, scenario_id)
+    return Response(
+        content=xlsx_bytes(model),
+        media_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{_download_name(model, "xlsx")}"'
+        },
+    )
+
+
+@router.get("/documents/{document_id}/exports/report.pdf")
+def export_report(request: Request, document_id: str, scenario_id: str = BASE):
+    model = _export_model(request, document_id, scenario_id)
+    return Response(
+        content=pdf_bytes(model),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{_download_name(model, "pdf")}"'
+        },
+    )

@@ -7,7 +7,7 @@
 {%- endmacro %}
 
 {% macro amount(value) -%}
-  {% if value is none %}<span class="muted">&mdash;</span>{% else %}{{ "{:,.0f}".format(value) }}{% endif %}
+  {% if value is none %}<span class="muted">&mdash;</span>{% else %}<span{% if value | tooltip %} title="{{ value | tooltip }}"{% endif %}>{{ value | money }}</span>{% endif %}
 {%- endmacro %}
 
 {% block body %}

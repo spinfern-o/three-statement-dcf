@@ -515,7 +515,8 @@ VIEWPORTS = (
 #: Every screen the application has. A layout test that covers one screen
 #: covers the one that happened to be easy.
 SCREENS = ("", "/mapping", "/statements", "/schedules", "/formulas",
-           "/assumptions", "/forecast", "/valuation", "/diagnostics")
+           "/assumptions", "/forecast", "/valuation", "/diagnostics",
+           "/exports")
 
 
 @pytest.mark.parametrize("name,width,height", VIEWPORTS, ids=lambda v: str(v))

@@ -111,7 +111,7 @@
             <td>{{ row.fact.period_label }}</td>
             <td class="num">
               {% if row.fact.value is none %}<span class="muted">no value</span>
-              {% else %}{{ '{:,}'.format(row.fact.value) }}{% endif %}
+              {% else %}<span{% if row.fact.value | tooltip %} title="{{ row.fact.value | tooltip }}"{% endif %}>{{ row.fact.value | money }}</span>{% endif %}
             </td>
             <td class="small">
               p{{ row.location.page_number if row.location else '?' }}
@@ -287,7 +287,7 @@
                 <span class="badge badge-warning">absent</span>
                 <div class="small muted">{{ value.absent_because }}</div>
               {% else %}
-                {{ '{:,}'.format(value.value) }}
+                <span{% if value.value | tooltip %} title="{{ value.value | tooltip }}"{% endif %}>{{ value.value | money }}</span>
                 {% if value.contributors | length > 1 %}
                   <div class="small muted">sum of {{ value.contributors | length }} lines</div>
                 {% endif %}

@@ -46,6 +46,8 @@ SECTIONS = (
     ("Assumptions", "assumptions", "6"),
     ("Forecast", "forecast", "7"),
     ("Valuation", "valuation", "8"),
+    ("Diagnostics", "diagnostics", "9"),
+    ("Exports", "exports", "10"),
 )
 
 #: The furthest status at which each section has something to show. A section
@@ -56,10 +58,16 @@ REQUIRES = {
     "Formulas": ModelStatus.VALIDATED,
     "Forecast": ModelStatus.FORECAST_READY,
     "Valuation": ModelStatus.VALUATION_READY,
+    "Exports": ModelStatus.VALIDATED,
 }
+
+# Diagnostics is deliberately absent from REQUIRES: it is reachable at every
+# status, because the question it answers -- what is outstanding and why -- is
+# most useful on the model that has not got anywhere yet.
 
 REASONS = {
     "Statements": "the statements build once every fact is reviewed and mapped",
+    "Exports": "an export is a claim about a model, and needs one to claim about",
     "Schedules": "the schedules are built from the statements",
     "Formulas": "the cross-check needs statements to check",
     "Forecast": "the forecast needs every required assumption to be an answer (14.1)",
