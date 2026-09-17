@@ -558,6 +558,46 @@ single-user application — none of which is a Section 2 row, and all of which
 belongs with Phase 15 (security and operations) rather than being half-built
 now. Recorded so it cannot be mistaken for done.
 
+
+### F-16 — RESOLVED in Phase 5. The canonical chart had no definitions
+
+[`data-dictionary.md`](data-dictionary.md) §9.6 recorded it as the gap that
+mattered most:
+
+> **Absent.** No account has a written definition anywhere in the repository.
+> This is the gap that matters most for 11.3: a reviewer approving a mapping
+> has no canonical text to compare the company's label against.
+
+[`apps/api/app/mapping/chart.py`](../apps/api/app/mapping/chart.py) now carries
+one per line, and `test_every_line_has_a_real_definition` rejects a stub — it
+caught four of them on the first run, which is the point of testing prose at
+all.
+
+The definitions are **metadata over `model/accounts.py`, not a second chart**.
+Two charts that drift apart is the obvious failure mode here and it is silent,
+so `test_chart.py` asserts the two cannot gain or lose an account
+independently, and that the expected-sign and working-capital tags agree with
+the conventions the engine states in prose.
+
+### F-17 — OPEN. The chart is short of Section 12, and mapping makes it visible
+
+[`data-dictionary.md`](data-dictionary.md) already listed what the engine's
+vocabulary lacks against specification 12.1–12.3: `goodwill`, `intangibles`,
+`lease_liabilities`, `minority_interest`, `ebitda`, operating expense by
+disclosed category, a statement of equity, and `fx_effect_on_cash`.
+
+That was a note about the engine. Phase 5 turns it into something a reviewer
+meets: mapping a filing's goodwill line offers `other_noncurrent_assets`,
+because there is nowhere else for it to go. The proposal says so in its rule
+text, which is the honest handling, and it is not a fix — an entity with
+material goodwill gets a model whose balance sheet is right and whose
+intangibles schedule (13.3) and check 17.12 do not exist.
+
+Extending the chart is a change to `model/accounts.py` and therefore to the
+engine's derivation and checks, which is why it is not folded into Phase 5.
+It should be done before the system is pointed at a filing with material
+goodwill, leases, or minority interests.
+
 ---
 
 ---
@@ -592,6 +632,20 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 5 (items 50–58) is built**, in
+[`apps/api/app/mapping/`](../apps/api/app/mapping): the canonical chart with a
+written definition per line (the gap `data-dictionary.md` called the one that
+mattered most), deterministic mapping proposals that refuse the traps, split
+and combine, duplicate-count **prevention**, subtotal and cross-statement
+reconciliation, human approval, and versioned mapping sets.
+
+Two things it turned on that nothing else could. **`VERIFIED` is reachable**:
+source-policy.md §9's seventh condition is a human-approved mapping, so before
+Phase 5 the correct answer for every fact was no. On the fixture filing 46 of
+50 facts now reach it. **`SUBTOTAL_MISMATCH` and `CROSS_STATEMENT_MISMATCH`
+fire**: both were defined in Phase 3 and never raised, because a subtotal has
+nothing to disagree with until its components are mapped.
 
 **Phase 4 (items 39–49) is built**, in
 [`apps/api/app/review/`](../apps/api/app/review) and

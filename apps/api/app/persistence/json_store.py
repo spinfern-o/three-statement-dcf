@@ -41,6 +41,13 @@ from ..extraction.metadata import (
 from ..extraction.pages import PageKind, PageProfile
 from ..extraction.parsing import NumberLocale, ParsedValue, SignSource, UnitMarker
 from ..extraction.reasons import Confidence, EvidenceCheck, ReasonCode
+from ..mapping.sets import (
+    FactMapping,
+    MappingSet,
+    MappingType,
+    Origin,
+    SignNormalization,
+)
 from ..extraction.records import (
     AuditEvent,
     ExtractionResult,
@@ -142,6 +149,7 @@ class JsonDocumentRepository:
             "facts": _jsonable(result.facts),
             "audit": _jsonable(result.audit),
             "job_history": list(result.job_history),
+            "mappings": _jsonable(result.mappings),
         }
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False))
 
@@ -339,11 +347,44 @@ def _fact(data: dict) -> ReportedFact:
             for r in data["resolutions"]
         ),
         decision=_decision(data["decision"]),
+        mapping_codes=_codes(data.get("mapping_codes", ())),
+        mapping_notes=tuple(data.get("mapping_notes", ())),
         period_start=_date(data["period_start"]),
         period_end=_date(data["period_end"]),
         instant_date=_date(data["instant_date"]),
         segment=data["segment"],
         reviewer_id=data["reviewer_id"],
+    )
+
+
+def _mapping(data: dict) -> FactMapping:
+    return FactMapping(
+        id=data["id"],
+        reported_fact_id=data["reported_fact_id"],
+        canonical_code=data["canonical_code"],
+        mapping_type=MappingType(data["mapping_type"]),
+        reviewer_note=data["reviewer_note"],
+        origin=Origin(data["origin"]),
+        sign_normalization=SignNormalization(data["sign_normalization"]),
+        allocation_amount=_decimal(data["allocation_amount"]),
+        allocation_basis=data["allocation_basis"],
+        approved_by=data["approved_by"],
+        approved_at=_dt(data["approved_at"]) if data["approved_at"] else None,
+        proposal_score=_decimal(data["proposal_score"]),
+        proposal_rule=data["proposal_rule"],
+    )
+
+
+def _mapping_set(data: dict | None) -> MappingSet | None:
+    if data is None:
+        return None
+    return MappingSet(
+        version=data["version"],
+        created_at=_dt(data["created_at"]),
+        created_by=data["created_by"],
+        reason=data["reason"],
+        mappings=tuple(_mapping(m) for m in data["mappings"]),
+        supersedes=data["supersedes"],
     )
 
 
@@ -389,4 +430,5 @@ def result_from_jsonable(payload: dict) -> ExtractionResult:
             for e in payload["audit"]
         ),
         job_history=tuple(payload["job_history"]),
+        mappings=_mapping_set(payload.get("mappings")),
     )

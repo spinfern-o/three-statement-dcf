@@ -5,6 +5,11 @@
 {% block body %}
 <main id="main" class="layout">
   <h1>Source review</h1>
+  <p class="muted">
+    <a href="/documents/{{ document.id }}/mapping">Mapping review</a> &mdash;
+    map these values onto the canonical chart (Phase 5). Nothing is VERIFIED
+    until its mapping is approved there.
+  </p>
 
   {% if error %}
   <div class="notice notice-error" role="alert">

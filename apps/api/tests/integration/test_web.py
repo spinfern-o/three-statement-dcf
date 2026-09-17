@@ -323,3 +323,116 @@ def test_tokens_and_stylesheet_are_served(client):
 def test_the_interactive_api_explorer_is_off(client):
     """20.x: a private deployment does not need a public schema browser."""
     assert client.get("/docs").status_code == 404
+
+
+# --- item 52: the mapping review table (7.4) --------------------------------
+
+def _mapping_url(client, *rest):
+    return "/".join([f"/documents/{client.document_id}/mapping", *rest])
+
+
+def _confirm(client):
+    client.post(
+        f"/documents/{client.document_id}/metadata",
+        data={"page": "2", "reason": "checked the cover"}, follow_redirects=True,
+    )
+
+
+def test_the_mapping_page_loads_before_anything_is_mapped(client):
+    response = client.get(_mapping_url(client))
+    assert response.status_code == 200
+    assert "No mapping set yet" in response.text
+
+
+def test_the_source_room_links_to_the_mapping_room(client):
+    assert f"/documents/{client.document_id}/mapping" in _room(client).text
+
+
+def test_the_canonical_definitions_are_on_the_page(client):
+    """11.3 asks a reviewer to compare a label against a definition. It has to
+    be somewhere they can read it."""
+    body = client.get(_mapping_url(client)).text
+    assert "Canonical chart of accounts" in body
+    assert "Stored POSITIVE and subtracted" in body
+
+
+def test_proposing_shows_the_rule_that_produced_each_suggestion(client):
+    response = client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    assert "Proposed" in response.text
+    assert "11.11 needs a person" in response.text
+    body = client.get(_mapping_url(client)).text
+    assert "matched a cost-of-sales caption" in body
+
+
+def test_a_trap_label_shows_why_nothing_was_proposed(client):
+    client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    body = client.get(_mapping_url(client)).text
+    assert "subtotal of part of the balance sheet" in body
+
+
+def test_mapping_without_a_note_is_refused(client, stored):
+    _confirm(client)
+    client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    fact = next(f for f in stored.facts if f.raw_label == "Revenue")
+    response = client.post(
+        _mapping_url(client, "facts", fact.id),
+        data={"action": "map", "canonical_code": "revenue", "note": ""},
+        follow_redirects=True,
+    )
+    assert "reviewer note is required" in response.text
+    assert 'role="alert"' in response.text
+
+
+def test_an_unknown_canonical_code_is_refused_not_created(client, stored):
+    client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    fact = next(f for f in stored.facts if f.raw_label == "Revenue")
+    response = client.post(
+        _mapping_url(client, "facts", fact.id),
+        data={"action": "map", "canonical_code": "ebitda", "note": "looks right"},
+        follow_redirects=True,
+    )
+    assert "not a canonical line item" in response.text
+
+
+def test_approve_all_refuses_rather_than_approving_around_a_double_count(client):
+    """11.6 prevents; it does not warn and continue."""
+    client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    response = client.post(
+        _mapping_url(client, "approve-all"),
+        data={"note": "everything looks fine"}, follow_redirects=True,
+    )
+    assert "double-count" in response.text
+    assert 'role="alert"' in response.text
+
+
+def test_a_bad_allocation_line_says_which_line(client, stored):
+    client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    fact = next(f for f in stored.facts if f.raw_label == "Revenue")
+    response = client.post(
+        _mapping_url(client, "facts", fact.id),
+        data={
+            "action": "split", "note": "test", "basis": "note 3",
+            "allocation": "revenue 1200000\nother_income_expense = 50000",
+        },
+        follow_redirects=True,
+    )
+    assert "line 1" in response.text
+
+
+def test_the_page_reports_zero_verified_until_mappings_are_approved(client):
+    client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    body = client.get(_mapping_url(client)).text
+    assert "0 VERIFIED" in body or "<strong>0 VERIFIED</strong>" in body
+
+
+def test_the_mapping_page_keeps_the_accessibility_contract(client):
+    """The same structural rules as the source room, on a second screen."""
+    client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    body = client.get(_mapping_url(client)).text
+    assert body.count("<h1>") == 1
+    levels = [int(m) for m in re.findall(r"<h([1-6])[ >]", body)]
+    for previous, current in zip(levels, levels[1:]):
+        assert current <= previous + 1
+    controls = re.findall(r'<(?:input|select|textarea)\b[^>]*id="([^"]+)"[^>]*>', body)
+    labelled = set(re.findall(r'<label[^>]*for="([^"]+)"', body))
+    assert not [c for c in controls if c not in labelled]

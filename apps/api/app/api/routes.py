@@ -21,6 +21,21 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from ..extraction.records import confirm_metadata
+from ..mapping.actions import (
+    approve_all,
+    approve_fact_mapping,
+    combine_facts,
+    map_fact,
+    propose_all,
+    proposals_for,
+    reject_mapping,
+    split_fact,
+    why_no_proposal,
+)
+from ..mapping.chart import CHART
+from ..mapping.checks import all_findings, apply_findings
+from ..mapping.normalized import normalize, periods as ledger_periods, statement_of_fact
+from ..mapping.sets import MappingError
 from ..review.actions import ACCEPT, CORRECT, REJECT, ReviewError, accept_fact, correct_fact, reject_fact
 from ..review.progress import review_progress, verification_gates
 from .bookmarks import bookmarks, unmapped_statements
@@ -225,3 +240,158 @@ def _actor(request: Request) -> str:
     recorded rather than assumed silently.
     """
     return request.app.state.actor
+
+
+# --- item 52: the mapping review table (7.4) --------------------------------
+
+
+def _mapping_back(document_id: str, **flash) -> RedirectResponse:
+    query = urlencode({k: v for k, v in flash.items() if v})
+    return RedirectResponse(
+        f"/documents/{document_id}/mapping" + (f"?{query}" if query else ""),
+        status_code=303,
+    )
+
+
+@router.get("/documents/{document_id}/mapping", response_class=HTMLResponse)
+def mapping_review(request: Request, document_id: str, error: str = "", ok: str = ""):
+    """7.4 Mapping Review. Every raw line beside the canonical line it becomes."""
+    result = _load(request, document_id)
+    mappings = result.mappings
+
+    rows = []
+    for fact in result.facts:
+        location = result.location(fact.source_location_id)
+        existing = mappings.for_fact(fact.id) if mappings else ()
+        rows.append(
+            {
+                "fact": fact,
+                "location": location,
+                "statement": statement_of_fact(result, fact),
+                "mappings": existing,
+                "candidates": proposals_for(result, fact),
+                "why_none": why_no_proposal(result, fact) if not existing else "",
+                "approved": bool(mappings and mappings.is_approved(fact.id)),
+                "excluded": bool(mappings and mappings.is_excluded(fact.id)),
+            }
+        )
+
+    ledger = normalize(result)
+    return _templates(request).TemplateResponse(
+        request=request,
+        name="mapping.html",
+        context={
+            "result": result,
+            "document": result.document,
+            "rows": rows,
+            "mappings": mappings,
+            "chart": CHART,
+            "findings": all_findings(result),
+            "ledger": ledger,
+            "ledger_periods": ledger_periods(ledger),
+            "progress": review_progress(result),
+            "error": error,
+            "ok": ok,
+        },
+    )
+
+
+@router.post("/documents/{document_id}/mapping/propose")
+def propose(request: Request, document_id: str):
+    """Item 51. Runs the proposer; approves nothing."""
+    result = _load(request, document_id)
+    before = len(result.mappings.mappings) if result.mappings else 0
+    updated = apply_findings(propose_all(result, actor="system"))
+    _repository(request).save(updated)
+    added = (len(updated.mappings.mappings) if updated.mappings else 0) - before
+    return _mapping_back(
+        document_id,
+        ok=f"Proposed {added} mapping(s). None is approved -- 11.11 needs a person.",
+    )
+
+
+@router.post("/documents/{document_id}/mapping/facts/{fact_id}")
+def decide_mapping(
+    request: Request,
+    document_id: str,
+    fact_id: str,
+    action: str = Form(...),
+    note: str = Form(""),
+    canonical_code: str = Form(""),
+    allocation: str = Form(""),
+    basis: str = Form(""),
+):
+    """Items 53 and 56. Map, split, reject, or approve one fact's mapping."""
+    result = _load(request, document_id)
+    actor = _actor(request)
+    try:
+        if action == "map":
+            updated = map_fact(result, fact_id, canonical_code, actor=actor, note=note)
+        elif action == "split":
+            updated = split_fact(
+                result, fact_id, _parse_allocation(allocation),
+                basis=basis, actor=actor, note=note,
+            )
+        elif action == "reject":
+            updated = reject_mapping(result, fact_id, actor=actor, note=note)
+        elif action == "approve":
+            updated = approve_fact_mapping(result, fact_id, actor=actor, note=note)
+        else:
+            raise MappingError(f"{action!r} is not a mapping action")
+    except (MappingError, KeyError) as exc:
+        return _mapping_back(document_id, error=str(exc))
+
+    _repository(request).save(apply_findings(updated))
+    return _mapping_back(document_id, ok=f"Recorded: {action}.")
+
+
+def _parse_allocation(text: str) -> "list[tuple[str, str]]":
+    """`code = amount` per line. Refuses anything it cannot read."""
+    allocations = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        if "=" not in line:
+            raise MappingError(
+                f"line {number} of the allocation, {line.strip()!r}, is not "
+                f"`canonical_code = amount`"
+            )
+        code, _, amount = line.partition("=")
+        allocations.append((code.strip(), amount.strip()))
+    if not allocations:
+        raise MappingError("a split needs an allocation: one `code = amount` per line")
+    return allocations
+
+
+@router.post("/documents/{document_id}/mapping/combine")
+def combine(
+    request: Request,
+    document_id: str,
+    canonical_code: str = Form(...),
+    note: str = Form(""),
+    fact_ids: "list[str]" = Form(default=[]),
+):
+    """Item 53, 11.5. Several raw lines onto one canonical line."""
+    result = _load(request, document_id)
+    try:
+        updated = combine_facts(
+            result, list(fact_ids), canonical_code, actor=_actor(request), note=note
+        )
+    except (MappingError, KeyError) as exc:
+        return _mapping_back(document_id, error=str(exc))
+    _repository(request).save(apply_findings(updated))
+    return _mapping_back(
+        document_id, ok=f"Combined {len(fact_ids)} line(s) into {canonical_code}."
+    )
+
+
+@router.post("/documents/{document_id}/mapping/approve-all")
+def approve_everything(request: Request, document_id: str, note: str = Form("")):
+    """11.11 in bulk. Refuses rather than approving around a double count."""
+    result = _load(request, document_id)
+    try:
+        updated = approve_all(result, actor=_actor(request), note=note)
+    except MappingError as exc:
+        return _mapping_back(document_id, error=str(exc))
+    _repository(request).save(apply_findings(updated))
+    return _mapping_back(document_id, ok="Approved every outstanding mapping.")

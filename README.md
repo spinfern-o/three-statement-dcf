@@ -8,7 +8,7 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2, 3 and 4 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–5 of 17** |
 
 ## Status, stated plainly
 
@@ -23,26 +23,30 @@ Two documents govern this repository, and they are different things:
    text and table extraction with page geometry, metadata detection in the
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
-3. **The source-review room** (`review_server.py`) — specification Phase 4,
-   items 39–49. A browser interface showing the PDF page beside the values
-   read from it, with every extracted number boxed on the page it came from,
-   and accept / correct / reject actions that each require a written reason
-   and each write an audit entry.
+3. **The source-review room and mapping review** (`review_server.py`) —
+   specification Phases 4 and 5, items 39–58. A browser interface showing the
+   PDF page beside the values read from it, with every extracted number boxed
+   on the page it came from; accept / correct / reject actions that each
+   require a written reason; and a mapping screen that carries each reported
+   line onto a canonical chart of accounts, with human approval, split and
+   combine, double-count prevention and subtotal reconciliation.
 
-343 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+534 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser. All arithmetic is exact decimal.
 
-**What does not exist yet:** the mapping between the two halves, and most of
-the website. No database, no exports, no dashboard, no forecast or valuation
-screens. Nothing yet carries an extracted fact into the calculation engine —
-that is the mapping stage, Phase 5.
+**Facts can now reach `VERIFIED`.** Verification is a seven-part conjunction
+(`docs/source-policy.md` §9) whose seventh condition is a human-approved
+mapping. Through Phase 4 the correct answer for every fact was no, because
+there was no mapping stage; Phase 5 built one. The application still evaluates
+all seven conditions separately and names the one that is failing, because
+rule 1.14 says an unresolved requirement must never appear as PASS.
 
-**And no extracted fact is ever `VERIFIED`.** Verification is a seven-part
-conjunction (`docs/source-policy.md` §9) whose seventh condition is a
-human-approved mapping to a normalized line item. A fully reviewed document is
-reviewed, not verified. The application evaluates all seven conditions
-separately and reports zero verified facts on every page, because rule 1.14
-says an unresolved requirement must never appear as PASS.
+**What does not exist yet:** most of the website. No database, no exports, no
+dashboard, no forecast or valuation screens. And the last mile is still open —
+**a verified, mapped document does not yet become an engine input.** The
+normalized ledger exists on screen; writing it into the YAML `run_model.py`
+consumes is the next piece of work, and it is small compared with everything
+that had to be true before it was worth doing.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
 1.15 and 4.4 prohibit binary floating point here, so the engine runs on
@@ -117,7 +121,7 @@ values and watch 47 of them clear — what remains is exactly the three cells
 that print an em dash, an en dash and `N/A`, which rule 1.5 says a human must
 resolve.
 
-Review what it extracted, in a browser:
+Review and map what it extracted, in a browser:
 
 ```bash
 python3 ingest_pdf.py apps/api/tests/fixtures/text_native_statements.pdf --store var/sources
@@ -130,6 +134,15 @@ document's metadata and 47 of the 50 facts clear at once; the three that
 remain are the cells printing an em dash, an en dash and `N/A`, which rule 1.5
 says a human must resolve. Every decision needs a typed reason, and the audit
 log at the bottom of the page shows what was recorded.
+
+Then open the mapping screen from the source room. Press **Propose mappings**:
+46 of the 50 facts get a suggestion with the rule that produced it, and four do
+not — `Total current assets` and `Total liabilities and equity` have no
+canonical line, and the page says why rather than filing them under the
+statement total. **Approve all** is then refused, because three operating
+expense categories map to one canonical line and that is a double count until
+you declare it an aggregate (11.5). Declare it, approve, and 46 facts reach
+`VERIFIED` with every subtotal reconciling.
 
 It binds to localhost and **has no authentication** — decision 2.2.c requires
 it and it is not built (finding F-15).
@@ -298,6 +311,18 @@ Source review (specification Phase 4, items 39–49):
 | `packages/design-tokens/` | — | Section 6.4 tokens, with their contrast ratios tested |
 | `review_server.py` | — | Launcher |
 
+Normalization and mapping (specification Phase 5, items 50–58):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/mapping/chart.py` | 50 | The canonical chart as rows, with a written definition per line |
+| `apps/api/app/mapping/proposals.py` | 51 | Deterministic proposals, each carrying the rule that produced it |
+| `apps/api/app/mapping/sets.py` | 57 | `FactMapping` and a versioned, immutable `MappingSet` |
+| `apps/api/app/mapping/actions.py` | 53, 56 | Map, split, combine, reject, approve |
+| `apps/api/app/mapping/checks.py` | 54, 55 | Double-count prevention; subtotal and cross-statement reconciliation |
+| `apps/api/app/mapping/normalized.py` | — | What the approved mappings produce, sparse and unplugged |
+| `apps/api/app/api/templates/mapping.html` | 52 | The 7.4 review table |
+
 Documentation:
 
 | Path | What it is |
@@ -325,7 +350,7 @@ does nothing at all:
 python3 -m pytest -q
 ```
 
-343 tests, no network and no API key. Two trees: `tests/` is the calculation
+534 tests, no network and no API key. Two trees: `tests/` is the calculation
 engine, `apps/api/tests/` is the website backend — ingestion and review.
 
 Four groups in the engine's suite worth knowing about:
@@ -377,6 +402,17 @@ And in the review suite:
   decision, focus order, a visible focus ring, accessible names, no sideways
   scroll at 200% zoom, and reduced motion. It has its own CI job, which fails
   if every test in it skipped — a skip that never un-skips is not a test.
+- `apps/api/tests/integration/test_mapping.py` — Phase 5 end to end, including
+  the test that matters most: a fully mapped filing produces facts that satisfy
+  all seven verification conditions. Also the ones that stop it being easy —
+  a split that loses three units is refused, a mapping that would double-count
+  cannot be approved, and a finding raised against a wrong mapping does not
+  survive the mapping being fixed.
+- `apps/api/tests/unit/test_chart.py` — asserts the canonical chart and
+  `model/accounts.py` cannot drift apart, and that the chart's expected-sign
+  and working-capital tags agree with the conventions the engine states in
+  prose. `test_every_line_has_a_real_definition` rejects a stub; it caught four
+  on its first run.
 - `apps/api/tests/unit/test_design_tokens.py` — parses
   `packages/design-tokens/tokens.css` and computes every contrast ratio the
   application renders. A colour edited to something prettier that fails WCAG
@@ -391,13 +427,13 @@ It is labeled `FICTIONAL` in every file and is not derived from any filing.
 
 ## Scope
 
-The workflow starts at STEP 1 with a PDF already in hand. `ingest_pdf.py` now
-reads that PDF, but the two halves are **not connected**: extraction produces
-`UNVERIFIED` facts with company line-item wording, and the engine consumes
-verified figures mapped to a canonical chart of accounts. The mapping between
-them, with the human review specification Section 11 requires, is Phase 5.
-Until then, STEP 4 transcription remains manual, and ingestion is a separate
-tool that tells you what a filing says and what about it needs checking.
+The workflow starts at STEP 1 with a PDF already in hand. `ingest_pdf.py`
+reads that PDF and the mapping screen carries its lines onto the canonical
+chart, so the two halves now meet — but they are not yet **joined**. The
+normalized ledger exists as data and on screen; nothing writes it into the
+YAML `run_model.py` consumes, so STEP 4 transcription is still manual. That
+last step is small, and it was not worth building before a fact could be
+verified and a subtotal could be checked.
 
 OCR is deliberately out of scope (decision 2.3.c). A scanned page refuses the
 document rather than being read badly — see finding F-11, which proposes
