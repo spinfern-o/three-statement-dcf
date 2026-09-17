@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Diagnostics &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Diagnostics &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% macro region(label) -%}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{% macro verdict(status) -%}
+  {% if status.value == 'PASS' %}<span class="badge badge-success">PASS</span>
+  {% elif status.value == 'FAIL' %}<span class="badge badge-danger">FAIL</span>
+  {% else %}<span class="badge badge-warning">could not run</span>{% endif %}
+{%- endmacro %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Diagnostics</h1>
+
+  <p class="muted">
+    All thirty checks Section 17 requires, in one panel. A check that could not
+    run is reported as such and never as a pass &mdash; rule 1.14.
+    <a href="/documents/{{ document.id }}/valuation">Valuation</a> &middot;
+    <a href="/documents/{{ document.id }}/statements">Historical statements</a>
+  </p>
+
+  {# --- items 136, 137: the release gate -------------------------------- #}
+  <section class="card" aria-labelledby="release-heading">
+    <h2 id="release-heading">Release readiness (136, 137)</h2>
+    <p>
+      {% if readiness.may_release %}
+      <span class="badge badge-success">releasable</span>
+      {% else %}
+      <span class="badge badge-danger">not releasable</span>
+      {% endif %}
+      {{ readiness.describe() }}
+    </p>
+    {% call region("Release checklist by stage") %}
+    <table>
+      <caption>Item 136's checklist, in the order the work happens</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Clauses</th>
+        <th scope="col">State</th><th scope="col">Outstanding</th></tr></thead>
+      <tbody>
+        {% for item in checklist %}
+        <tr>
+          <th scope="row">{{ item.stage }}</th>
+          <td class="small">{{ item.clauses | join(', ') }}</td>
+          <td>
+            {% if item.is_clear %}<span class="badge badge-success">clear</span>
+            {% else %}<span class="badge badge-warning">{{ item.outstanding | length }} outstanding</span>{% endif %}
+          </td>
+          <td class="small">
+            {% for outcome in item.outstanding %}
+            <div>{{ outcome.check.clause }} &mdash; {{ outcome.detail }}</div>
+            {% endfor %}
+            {% if item.is_clear %}<span class="muted">nothing</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- item 131, 7.10.a-b: every check --------------------------------- #}
+  <section class="card" aria-labelledby="checks-heading">
+    <h2 id="checks-heading">Every Section 17 check (7.10.a)</h2>
+    <p class="small muted">{{ diagnostics.summarize() }}.
+      Severity in <strong>bold</strong> is forced by a rule elsewhere in the
+      specification; the rest are proposals awaiting ratification (F-4).</p>
+    {% call region("Section 17 checks") %}
+    <table>
+      <caption>Checks 17.1 to 17.30</caption>
+      <thead><tr><th scope="col">Code</th><th scope="col">Clause</th>
+        <th scope="col">Severity</th><th scope="col">Result</th>
+        <th scope="col">What it compares, and what it found</th></tr></thead>
+      <tbody>
+        {% for outcome in diagnostics.outcomes %}
+        <tr>
+          <th scope="row"><code>{{ outcome.check.code }}</code></th>
+          <td class="small">{{ outcome.check.clause }}</td>
+          <td class="small">
+            {% if outcome.check.forced %}
+            <strong>{{ outcome.check.severity.value }}</strong>
+            <div class="muted">forced by {{ outcome.check.forced_by }}</div>
+            {% else %}
+            {{ outcome.check.severity.value }}
+            <div class="muted">proposed</div>
+            {% endif %}
+          </td>
+          <td>{{ verdict(outcome.status) }}</td>
+          <td class="small">
+            <div class="muted">{{ outcome.check.compares }}</div>
+            <div>{{ outcome.detail }}</div>
+            {% if outcome.blocked_by %}
+            <div class="muted">blocked by: {{ outcome.blocked_by }}</div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- item 133, 7.10.c: the dependency graph -------------------------- #}
+  <section class="card" aria-labelledby="graph-heading">
+    <h2 id="graph-heading">Formula dependency graph (7.10.c, 18.4&ndash;18.6)</h2>
+    <p class="small">
+      {{ graph.formulas | length }} versioned definitions,
+      {{ graph.required_inputs | length }} required inputs.
+      {% if cycles %}
+      <span class="badge badge-danger">{{ cycles | length }} cycle(s)</span>
+      {% else %}<span class="badge badge-success">no cycles</span>{% endif %}
+    </p>
+    {% call region("Formula dependencies") %}
+    <table>
+      <caption>Each formula, what it reads, and what reads it</caption>
+      <thead><tr><th scope="col">Target</th><th scope="col">Formula</th>
+        <th scope="col">Reads</th><th scope="col">Read by</th></tr></thead>
+      <tbody>
+        {% for row in graph_rows %}
+        <tr>
+          <th scope="row">{{ row.target }}
+            <div class="small muted">{{ row.code }} v{{ row.version }}</div></th>
+          <td class="raw">{{ row.expression }}</td>
+          <td class="small">{{ row.reads | join(', ') }}</td>
+          <td class="small">
+            {% if row.read_by %}{{ row.read_by | join(', ') }}
+            {% else %}<span class="muted">nothing &mdash; this is an output</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- item 132, 7.10.d: lineage --------------------------------------- #}
+  <section class="card" aria-labelledby="lineage-heading">
+    <h2 id="lineage-heading">Source-to-output lineage (7.10.d, 17.30)</h2>
+    <form method="get" action="/documents/{{ document.id }}/diagnostics">
+      <label for="trace-code">Line</label>
+      <select id="trace-code" name="code">
+        {% for statement, code, period in traceable %}
+        <option value="{{ code }}|{{ period }}"
+                {% if code == trace_code and period == trace_period %}selected{% endif %}>
+          {{ code }} {{ period }} ({{ statement }})
+        </option>
+        {% endfor %}
+      </select>
+      <button type="submit">Trace it back</button>
+    </form>
+
+    {% if lineage %}
+    {% if not lineage.is_complete %}
+    <p class="small"><span class="badge badge-warning">incomplete</span> {{ lineage.incomplete }}</p>
+    {% else %}
+    <ol class="small">
+      {% for step in lineage.steps %}
+      <li>
+        <strong>{{ step.stage }}</strong>: {{ step.label }}
+        <div class="muted">{{ step.detail }}{% if step.rule %} &mdash; {{ step.rule }}{% endif %}</div>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+    {% endif %}
+  </section>
+
+  {# --- item 134, 7.10.e: the audit log --------------------------------- #}
+  <section class="card" aria-labelledby="audit-heading">
+    <h2 id="audit-heading">Change log (7.10.e, 9.14)</h2>
+    <form method="get" action="/documents/{{ document.id }}/diagnostics">
+      <input type="hidden" name="code" value="{{ trace_code }}|{{ trace_period }}">
+      <label for="f-actor">Actor</label>
+      <select id="f-actor" name="actor">
+        <option value="">any</option>
+        {% for value in choices.actor %}
+        <option value="{{ value }}" {% if value == log.filters.actor %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label for="f-action">Action</label>
+      <select id="f-action" name="action">
+        <option value="">any</option>
+        {% for value in choices.action %}
+        <option value="{{ value }}" {% if value == log.filters.action %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label for="f-entity">Entity type</label>
+      <select id="f-entity" name="entity_type">
+        <option value="">any</option>
+        {% for value in choices.entity_type %}
+        <option value="{{ value }}" {% if value == log.filters.entity_type %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label for="f-text">Reason contains</label>
+      <input id="f-text" name="text" value="{{ log.filters.text }}">
+      <button type="submit">Filter</button>
+    </form>
+
+    <p class="small muted">
+      {{ log.events | length }} of {{ log.total }} event(s) shown
+      ({{ log.filters.describe() }}).
+      {% if log.hidden %}{{ log.hidden }} hidden by the filter.{% endif %}
+    </p>
+    {% call region("Audit log") %}
+    <table>
+      <caption>Newest first. Every entry carries the reason its actor typed (10.33).</caption>
+      <thead><tr><th scope="col">When</th><th scope="col">Actor</th>
+        <th scope="col">Action</th><th scope="col">Entity</th>
+        <th scope="col">Reason</th></tr></thead>
+      <tbody>
+        {% for event in log.events[:200] %}
+        <tr>
+          <td class="small">{{ event.at.isoformat(timespec='seconds') }}</td>
+          <th scope="row">{{ event.actor }}</th>
+          <td class="small">{{ event.action }}</td>
+          <td class="small">{{ event.entity_type }}
+            <div class="raw">{{ event.entity_id }}</div></td>
+          <td class="small">{{ event.detail }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- item 135, 7.10.f: the benchmark report -------------------------- #}
+  <section class="card" aria-labelledby="benchmark-heading">
+    <h2 id="benchmark-heading">Benchmark accuracy (7.10.f, 4.15&ndash;4.20)</h2>
+    <p class="small">{{ benchmark.verdict }}</p>
+    {% call region("Benchmark coverage") %}
+    <table>
+      <caption>4.16's required outputs, and what compares each independently</caption>
+      <thead><tr><th scope="col">Output</th><th scope="col">Compared</th>
+        <th scope="col">How, independently</th><th scope="col">Where</th></tr></thead>
+      <tbody>
+        {% for row in benchmark.coverage %}
+        <tr>
+          <th scope="row">{{ row.output }}</th>
+          <td>
+            {% if row.compared %}<span class="badge badge-success">yes</span>
+            {% else %}<span class="badge badge-warning">no</span>{% endif %}
+          </td>
+          <td class="small">{{ row.method or row.reason }}</td>
+          <td class="raw">{{ row.where }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    <h3>Extreme inputs (4.17)</h3>
+    <ul class="small">
+      {% for family, where in benchmark.extremes %}
+      <li>{{ family }} &mdash; <code>{{ where }}</code></li>
+      {% endfor %}
+    </ul>
+  </section>
+</main>
+{% endblock %}

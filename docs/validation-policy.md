@@ -43,10 +43,13 @@ therefore marked in two ways:
 - Plain — **a proposal requiring the owner's confirmation.** Not confirmed,
   not inferred from anything authoritative.
 
-Only four are forced:
+Only five are forced. Each names a rule that states a *consequence* — block
+calculation, block release, do not compute — because that is what fixes a
+level; a rule merely using the word "critical" does not (see F-26):
 
 | Check | Severity | Forced by |
 |---|---|---|
+| `VAL-017-018` no required forecast assumption is missing | **CRITICAL** | 14.1 "No forecast may calculate until all required assumptions have a status" — blocking calculation is CRITICAL's own consequence |
 | `VAL-017-024` WACC > g | **CRITICAL** | 16.16 "Block calculation when WACC <= g"; rule 1.18 |
 | `VAL-017-026` diluted shares nonzero and sourced | **CRITICAL** | 16.20 "only when diluted shares are verified" — the per-share value must not be computed |
 | `VAL-017-027` no NaN/Infinity/null in a released calculation | **CRITICAL** | 17.27's own wording, and the traps 4.4 requires |
@@ -192,7 +195,7 @@ the owner. `Engine` is what [`model/`](../model) does today.
 | `VAL-017-002` | 17.2 | Every required metadata field is CONFIRMED, not UNCONFIRMED (10.11–10.13) | ERROR | **Different mechanism.** Nothing is detected, so nothing is UNCONFIRMED; `loader.load_profile` instead refuses a blank field, naming the STEP that requires it. Equivalent in effect for the fields it covers; no state machine |
 | `VAL-017-003` | 17.3 | Every period resolves to one unambiguous basis and date range (1.7, 10.24) | ERROR | **No.** `Periods` validates the `A`/`E` suffix, ascending order, no duplicates, consecutiveness, and that the forecast starts the year after the last actual — which is strong *structural* validation, but there are no dates and no cadence, so ambiguity of basis cannot arise or be detected |
 | `VAL-017-004` | 17.4 | `reporting_currency` and `displayed_scale` are confirmed for every document (1.9, 1.10) | ERROR | **Partial.** Both are required non-blank on `CompanyProfile`, and `units` must parse to the `Units` enum. But they are per-model, not per-document, and never normalized (4.6) |
-| `VAL-017-005` | 17.5 | Every critical fact has `verification_status = VERIFIED` per [`source-policy.md`](source-policy.md) §9 | **CRITICAL** (1.14 — this is what "unresolved critical" refers to) | **No.** No verification status exists; every transcribed figure is treated as equally authoritative |
+| `VAL-017-005` | 17.5 | Every critical fact has `verification_status = VERIFIED` per [`source-policy.md`](source-policy.md) §9 | CRITICAL (proposed — see F-26; 1.14 presupposes "critical" without saying which checks are) | **No.** No verification status exists; every transcribed figure is treated as equally authoritative |
 | `VAL-017-006` | 17.6 | Every `FactMapping` has `approved_by` set (11.10–11.11) | ERROR | **No.** No mapping entity; the input file fuses fact and mapping |
 | `VAL-017-007` | 17.7 | No source fact contributes to a subtotal both directly and through a component (11.6) | ERROR | **No as a check**, but **prevented by construction**: `accounts.DERIVED` names each subtotal's components exactly once, and rule 1.6's error mode — a subtotal treated as an additional component — cannot be expressed in the account vocabulary |
 

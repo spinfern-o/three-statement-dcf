@@ -1078,3 +1078,95 @@ def test_the_statement_tables_freeze_their_headers(forecast_client):
     for path in ("/statements", "/schedules", "/forecast"):
         body = client.get(f"/documents/{client.document_id}{path}").text
         assert 'class="table-scroll is-frozen"' in body, path
+
+
+# --- items 131-137: the diagnostics screen (7.10) ---------------------------
+
+def test_the_diagnostics_page_shows_all_thirty_checks(forecast_client):
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/diagnostics").text
+    for number in range(1, 31):
+        assert f"VAL-017-{number:03d}" in body, f"17.{number} is missing"
+
+
+def test_a_forced_severity_is_marked_and_cites_its_rule(forecast_client):
+    """F-4: five are forced, twenty-five are proposals, and the screen says so."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/diagnostics").text
+    assert "forced by" in body
+    assert "proposed" in body
+    assert "<strong>CRITICAL</strong>" in body
+
+
+def test_the_release_gate_says_what_it_is_standing_in_for(forecast_client):
+    """Item 137 cannot be implemented as written while F-4 is open."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/diagnostics").text
+    assert "Release readiness (136, 137)" in body
+    assert "assigns none of its thirty checks" in body
+    assert "stricter than 137" in body
+
+
+def test_the_checklist_shows_where_the_work_stopped(forecast_client):
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/diagnostics").text
+    for stage in ("Source and mapping", "Historical statements and schedules",
+                  "Forecast", "Valuation", "Numbers and lineage"):
+        assert stage in body
+
+
+def test_the_lineage_panel_traces_a_line_back_to_its_page(forecast_client):
+    """7.10.d and 17.30."""
+    client = forecast_client
+    body = client.get(
+        f"/documents/{client.document_id}/diagnostics?code=revenue|2025A"
+    ).text
+    assert "Source-to-output lineage" in body
+    assert "revenue 2025A" in body
+    assert "printed as" in body
+    assert "page" in body
+
+
+def test_the_dependency_view_shows_what_reads_what(forecast_client):
+    """7.10.c and 18.4."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/diagnostics").text
+    assert "Formula dependency graph" in body
+    assert "no cycles" in body
+    assert "gross_profit" in body and "revenue - cogs" in body
+
+
+def test_the_audit_log_filters(forecast_client):
+    """7.10.e and item 134."""
+    client = forecast_client
+    unfiltered = client.get(f"/documents/{client.document_id}/diagnostics").text
+    assert "Change log" in unfiltered
+    assert "event(s) shown" in unfiltered
+
+    filtered = client.get(
+        f"/documents/{client.document_id}/diagnostics?text=matches+the+printed+page"
+    ).text
+    assert "hidden by the filter" in filtered
+
+
+def test_the_benchmark_panel_does_not_claim_a_result_it_did_not_see(
+    forecast_client,
+):
+    """4.20, on the screen where the claim would otherwise be made."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/diagnostics").text
+    assert "Benchmark accuracy" in body
+    assert "does not assert that the suite passed" in body
+    assert "EBITDA" in body, "an uncovered 4.16 output is listed, not omitted"
+
+
+def test_the_diagnostics_page_keeps_the_accessibility_contract(forecast_client):
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/diagnostics").text
+    assert body.count("<caption>") >= 4
+    assert '<th scope="col"' in body and '<th scope="row"' in body
+    assert "{{" not in body
+    import re
+
+    for control_id in re.findall(r'<(?:input|select)[^>]*id="([^"]+)"', body):
+        assert f'for="{control_id}"' in body, f"{control_id} has no label"

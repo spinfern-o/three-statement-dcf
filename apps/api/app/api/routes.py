@@ -42,6 +42,11 @@ from ..mapping.normalized import normalize, periods as ledger_periods, statement
 from ..mapping.sets import MappingError
 from ..assumptions.gate import evaluate as evaluate_gate
 from ..dashboard.cards import STATUS_LEGEND, portfolio_cards
+from ..diagnostics.audit import Filters, choices as audit_choices, filter_events
+from ..diagnostics.benchmark import Report as BenchmarkReport
+from ..diagnostics.lineage import trace, traceable_lines
+from ..diagnostics.release import checklist, readiness
+from ..diagnostics.run import evaluate as run_diagnostics
 from ..dashboard.charts import line_chart
 from ..dashboard.navigation import nav_items
 from ..dashboard.standing import standing_for
@@ -64,6 +69,7 @@ from ..forecast.views import comparison, driver_rows as forecast_driver_rows
 from ..forecast.build import forecast_ledger
 from ..forecast.views import statement_rows as forecast_statement_rows
 from ..formula.catalog import derivation_formulas, ledger_environment
+from ..formula.graph import DependencyGraph
 from ..valuation.build import ValuationError, build_scenario_valuation
 from ..valuation.checks import EXIT_MULTIPLE_STATUS, headroom, terminal_share
 from ..valuation.inputs import LEASE_LIABILITIES_NOTE
@@ -137,7 +143,7 @@ def _context_units(context: dict) -> str:
     if fields is None:
         return ""
     parts = []
-    for name in ("reporting_currency", "scale"):
+    for name in ("reporting_currency", "displayed_scale"):
         field = fields.fields.get(name)
         if field is not None and field.value:
             mark = "" if field.confirmed else " (unconfirmed)"
@@ -283,7 +289,7 @@ def _revenue_series(result, scenarios=None):
 
 
 def _units_for(result) -> str:
-    field = result.document.metadata.fields.get("scale")
+    field = result.document.metadata.fields.get("displayed_scale")
     scale = str(field.value) if field is not None and field.value else "reporting units"
     currency = result.document.metadata.fields.get("reporting_currency")
     money = str(currency.value) if currency is not None and currency.value else ""
@@ -1140,3 +1146,101 @@ def valuation(request: Request, document_id: str, scenario_id: str = BASE, error
             "error": error,
         },
     )
+
+
+# --- items 131-137: the diagnostics screen (7.10) ---------------------------
+
+@router.get("/documents/{document_id}/diagnostics", response_class=HTMLResponse)
+def diagnostics(
+    request: Request,
+    document_id: str,
+    scenario_id: str = BASE,
+    code: str = "",
+    actor: str = "",
+    action: str = "",
+    entity_type: str = "",
+    text: str = "",
+):
+    """7.10 Diagnostics: every check, the lineage, the log, the benchmark.
+
+    One page rather than six, because 7.10 lists them together and because the
+    question a reader arrives with -- "can this be released, and if not why" --
+    is answered by reading across them.
+    """
+    result = _load(request, document_id)
+    scenarios = _scenario_store(request).load(document_id, owner=_actor(request))
+    has_scenario = bool(scenarios.assumptions)
+
+    outcomes = run_diagnostics(result, scenarios if has_scenario else None, scenario_id)
+    verdict = readiness(outcomes)
+
+    try:
+        built = build_statements(result, strict=True)
+    except BuildError:
+        built = None
+
+    traceable = traceable_lines(built)
+    trace_code, trace_period = _trace_target(code, traceable)
+    lineage = (
+        trace(result, built, trace_code, trace_period)
+        if trace_code and built is not None
+        else None
+    )
+
+    log = filter_events(
+        result,
+        Filters(actor=actor, action=action, entity_type=entity_type, text=text),
+    )
+
+    formulas = derivation_formulas()
+    graph = DependencyGraph(formulas)
+    dependents = graph.dependents()
+
+    return _templates(request).TemplateResponse(
+        request=request, name="diagnostics.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "diagnostics": outcomes,
+            "readiness": verdict,
+            "checklist": checklist(outcomes),
+            "graph": graph,
+            # `cycles()` is a method; calling it here keeps the template free of
+            # logic that could quietly render a bound method as truthy.
+            "cycles": graph.cycles(),
+            "graph_rows": [
+                {
+                    "target": definition.target,
+                    "code": definition.code,
+                    "version": definition.version,
+                    "expression": definition.expression,
+                    "reads": sorted(definition.inputs),
+                    "read_by": sorted(dependents.get(definition.target, ())),
+                }
+                for definition in formulas
+            ],
+            "traceable": traceable,
+            "trace_code": trace_code,
+            "trace_period": trace_period,
+            "lineage": lineage,
+            "log": log,
+            "choices": audit_choices(result),
+            "benchmark": BenchmarkReport(),
+        },
+    )
+
+
+def _trace_target(raw: str, traceable) -> "tuple[str, str]":
+    """Which line the lineage panel is showing.
+
+    Defaults to the first traceable line rather than to nothing: a panel that
+    starts empty teaches a reader it has nothing to show.
+    """
+    if raw and "|" in raw:
+        code, _, period = raw.partition("|")
+        if any(c == code and p == period for _, c, p in traceable):
+            return code, period
+    if traceable:
+        _, code, period = traceable[0]
+        return code, period
+    return "", ""

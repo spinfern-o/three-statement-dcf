@@ -254,19 +254,35 @@ action the implementing agent cannot perform.
 
 Section 17 defines four severity levels and their consequences, then lists
 thirty required checks — and never says which check carries which level.
-Four are forced by rules elsewhere in the specification:
+Five are forced by rules elsewhere in the specification:
 
 | Check | Severity | Forced by |
 |---|---|---|
+| 17.18 no required forecast assumption missing | CRITICAL | 14.1 "No forecast may calculate until all required assumptions have a status" |
 | 17.24 WACC > g | CRITICAL | 16.16 "Block calculation when WACC <= g"; rule 1.18 |
 | 17.26 diluted shares nonzero and sourced | CRITICAL | 16.20 |
 | 17.27 no NaN/Infinity/null released | CRITICAL | 17.27's own wording; 4.4 |
 | 17.28 benchmark meets Section 4 tolerance | ERROR | 4.20 |
 
-The remaining twenty-six are not derivable from the text.
+Each of those five cites a rule stating a **consequence** — block calculation,
+block release, do not compute the figure, do not make the claim — because the
+consequence is what the level *means*. That is the test for a forcing rule, and
+it is F-26's lesson.
+
+The remaining twenty-five are not derivable from the text.
 [`validation-policy.md`](validation-policy.md) §1 proposes an assignment and
-labels every proposed row as a proposal. A release gate cannot be built on a
-proposal, so item 137 is blocked until the owner confirms the mapping.
+labels every proposed row as a proposal.
+
+**Phase 13 built item 137 anyway, and said what it was standing in for.** A
+release gate cannot be built on a proposal, so
+[`release.py`](../apps/api/app/diagnostics/release.py) does not use one: every
+outstanding check blocks, failed and skipped alike, whatever severity it has
+been proposed. That is strictly stricter than 137 under any assignment the
+owner might make, so the gate cannot release a model 137 would have stopped —
+it can only refuse one 137 would have allowed. `severity_is_unratified` is
+carried on the result and printed on the screen, so the reader is told that
+ratifying this finding is what would let the gate tell a blocking failure from
+an acknowledged warning. **Confirming the twenty-five is still owner work.**
 
 This is not a Section 2 decision — it is a gap in Section 17 — so it is
 recorded here rather than in the tables above.
@@ -814,6 +830,39 @@ what the stylesheet claims.
 
 ---
 
+### F-26 — RESOLVED in Phase 13. A severity was marked settled on a shared word
+
+`validation-policy.md` was written in Phase 2 and says, in its own prose,
+**"Only four are forced"** — then bolds **six** rows in the table underneath.
+The registry Phase 13 generated from that table inherited both, so six
+severities sat in the settled column and one of them had no rule behind it.
+
+The two extra rows are not the same mistake:
+
+- **17.18 is genuinely forced** and the summary table had simply missed it.
+  14.1 — "No forecast may calculate until all required assumptions have a
+  status" — blocks calculation, and blocking calculation is CRITICAL's own
+  stated consequence. It is now in the summary table.
+- **17.5 was forced on a word.** Its citation was rule 1.14, "never allow an
+  unresolved *critical* validation error to appear as PASS". That rule
+  presupposes some checks are critical and never says which — it is the *cause*
+  of F-4, not its answer. Reading 17.5's "critical fact" as the missing
+  assignment is a word in common, not a derivation. It is now a proposal, and
+  the count is five forced, twenty-five proposed.
+
+**The test this yields is the useful part: a rule forces a severity only when
+it states a consequence.** Block calculation, block release, do not compute the
+figure, do not make the claim — the consequence is what the level *means*, so a
+rule naming one fixes the level, and a rule merely using the word does not. All
+five surviving citations pass that test. A new test also asserts the document's
+summary table and its row-by-row table name the same set, which is the drift
+that hid this for eleven phases.
+
+Nothing downstream moves: the release gate blocks on every outstanding check
+regardless of severity, so 17.5 blocked before and blocks now. What changes is
+what the screen tells a reader is **settled**, and one row claiming more
+authority than it has is how a reader stops trusting the column.
+
 ### F-25 — RESOLVED in Phase 12. Every table screen scrolled the page sideways
 
 Found by widening item 130's sweep from two screens at one width to eight
@@ -868,6 +917,93 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 13 (items 131-137) is built**, in
+[`apps/api/app/diagnostics/`](../apps/api/app/diagnostics): Section 17's thirty
+checks in one registry, source-to-output lineage, the audit log made
+searchable, the benchmark-coverage report, and the release gate.
+
+**The thirty checks were never missing; they were scattered.** Phases 3 to 11
+each built the checks its own stage needed -- extraction confidence, subtotal
+and cross-statement reconciliation, the balance-sheet identity, the cash tie,
+schedule reconciliation, the formula graph's cycles, the 14.1 assumption gate,
+the engine's thirteen PASS/FAIL checks, the terminal-value share. A reader met
+six panels and had to know which one to look in.
+[`run.py`](../apps/api/app/diagnostics/run.py) maps each Section 17 clause onto
+the code that already answers it and reports it under the clause's own code.
+Nothing is reimplemented, because a second implementation of a check is a
+second answer to the same question.
+
+**SKIP is a reported state, not an absence.** Rule 1.14 -- "an unresolved
+requirement must never appear as PASS" -- is the whole reason the third state
+exists. A check whose inputs do not exist has not passed, it has not run, and
+the difference is the one a reviewer needs. Every skip carries its reason.
+
+Two clauses cannot be evaluated by this system at all and say so instead of
+skipping quietly: **17.12**'s intangibles schedule, because the chart has no
+intangibles line (F-17), and **17.21**'s iterative-calculation clause, because
+no iterative calculation is configured and the dependency graph is checked for
+cycles regardless. A gate permanently red for a reason no reviewer can act on
+teaches reviewers to ignore it.
+
+**Item 137 cannot be implemented as written, and the gate says which rule it
+is standing in for.** "Prevent release when CRITICAL/ERROR checks remain"
+needs a severity per check; Section 17 supplies four severities and assigns
+none of the thirty to one. That is **F-4**, open since Phase 2. Five severities
+are *forced* by rules elsewhere in the specification and carry their citations;
+the other twenty-five are proposals in `validation-policy.md` (F-26 corrected
+that count: one of the six had been forced on a shared word rather than a rule).
+
+So [`release.py`](../apps/api/app/diagnostics/release.py) does the thing that
+cannot be wrong in the dangerous direction: **every outstanding check blocks,
+whatever its proposed severity** -- failed and skipped alike. That is strictly
+stricter than 137 under any assignment the owner might later make, so the gate
+cannot release a model 137 would have stopped. It can refuse one 137 would have
+allowed, an acknowledged WARNING say, and for a valuation that is the direction
+to err in.
+
+Building that gate found **F-26**: `validation-policy.md` said "only four are
+forced" and bolded six, and one of the two extra rows was forced on a word
+1.14 uses rather than a rule 1.14 states. Five, not six. `severity_is_unratified` is carried on the result and printed on the
+screen, so a reader who is told "not releasable" is also told that ratifying
+F-4 is what would let the gate distinguish a blocking failure from a warning.
+
+**Lineage stops being per-fact at the forecast, and says so.** The chain
+[`lineage.py`](../apps/api/app/diagnostics/lineage.py) walks -- a page, a
+located fact, a human decision with its written reason, an approved mapping, a
+ledger cell carrying its `Figure` and `Source`, a forecast cell naming its
+driver, an FCFF year and a discount factor -- is real up to the forecast
+boundary and then changes shape. A projected cell rests on the whole last
+actual year plus a driver, not on one page. The forward trace reports that join
+explicitly rather than continuing to name a single page, because a lineage that
+looks more precise than it is, is worse than one that admits where it widens.
+
+**The benchmark report makes the weaker, true claim.** 4.20 forbids claiming
+"less than 0.0001% error" until the benchmark suite passes *and* the report
+identifies the exact dataset and formulas tested. A running web process cannot
+honour the first half -- the benchmark lives in the test suite and runs in CI,
+and this process does not observe its result. A screen printing "0.0001%
+accuracy" because somebody once ran the tests would be making exactly the claim
+4.20 exists to prevent. So
+[`benchmark.py`](../apps/api/app/diagnostics/benchmark.py) reports the second
+half, which it can establish: which of 4.16's required outputs are compared,
+formula by formula, against an implementation sharing no helper with the
+engine, and where each comparison lives. Twenty of twenty-two rows are
+compared; the verdict line says the result is not observed here and where to
+look for it.
+
+**The audit log becomes searchable.** `AuditEvent` has been written on every
+mutation since Phase 3 and nothing read it back except a count.
+[`audit.py`](../apps/api/app/diagnostics/audit.py) adds the four questions
+somebody actually asks -- who, what kind of thing, to which entity, in what
+window -- and composes them, because the useful question is usually two at
+once. Ordering is newest-first and stable, tie-broken on the monotonic id: a
+log whose order drifts between two readings is one nobody can cite.
+
+On the fixture model the panel reports **23 passed, 3 failed, 4 could not run**,
+and all three failures are true facts about that filing rather than defects:
+two trap labels correctly left unmapped (17.5, 17.6), and 16.19's lease
+liability line that nobody has addressed (17.25).
 
 **Phase 12 (items 121-130) is built**, in
 [`apps/api/app/dashboard/`](../apps/api/app/dashboard),
@@ -1269,7 +1405,10 @@ unbuilt for want of work, not for want of an answer.
 Two things are still genuinely open, and neither is a Section 2 row:
 
 - **F-4** — Section 17 assigns a severity to none of its thirty checks.
-  `validation-policy.md` proposes twenty-six and labels each a proposal. Release
-  gating (Phase 13 item 137) cannot run on a proposal.
+  `validation-policy.md` proposes twenty-five and labels each a proposal. Phase
+  13's release gate is built and blocks on *every* outstanding check rather than
+  on a proposed severity — strictly stricter, so it cannot wrongly release — but
+  it cannot tell a blocking failure from an acknowledged warning until the
+  owner ratifies the assignment.
 - **F-5** — Section 9 requires `scenario_id` and defines no Scenario entity.
   That is a specification amendment, not an implementation choice.
