@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}Mapping &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Mapping review &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Mapping review</h1>
+
+  {% if error %}
+  <div class="notice notice-error" role="alert"><strong>Refused.</strong> {{ error }}</div>
+  {% endif %}
+  {% if ok %}
+  <div class="notice notice-ok" role="status">{{ ok }}</div>
+  {% endif %}
+
+  <p class="muted">
+    11.3 maps one raw line to one canonical line <strong>only when their
+    definitions align</strong>. Every canonical line below carries a written
+    definition; the proposal beside each raw line is a suggestion with the rule
+    that produced it, and nothing is approved until you say so (11.10, 11.11).
+    <a href="/documents/{{ document.id }}">Back to the source room</a>
+  </p>
+
+  <section class="card" aria-labelledby="state-heading">
+    <h2 id="state-heading">Mapping set</h2>
+    {% if mappings %}
+      <p>{{ mappings.describe() }}</p>
+    {% else %}
+      <p class="muted">No mapping set yet. Nothing has been proposed for this document.</p>
+    {% endif %}
+    <ul class="small">
+      <li>{{ progress.mapped_and_approved }} of {{ progress.total }} fact(s) have an approved mapping</li>
+      <li>{{ progress.excluded }} excluded from the model on purpose; {{ progress.unmapped }} not mapped at all</li>
+      <li><strong>{{ progress.verified }} VERIFIED</strong> &mdash; all seven conditions of source-policy.md §9</li>
+    </ul>
+    <div class="actions" style="margin-top:var(--space-4)">
+      <form method="post" action="/documents/{{ document.id }}/mapping/propose">
+        <button type="submit">Propose mappings</button>
+      </form>
+      <form method="post" action="/documents/{{ document.id }}/mapping/approve-all" class="decide" style="grid-template-columns: minmax(0,1fr) auto">
+        <div class="field">
+          <label for="approve-all-note">Note for approving everything <span aria-hidden="true">*</span></label>
+          <input type="text" id="approve-all-note" name="note" required autocomplete="off">
+        </div>
+        <div class="actions"><button type="submit" class="primary">Approve all</button></div>
+      </form>
+    </div>
+  </section>
+
+  {% if findings %}
+  <section class="card" aria-labelledby="findings-heading">
+    <h2 id="findings-heading">
+      <span class="badge badge-warning">{{ findings | length }}</span> mapping finding(s)
+    </h2>
+    <p class="small muted">
+      11.6 prevents double counting; 11.7 keeps reported totals as validation
+      targets. A difference is reported, never plugged.
+    </p>
+    <ul class="reasons">
+      {% for finding in findings %}
+      <li><code>{{ finding.code.value }}</code> {{ finding.canonical_code }} {{ finding.period_label }} &mdash; {{ finding.message }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {# One list for every code input on the page. Repeating 40 options per row
+     would put two thousand of them in the document for no gain. #}
+  <datalist id="canonical-lines">
+    {% for item in chart %}
+    <option value="{{ item.canonical_code }}">{{ item.display_name }}</option>
+    {% endfor %}
+  </datalist>
+
+  <section class="card" aria-labelledby="rows-heading">
+    <h2 id="rows-heading">Reported lines</h2>
+    <form method="post" action="/documents/{{ document.id }}/mapping/combine">
+      <table>
+        <caption>
+          {{ rows | length }} reported line(s). Tick two or more that belong on one
+          canonical line, then use the aggregate form below the table (11.5).
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col"><span class="sr-only">Select for aggregation</span></th>
+            <th scope="col">Reported line (7.4.a)</th>
+            <th scope="col">Period</th>
+            <th scope="col" class="num">Value</th>
+            <th scope="col">Page</th>
+            <th scope="col">Proposed canonical line (7.4.b)</th>
+            <th scope="col">State</th>
+          </tr>
+        </thead>
+        {% for row in rows %}
+        <tbody id="map-{{ row.fact.id }}">
+          <tr>
+            <td>
+              <input type="checkbox" name="fact_ids" value="{{ row.fact.id }}"
+                     id="pick-{{ row.fact.id }}">
+              <label class="sr-only" for="pick-{{ row.fact.id }}">
+                Include {{ row.fact.raw_label }} {{ row.fact.period_label }} in the aggregate
+              </label>
+            </td>
+            <th scope="row">
+              {{ row.fact.raw_label or '(no label)' }}
+              <div class="raw">printed {{ row.fact.raw_value }}</div>
+            </th>
+            <td>{{ row.fact.period_label }}</td>
+            <td class="num">
+              {% if row.fact.value is none %}<span class="muted">no value</span>
+              {% else %}{{ '{:,}'.format(row.fact.value) }}{% endif %}
+            </td>
+            <td class="small">
+              p{{ row.location.page_number if row.location else '?' }}
+              <div class="muted">{{ row.statement.value if row.statement else 'statement unknown' }} &middot; {{ row.fact.scope.value }}</div>
+            </td>
+            <td>
+              {% if row.mappings %}
+                {% for m in row.mappings %}
+                  <div>{{ m.describe() }}</div>
+                  {% if m.proposal_rule %}
+                    <div class="small muted">{{ m.proposal_rule }}</div>
+                  {% endif %}
+                  {% if m.reviewer_note and m.reviewer_note != 'system proposal: ' ~ m.proposal_rule %}
+                    <div class="small muted">note: {{ m.reviewer_note }}</div>
+                  {% endif %}
+                  {% if m.allocation_basis %}
+                    <div class="small muted">basis: {{ m.allocation_basis }}</div>
+                  {% endif %}
+                {% endfor %}
+              {% elif row.candidates %}
+                {% for c in row.candidates %}
+                  <div class="small">
+                    <strong>{{ c.code }}</strong> {{ c.score }}
+                    {% if c.is_weak %}<span class="badge badge-warning">weak</span>{% endif %}
+                    <div class="muted">{{ c.rule }}</div>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <span class="small muted">{{ row.why_none }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.approved %}<span class="badge badge-success">approved</span>
+              {% elif row.excluded %}<span class="badge badge-neutral">excluded</span>
+              {% elif row.mappings %}<span class="badge badge-warning">proposed</span>
+              {% else %}<span class="badge badge-neutral">unmapped</span>{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td colspan="7">
+              {% if row.fact.mapping_notes %}
+              <ul class="reasons">
+                {% for note in row.fact.mapping_notes %}<li>{{ note }}</li>{% endfor %}
+              </ul>
+              {% endif %}
+              <details>
+                <summary>Map, split, reject or approve this line (7.4.d)</summary>
+
+                <div class="field" style="margin-top:var(--space-4)">
+                  <label for="code-{{ row.fact.id }}">Canonical line</label>
+                  <input type="text" id="code-{{ row.fact.id }}" name="canonical_code"
+                         list="canonical-lines" autocomplete="off"
+                         form="decide-{{ row.fact.id }}"
+                         value="{% if row.candidates %}{{ row.candidates[0].code }}{% endif %}"
+                         aria-describedby="code-help-{{ row.fact.id }}">
+                  <span id="code-help-{{ row.fact.id }}" class="small muted">
+                    One of the {{ chart | length }} canonical codes listed at the
+                    bottom of this page. An unknown code is refused, not created.
+                  </span>
+                </div>
+
+                <div class="field">
+                  <label for="note-{{ row.fact.id }}">Reviewer note <span aria-hidden="true">*</span></label>
+                  <input type="text" id="note-{{ row.fact.id }}" name="note" required
+                         autocomplete="off" form="decide-{{ row.fact.id }}"
+                         aria-describedby="note-help-{{ row.fact.id }}">
+                  <span id="note-help-{{ row.fact.id }}" class="small muted">
+                    Required for any manual change (7.4.e). Say why the definitions align.
+                  </span>
+                </div>
+
+                <div class="field">
+                  <label for="alloc-{{ row.fact.id }}">Split allocation, one <code>code = amount</code> per line</label>
+                  <textarea id="alloc-{{ row.fact.id }}" name="allocation" rows="2"
+                            form="decide-{{ row.fact.id }}"
+                            aria-describedby="alloc-help-{{ row.fact.id }}"></textarea>
+                  <span id="alloc-help-{{ row.fact.id }}" class="small muted">
+                    Used only by &ldquo;Split&rdquo;. The parts must sum to the printed
+                    value exactly (11.4).
+                  </span>
+                </div>
+
+                <div class="field">
+                  <label for="basis-{{ row.fact.id }}">Disclosure the split rests on</label>
+                  <input type="text" id="basis-{{ row.fact.id }}" name="basis"
+                         autocomplete="off" form="decide-{{ row.fact.id }}"
+                         aria-describedby="basis-help-{{ row.fact.id }}">
+                  <span id="basis-help-{{ row.fact.id }}" class="small muted">
+                    11.4 permits a split only when the notes provide one. Name it.
+                  </span>
+                </div>
+
+                <div class="actions">
+                  <button type="submit" name="action" value="map" class="primary"
+                          form="decide-{{ row.fact.id }}">Map</button>
+                  <button type="submit" name="action" value="split"
+                          form="decide-{{ row.fact.id }}">Split</button>
+                  <button type="submit" name="action" value="approve"
+                          form="decide-{{ row.fact.id }}">Approve</button>
+                  <button type="submit" name="action" value="reject" class="danger"
+                          form="decide-{{ row.fact.id }}">Reject</button>
+                </div>
+              </details>
+            </td>
+          </tr>
+        </tbody>
+        {% endfor %}
+      </table>
+
+      <div class="decide" style="margin-top:var(--space-5)">
+        <div class="field">
+          <label for="combine-note">Aggregate the ticked lines &mdash; note <span aria-hidden="true">*</span></label>
+          <input type="text" id="combine-note" name="note" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="combine-code">into this canonical line</label>
+          <input type="text" id="combine-code" name="canonical_code"
+                 list="canonical-lines" autocomplete="off" required>
+        </div>
+        <div class="actions"><button type="submit">Combine</button></div>
+      </div>
+    </form>
+
+    {# One form element per row, outside the table, referenced by the controls
+       above. A <form> cannot straddle table rows, and duplicating the fields
+       into three forms would give a screen reader three copies of each label. #}
+    {% for row in rows %}
+    <form id="decide-{{ row.fact.id }}" method="post"
+          action="/documents/{{ document.id }}/mapping/facts/{{ row.fact.id }}"></form>
+    {% endfor %}
+  </section>
+
+  <section class="card" aria-labelledby="ledger-heading">
+    <h2 id="ledger-heading">Normalized ledger</h2>
+    <p class="small muted">
+      What the approved mappings produce. A line with an unreadable contributor
+      is <strong>absent</strong>, not a partial sum &mdash; adding up the three of
+      four figures you could read and calling it the total is the silent damage
+      rule 1.2 exists to stop.
+    </p>
+    {% if not ledger %}
+      <p class="muted">Nothing mapped yet.</p>
+    {% else %}
+    <table>
+      <caption>{{ ledger | length }} mapped line-period value(s).</caption>
+      <thead>
+        <tr>
+          <th scope="col">Canonical line</th>
+          {% for period in ledger_periods %}<th scope="col" class="num">{{ period }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in chart %}
+          {% set present = [] %}
+          {% for period in ledger_periods %}
+            {% if (item.canonical_code, period) in ledger %}{% set _ = present.append(1) %}{% endif %}
+          {% endfor %}
+          {% if present %}
+          <tr>
+            <th scope="row">
+              {{ item.canonical_code }}
+              <div class="small muted">{{ item.display_name }}</div>
+            </th>
+            {% for period in ledger_periods %}
+              {% set value = ledger.get((item.canonical_code, period)) %}
+              <td class="num {% if item.is_subtotal %}total{% endif %}">
+                {% if value is none %}<span class="muted">&mdash;</span>
+                {% elif value.value is none %}
+                  <span class="badge badge-warning">absent</span>
+                  <div class="small muted">{{ value.absent_because }}</div>
+                {% else %}
+                  {{ '{:,}'.format(value.value) }}
+                  {% if value.contributors | length > 1 %}
+                    <div class="small muted">sum of {{ value.contributors | length }} lines</div>
+                  {% endif %}
+                  {% if not value.approved %}<div class="small muted">mapping unapproved</div>{% endif %}
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+
+  <section class="card" aria-labelledby="chart-heading">
+    <h2 id="chart-heading">Canonical chart of accounts</h2>
+    <p class="small muted">
+      The definitions 11.3 asks you to compare a reported label against.
+    </p>
+    {% for item in chart %}
+    <details>
+      <summary>{{ item.canonical_code }} &mdash; {{ item.display_name }}</summary>
+      <p class="small">{{ item.definition }}</p>
+      <p class="small muted">
+        {{ item.statement_types | map(attribute='value') | join(', ') }} &middot;
+        expected sign {{ item.expected_sign.value }} &middot;
+        {{ item.operating_or_financing.value }}
+        {%- if item.cash_or_non_cash.value != 'not_applicable' %} &middot; {{ item.cash_or_non_cash.value }}{% endif %}
+        {%- if item.is_subtotal %} &middot; a subtotal: a reported value is a validation target, not an addend{% endif %}
+      </p>
+    </details>
+    {% endfor %}
+  </section>
+</main>
+{% endblock %}

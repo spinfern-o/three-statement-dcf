@@ -136,6 +136,14 @@ class ReasonCode(Enum):
         "10.29",
         "the confidence score is below the configured review threshold",
     )
+    # Added in Phase 5. 11.6 forbids double counting and check 17.7 tests for
+    # it; neither had a code, because neither could happen before mapping did.
+    DOUBLE_COUNTED = (
+        "DOUBLE_COUNTED",
+        True,
+        "11.6, 17.7",
+        "this fact would be counted twice: once directly and once through a subtotal",
+    )
 
     # --- advisory: recorded and shown, not individually blocking -----------
     OCR_DERIVED = ("OCR_DERIVED", False, "10.8", "the value came from OCR, not an embedded text layer")

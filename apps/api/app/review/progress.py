@@ -3,13 +3,15 @@
 `docs/source-policy.md` §9 answers "what makes a fact verified" as a
 conjunction of seven conditions. This module evaluates it, condition by
 condition, and says which one is failing -- which is more use to a reviewer
-than a boolean, and is what keeps the answer honest: **nothing reaches
-VERIFIED in Phase 4**, because condition 7 needs an approved mapping and the
-mapping stage is Phase 5.
+than a boolean.
 
-Saying that plainly matters more than it looks. A progress bar that reaches
-100% while condition 7 is structurally unmet would be the exact failure rule
-1.14 names -- an unresolved requirement appearing as PASS.
+Through Phase 4 nothing could reach VERIFIED at all: condition 7 is a
+human-approved mapping and there was no mapping stage. Phase 5 built one, so
+the seventh condition is now a real question with a real answer rather than a
+structural no. What has not changed is that the conditions are reported
+separately and the failing one is named: rule 1.14 forbids an unresolved
+requirement appearing as PASS, and an average over seven conditions is exactly
+that.
 """
 
 from __future__ import annotations
@@ -67,6 +69,7 @@ def verification_gates(fact: ReportedFact, result: ExtractionResult) -> tuple[Ga
         FactVerificationState.ACCEPTED,
         FactVerificationState.CORRECTED,
     )
+    mapping_approved = _is_mapping_approved(fact, result)
 
     return (
         Gate(
@@ -121,11 +124,49 @@ def verification_gates(fact: ReportedFact, result: ExtractionResult) -> tuple[Ga
         Gate(
             7,
             "its mapping to a normalized line item is human-approved",
-            False,
-            "phase 5",
-            "no mapping entity exists. Phase 5 owns 11.10 and 11.11, so no fact "
-            "can reach VERIFIED yet, and none is reported as verified.",
+            mapping_approved,
+            "reviewer",
+            "" if mapping_approved else _mapping_detail(fact, result),
         ),
+    )
+
+
+def _is_mapping_approved(fact: ReportedFact, result: ExtractionResult) -> bool:
+    """11.11. The seventh condition, and the one Phase 5 made reachable."""
+    mappings = result.mappings
+    if mappings is None:
+        return False
+    return mappings.is_approved(fact.id)
+
+
+def _is_excluded(fact: ReportedFact, result: ExtractionResult) -> bool:
+    mappings = result.mappings
+    return mappings is not None and mappings.is_excluded(fact.id)
+
+
+def _is_unmapped(fact: ReportedFact, result: ExtractionResult) -> bool:
+    mappings = result.mappings
+    return mappings is None or not mappings.for_fact(fact.id)
+
+
+def _mapping_detail(fact: ReportedFact, result: ExtractionResult) -> str:
+    mappings = result.mappings
+    if mappings is None:
+        return "no mapping set exists for this document yet"
+    existing = mappings.for_fact(fact.id)
+    if not existing:
+        return "this fact is not mapped to any canonical line"
+    if mappings.is_excluded(fact.id):
+        return (
+            "mapped to nothing, deliberately. A line excluded from the model is "
+            "not a verified figure IN it, so this condition stays unmet and the "
+            "fact is counted as excluded rather than verified."
+        )
+    unapproved = [m for m in existing if not m.approved]
+    return (
+        "mapped to "
+        + ", ".join(m.canonical_code for m in existing)
+        + f", {len(unapproved)} of {len(existing)} mapping(s) not yet approved (11.11)"
     )
 
 
@@ -164,8 +205,14 @@ class ReviewProgress:
     unresolved: int
     #: Facts meeting conditions 1-6.
     review_complete: int
-    #: Facts meeting all seven. Zero until Phase 5.
+    #: Facts meeting all seven of source-policy.md §9's conditions.
     verified: int
+    #: Facts whose contributing mappings are all human-approved (11.11).
+    mapped_and_approved: int
+    #: Facts mapped to nothing on purpose. Reviewed, and out of the model.
+    excluded: int
+    #: Facts with no mapping at all -- the work Phase 5 still has to do.
+    unmapped: int
     metadata_confirmed: bool
     unconfirmed_required: tuple[str, ...]
     pages: tuple[PageProgress, ...]
@@ -190,7 +237,9 @@ class ReviewProgress:
             f" -- {self.accepted} accepted, {self.corrected} corrected, {self.rejected} rejected",
             f"  {self.unresolved} still carrying an unresolved blocking code",
             f"  {self.review_complete} meeting conditions 1-6 of source-policy.md §9",
-            f"  {self.verified} VERIFIED -- condition 7 needs the approved mapping of Phase 5",
+            f"  {self.mapped_and_approved} with an approved mapping (11.11); "
+            f"{self.excluded} excluded from the model on purpose; {self.unmapped} unmapped",
+            f"  {self.verified} VERIFIED -- all seven conditions of source-policy.md §9",
         ]
         if not self.metadata_confirmed:
             lines.append(
@@ -228,6 +277,9 @@ def review_progress(result: ExtractionResult) -> ReviewProgress:
         unresolved=sum(1 for f in facts if f.blocking_codes),
         review_complete=sum(1 for f in facts if is_review_complete(f, result)),
         verified=sum(1 for f in facts if is_verified(f, result)),
+        mapped_and_approved=sum(1 for f in facts if _is_mapping_approved(f, result)),
+        excluded=sum(1 for f in facts if _is_excluded(f, result)),
+        unmapped=sum(1 for f in facts if _is_unmapped(f, result)),
         metadata_confirmed=(
             result.document.verification_status is DocumentVerificationState.CONFIRMED
         ),

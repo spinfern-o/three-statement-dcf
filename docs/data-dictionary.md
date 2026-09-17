@@ -281,6 +281,18 @@ from this table:
 This is the entity with the **largest existing overlap**, and the one where
 the divergence is most worth reading carefully.
 
+**Now implemented as rows (Phase 5).**
+[`apps/api/app/mapping/chart.py`](../apps/api/app/mapping/chart.py) supplies
+every field in this table, including the `definition` the note below called the
+gap that matters most. It is metadata **over** `model/accounts.py`, not a
+second chart: the codes come from the engine, and
+`apps/api/tests/unit/test_chart.py` asserts that neither side can gain or lose
+an account without the other. Three divergences from this table are recorded in
+that module: `statement_types` is a tuple (because `net_income` is on two
+statements), `operating_or_financing` has a `not_applicable` value (because
+`total_assets` is none of the four), and `components` replaces
+`parent_code_optional` (taken from `DERIVED`, which carries more information).
+
 **Engine counterpart:
 [`model/accounts.py`](../model/accounts.py)** — but as *module constants*, not
 as rows.
@@ -356,6 +368,14 @@ counts unapproved mappings, so the distinction must be queryable.
 
 Mapping sets are versioned (11.12), and changing one invalidates dependent
 model results.
+
+**Now implemented (Phase 5).**
+[`apps/api/app/mapping/sets.py`](../apps/api/app/mapping/sets.py) holds
+`FactMapping` with every field in this table, inside a `MappingSet` that is
+versioned and immutable (11.12). `approved_by` and `approved_at` are what
+source-policy.md §9's seventh condition reads, so an unapproved mapping keeps
+its fact out of VERIFIED — which is the behaviour 11.11 asks for, enforced
+rather than described.
 
 **Engine counterpart: none — and this is a structural difference, not a gap.**
 
@@ -753,8 +773,8 @@ collapsing them into one state loses that.
 | 9.3 SourceDocument | a free-text string in `model/`; **full record in `apps/api` (Phase 3)** | Complete for ingestion |
 | 9.4 SourceLocation | `provenance.Source` in `model/`; **full record in `apps/api` (Phase 3)** | Complete for ingestion, including geometry and raw text |
 | 9.5 ReportedFact | `provenance.Figure` in `model/`; **full record in `apps/api` (Phase 3)** | Complete for ingestion; three recorded divergences, above |
-| 9.6 NormalizedLineItem | `model/accounts.py` | **Strongest overlap** — codes, statement type and component structure present; no display name, definition, or per-item sign/cash tags |
-| 9.7 FactMapping | — | None; the input file fuses fact and mapping |
+| 9.6 NormalizedLineItem | `model/accounts.py` + **`mapping/chart.py` (Phase 5)** | Complete, including the written definition 11.3 needs |
+| 9.7 FactMapping | **`mapping/sets.py` (Phase 5)** | Complete, in a versioned mapping set |
 | 9.8 ModelVersion | — | None; no versioning, no valuation date, no base-unit normalization |
 | 9.9 ModelPeriod | `profile.Periods` | Partial — labels, A/E and ordering; **no dates**, annual only |
 | 9.10 Assumption | `assumptions.Assumption` | Partial — code, value, period, basis and a required source string; no unit, status, owner, source date or scenario |

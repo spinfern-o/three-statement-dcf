@@ -175,12 +175,13 @@ def test_progress_never_reports_a_verified_fact(confirmed):
     assert progress.review_complete > 0
 
 
-def test_the_seventh_condition_names_phase_5(confirmed):
+def test_the_seventh_condition_is_the_mapping(confirmed):
+    """Phase 4 can satisfy conditions 1-6. The seventh is Phase 5's approval."""
     after = accept_fact(confirmed, _fact(confirmed, "Revenue").id, actor="owner", reason="checked")
     gates = verification_gates(_fact(after, "Revenue"), after)
     unmet = [g for g in gates if not g.met]
     assert [g.number for g in unmet] == [7]
-    assert "Phase 5" in unmet[0].detail
+    assert "mapping set" in unmet[0].detail
     assert is_review_complete(_fact(after, "Revenue"), after)
     assert not is_verified(_fact(after, "Revenue"), after)
 

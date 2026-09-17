@@ -189,6 +189,12 @@ class ReportedFact:
     corrected_value: Decimal | None = None
     resolutions: tuple[Resolution, ...] = ()
     decision: ReviewDecision | None = None
+    #: Codes raised by the MAPPING stage (11.6, 11.7, 10.30), kept apart from
+    #: `reason_codes` because they are recomputed from the current mapping set
+    #: every time it changes. Mixing them into the extraction's findings would
+    #: leave a stale mismatch on a fact whose mapping was since corrected.
+    mapping_codes: tuple[ReasonCode, ...] = ()
+    mapping_notes: tuple[str, ...] = ()
     period_start: date | None = None
     period_end: date | None = None
     instant_date: date | None = None
@@ -225,12 +231,17 @@ class ReportedFact:
         extraction found; it simply no longer blocks.
         """
         resolved = set(self.resolved_codes)
-        return tuple(c for c in self.reason_codes if c.blocking and c not in resolved)
+        found = self.reason_codes + self.mapping_codes
+        seen: list[ReasonCode] = []
+        for code in found:
+            if code.blocking and code not in resolved and code not in seen:
+                seen.append(code)
+        return tuple(seen)
 
     @property
     def all_blocking_codes(self) -> tuple[ReasonCode, ...]:
-        """Every blocking code the extraction raised, resolved or not."""
-        return tuple(c for c in self.reason_codes if c.blocking)
+        """Every blocking code raised, resolved or not, at either stage."""
+        return tuple(c for c in self.reason_codes + self.mapping_codes if c.blocking)
 
     def describe(self) -> str:
         shown = self.value if self.value is not None else "(no value)"
@@ -302,7 +313,17 @@ class SourceDocument:
 
 @dataclass(frozen=True)
 class ExtractionResult:
-    """Everything one ingestion run produced."""
+    """Everything known about one document.
+
+    Named for what created it, but it accumulates: Phase 3 fills `tables`,
+    `locations` and `facts`; Phase 4 writes reviewer decisions onto the facts;
+    Phase 5 adds `mappings`. Keeping them in one record is what makes a
+    reviewer's session a single thing to load, save and version.
+
+    `mappings` is None until the mapping stage begins, which is distinct from
+    an empty set: "nobody has started" and "somebody started and mapped
+    nothing" are different states and only one of them is a problem.
+    """
 
     document: SourceDocument
     tables: tuple[RawTable, ...]
@@ -310,6 +331,10 @@ class ExtractionResult:
     facts: tuple[ReportedFact, ...]
     audit: tuple[AuditEvent, ...]
     job_history: tuple[str, ...]
+    #: Phase 5. A `mapping.sets.MappingSet`, typed loosely here so that
+    #: `extraction` does not import `mapping` -- the dependency runs the other
+    #: way, and a cycle between them would be the wrong shape.
+    mappings: "object | None" = None
 
     @property
     def facts_needing_review(self) -> tuple[ReportedFact, ...]:

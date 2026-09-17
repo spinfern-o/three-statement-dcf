@@ -488,6 +488,40 @@ reviewed document is reviewed, not verified, and
 so the one that is failing is named rather than averaged away. Rule 1.14 is
 why: an unresolved requirement must never appear as PASS.
 
+## 13. Section 11 coverage summary
+
+Phase 5 built the mapping stage. The same two columns: **Mapping** is
+[`apps/api/app/mapping/`](../apps/api/app/mapping); **Engine** is
+[`model/`](../model), where the mapping *is* the input file a modeller wrote
+by hand.
+
+| # | Rule | Mapping (Phase 5) | Engine (`model/`) |
+|---|---|---|---|
+| 11.1 | A canonical chart of accounts; do not force every company to use every line | **Yes.** [`chart.py`](../apps/api/app/mapping/chart.py) is metadata over `model/accounts.py`'s 40 codes -- there is one chart, and a test asserts the two cannot drift. Every line is optional by construction | **Yes** — the account vocabulary itself |
+| 11.2 | Preserve every original company label | **Yes** — `ReportedFact.raw_label` is never overwritten, and the mapping sits beside it | **Yes** — `Figure.source.line_item` requires the company's own wording |
+| 11.3 | Map one raw line to one normalized line **only when definitions align** | **Yes, and this is what Phase 5 added that nothing else had.** Every canonical line now carries a written definition — the text a reviewer compares a label against. Before this, "only when definitions align" was an instruction with nothing on one side of it | **No.** No account had a definition anywhere |
+| 11.4 | Keep a multi-concept line combined unless the notes defend a split | **Yes.** `split_fact` requires the disclosure in words AND requires the parts to sum to the printed value exactly. A split losing 3 units has invented a reconciling difference no filing contains | n/a |
+| 11.5 | Show the aggregation when several raw lines map to one | **Yes.** Each contributor keeps its own mapping row, and the normalized value lists what went into it. An undeclared aggregation is `DOUBLE_COUNTED`, not a silent sum | n/a |
+| 11.6 | Prevent double counting of components and subtotals | **Yes, prevented rather than reported.** `duplicate_counting` finds three shapes — one fact on two codes in a sum relationship, one fact on one code twice, and two facts on one code without an aggregate declaration — and `approve_fact_mapping` refuses while any of them stands | **Prevented by construction** — `DERIVED` names each subtotal's components exactly once |
+| 11.7 | Preserve reported totals as separate validation targets | **Yes.** A reported subtotal is mapped like any other line and then compared against the sum of its components. The difference is reported; neither side is adjusted | **Yes** — `Ledger.cross_check()`, check 17.10 |
+| 11.8 | Record sign normalization separately from source sign | **Yes.** The fact keeps what was printed; the mapping carries `sign_normalization`. A filing printing "(300,000)" for SG&A has printed an expense negative and this chart stores it positive, and the flip is visible to the reviewer rather than buried in the arithmetic | **No** — one convention for the whole model, stated once in prose |
+| 11.9 | Record operating, investing, financing, non-cash and non-operating tags | **Yes**, per line, and tested against the engine's own working-capital membership rather than declared independently | **Partial** — cash-flow sections only |
+| 11.10 | Record whether each mapping is system-proposed or human-approved | **Yes**, as two fields rather than one status: the machine proposed `operating_expenses`, and a person either agreed or did not. Collapsing them loses the record of what the machine suggested, which is the only way to find out it suggests the wrong thing | n/a |
+| 11.11 | Require human approval of all mappings before Verified | **Yes.** This is source-policy.md §9's seventh condition, and it is why nothing in this system could reach VERIFIED before Phase 5 | n/a |
+| 11.12 | Version the mapping set; invalidate dependent results when changed | **Yes.** `MappingSet` is immutable and every change supersedes the previous version. Editing a mapping withdraws its approval, because the approval was of a different mapping; findings are recomputed from scratch rather than accumulated, so a mismatch cannot survive the fix | **No versioning** |
+
+### What Phase 5 turned on elsewhere
+
+- **`VERIFIED` is reachable.** §9's conjunction now has a seventh condition
+  that can be satisfied. On the fixture filing, 46 of 50 facts reach it; the
+  four that do not are `Total current assets` and `Total liabilities and
+  equity`, which have no canonical line and are correctly left unmapped.
+- **`SUBTOTAL_MISMATCH` and `CROSS_STATEMENT_MISMATCH` fire.** Both were
+  defined in Phase 3 and never raised. A subtotal has nothing to disagree with
+  until its components are mapped.
+
+---
+
 ---
 
 ## Related documents
