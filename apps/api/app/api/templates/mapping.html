@@ -76,6 +76,8 @@
   <section class="card" aria-labelledby="rows-heading">
     <h2 id="rows-heading">Reported lines</h2>
     <form method="post" action="/documents/{{ document.id }}/mapping/combine">
+      <div class="table-scroll" tabindex="0" role="region"
+           aria-label="Table">
       <table>
         <caption>
           {{ rows | length }} reported line(s). Tick two or more that belong on one
@@ -218,6 +220,7 @@
         </tbody>
         {% endfor %}
       </table>
+      </div>
 
       <div class="decide" style="margin-top:var(--space-5)">
         <div class="field">
@@ -253,6 +256,8 @@
     {% if not ledger_rows %}
       <p class="muted">Nothing mapped yet.</p>
     {% else %}
+    <div class="table-scroll" tabindex="0" role="region"
+         aria-label="Table">
     <table>
       <caption>
         {{ ledger_rows | length }} canonical line(s). `net_income` appears twice
@@ -294,6 +299,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% endif %}
   </section>
 

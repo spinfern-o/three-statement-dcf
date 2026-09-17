@@ -2,6 +2,8 @@
  * are imported, not restated -- specification 6.4. */
 
 @import url("/tokens/tokens.css");
+/* Item 122. Self-hosted, for the reasons in packages/design-tokens/fonts.css. */
+@import url("/tokens/fonts.css");
 
 *,
 *::before,
@@ -153,10 +155,10 @@ button.danger  { background: var(--color-surface); border-color: var(--color-dan
 .meter { height: 8px; background: var(--color-surface-muted); border-radius: 999px; overflow: hidden; border: 1px solid var(--color-border); }
 .meter > span { display: block; height: 100%; background: var(--color-accent-primary); }
 
-.sidenav ul { list-style: none; margin: 0; padding: 0; }
-.sidenav li { margin-bottom: var(--space-2); }
-.sidenav a { display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); text-decoration: none; color: var(--color-text-primary); }
-.sidenav a[aria-current="page"] { background: var(--color-surface-muted); font-weight: 600; }
+.shell-nav ul { list-style: none; margin: 0; padding: 0; }
+.shell-nav li { margin-bottom: var(--space-2); }
+.shell-nav a { display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); text-decoration: none; color: var(--color-text-primary); }
+.shell-nav a[aria-current="page"] { background: var(--color-surface-muted); font-weight: 600; }
 
 .muted { color: var(--color-text-secondary); }
 .small { font-size: 0.8125rem; }
@@ -195,3 +197,263 @@ pre.raw {
   outline-offset: 2px;
   border-radius: var(--radius-control);
 }
+
+/* ==========================================================================
+ * Items 123, 124, 127, 129: the navigation shell, the dashboard grid, the
+ * frozen statement tables, and the tablet and mobile layouts.
+ *
+ * 6.3 describes three layouts. They are ONE set of markup and three media
+ * queries -- no JavaScript anywhere in this file's behaviour, because a
+ * navigation that depends on a script is a navigation that can strand a
+ * reviewer in the middle of a review when the script fails.
+ * ==========================================================================*/
+
+.shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;   /* 6.3.a: persistent left navigation */
+  min-height: 100vh;
+}
+
+.shell-nav {
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-5) var(--space-3);
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+.shell-nav .wordmark {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  display: block;
+  padding: 0 var(--space-3) var(--space-5);
+}
+.shell-nav ul { list-style: none; margin: 0; padding: 0; }
+.shell-nav a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: 0.9375rem;
+}
+.shell-nav a:hover { background: var(--color-surface-muted); color: var(--color-text-primary); }
+/* 6.2.e / 6.6: the current page is marked by `aria-current`, and the styling
+ * follows the attribute rather than a class -- so the thing a screen reader
+ * announces and the thing a sighted reader sees cannot drift apart. */
+.shell-nav a[aria-current="page"] {
+  background: var(--color-surface-muted);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-accent-primary);
+}
+/* A section with nothing behind it yet is dimmed and still reachable: 6.5.i
+ * asks empty states to explain what is missing, and a link that cannot be
+ * clicked explains nothing. */
+.shell-nav a.is-unavailable { opacity: 0.55; }
+.shell-nav .glyph {
+  width: 1.5rem; height: 1.5rem;
+  display: inline-grid; place-items: center;
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.shell-nav .label { flex: 1; }
+
+.shell-main { min-width: 0; display: flex; flex-direction: column; }
+.shell-main .layout { flex: 1; }
+
+/* --- item 124: the 12-column dashboard ---------------------------------- */
+.grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.span-3 { grid-column: span 3; }
+.span-4 { grid-column: span 4; }
+.span-6 { grid-column: span 6; }
+.span-8 { grid-column: span 8; }
+.span-12 { grid-column: span 12; }
+
+/* --- item 125: metric cards --------------------------------------------- */
+.metric {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.metric .metric-label {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+/* 6.2.a: the editorial serif for major financial figures. 6.2.c: tabular. */
+.metric .metric-value {
+  font-family: var(--font-serif);
+  font-size: 1.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent-financial);
+  line-height: 1.1;
+}
+.metric .metric-value.is-absent {
+  color: var(--color-text-secondary);
+  font-size: 1.125rem;
+}
+.metric .metric-meta { font-size: 0.8125rem; color: var(--color-text-secondary); }
+
+/* --- item 127: frozen headers and first column (6.3.e) ------------------ */
+/* Applied to a table inside `.table-scroll`, which is the focusable region
+ * WCAG 1.4.10 requires of two-dimensional data. The header row and the row
+ * header stay put while the periods scroll under them, which is the whole
+ * reason a statement table is readable at all past four columns. */
+.table-scroll.is-frozen { max-height: 70vh; overflow: auto; }
+.table-scroll.is-frozen thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-surface);
+}
+.table-scroll.is-frozen tbody th[scope="row"],
+.table-scroll.is-frozen thead th:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--color-surface);
+}
+.table-scroll.is-frozen thead th:first-child { z-index: 3; }
+.table-scroll.is-frozen tbody th[scope="row"] { z-index: 1; }
+/* A frozen cell needs its own right border: the table's own border-collapse
+ * borders scroll away with the cells they belong to. */
+.table-scroll.is-frozen tbody th[scope="row"],
+.table-scroll.is-frozen thead th:first-child {
+  box-shadow: 1px 0 0 var(--color-border);
+}
+
+/* --- item 126: charts --------------------------------------------------- */
+.chart { display: block; width: 100%; height: auto; }
+.chart .axis { stroke: var(--color-border); stroke-width: 1; }
+.chart .series-line { fill: none; stroke: var(--color-accent-financial); stroke-width: 2; }
+.chart .series-point { fill: var(--color-accent-financial); }
+/* 6.2.e: the estimate half of a series is dashed as well as differently
+ * coloured, so the distinction survives a monochrome print and a reader who
+ * does not see the colour difference. */
+.chart .series-line.is-estimate {
+  stroke: var(--color-accent-primary);
+  stroke-dasharray: 5 3;
+}
+.chart .series-point.is-estimate { fill: var(--color-accent-primary); }
+.chart .grid-line { stroke: var(--color-border); stroke-width: 1; stroke-dasharray: 2 4; }
+.chart text { font-family: var(--font-sans); font-size: 10px; fill: var(--color-text-secondary); }
+
+/* --- item 128: empty states and skeletons ------------------------------- */
+.empty {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-6);
+  text-align: left;
+  color: var(--color-text-secondary);
+}
+.empty h3 { margin-top: 0; color: var(--color-text-primary); }
+/* 6.5.h: a skeleton is a shape, never a number. A financial value must not
+ * flash a fake zero, so nothing here ever renders a digit. */
+.skeleton {
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+  color: transparent;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+.skeleton::after { content: "\00a0"; }
+@keyframes skeleton-pulse { 50% { opacity: 0.55; } }
+
+/* --- item 129: tablet, then mobile -------------------------------------- */
+/* 6.3.b: the navigation collapses to a rail of glyphs. The labels become
+ * screen-reader-only rather than being removed, so the accessible name of
+ * every link survives the layout change. */
+@media (max-width: 1100px) {
+  .shell { grid-template-columns: 64px 1fr; }
+  .shell-nav { padding: var(--space-5) var(--space-2); }
+  .shell-nav .wordmark,
+  .shell-nav .label,
+  .shell-nav .badge {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .shell-nav a { justify-content: center; padding: var(--space-3) 0; }
+  .span-3, .span-4 { grid-column: span 6; }
+  .span-8 { grid-column: span 12; }
+}
+
+/* 6.3.c: a bottom bar, single-column cards. The shell becomes one column and
+ * the navigation moves to the end of the document flow, which is also where a
+ * screen reader should meet it once it is no longer the primary landmark. */
+@media (max-width: 700px) {
+  .shell { display: flex; flex-direction: column; }
+  .shell-nav {
+    order: 2;
+    position: sticky;
+    bottom: 0;
+    top: auto;
+    max-height: none;
+    border-right: 0;
+    border-top: 1px solid var(--color-border);
+    padding: var(--space-2);
+  }
+  .shell-nav ul { display: flex; overflow-x: auto; gap: var(--space-1); }
+  .shell-nav li { flex: 0 0 auto; }
+  .shell-main { order: 1; }
+  .layout { padding: var(--space-4); }
+  .grid-12 { grid-template-columns: 1fr; gap: var(--space-4); }
+  .span-3, .span-4, .span-6, .span-8, .span-12 { grid-column: span 1; }
+}
+
+/* 6.6.g. The skeleton pulse is the only animation in the application, and it
+ * stops here rather than being the exception nobody remembered. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* --- the min-width:auto trap (6.6.d, WCAG 1.4.10) ----------------------- */
+/* A grid or flex item's default `min-width: auto` means it refuses to shrink
+ * below the intrinsic width of its content. A wide statement table therefore
+ * pushes its whole column wider than the viewport, and the PAGE scrolls
+ * sideways rather than the table -- which is the one thing 1.4.10 does not
+ * exempt.
+ *
+ * `min-width: 0` on every link in the chain from the shell down to the cards
+ * is what lets the scroll happen where it was meant to: inside
+ * `.table-scroll`, which is focusable and labelled. Written once here rather
+ * than per screen, because the failure mode is invisible until someone opens
+ * a narrow window and there are nine screens to forget. */
+.shell-main,
+.shell-main > .layout,
+.layout > *,
+.grid-12,
+.grid-12 > *,
+.card,
+.metric,
+.split,
+.split > * { min-width: 0; }
+
+/* `overflow-x: auto` makes the box scroll; it does NOT stop the table's
+ * min-content width from propagating up to the page, which is what was
+ * pushing every statement screen sideways. `contain: inline-size` says the
+ * box's inline size is independent of its contents -- which is exactly the
+ * claim being made, and the only one that makes the scroll happen here
+ * rather than on the document. */
+.table-scroll { max-width: 100%; contain: inline-size; }
+
+/* A long unbroken token -- a hash, a URL, a dotted reference path -- has no
+ * break opportunity, so it sets a min-content width of its own. */
+.raw, code, .small { overflow-wrap: anywhere; }
+pre.raw { white-space: pre-wrap; }

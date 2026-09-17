@@ -549,7 +549,7 @@ def test_the_schedules_page_keeps_the_accessibility_contract(
 
     # Each wide table scrolls inside a named, focusable region (WCAG 1.4.10,
     # 2.1.1) rather than taking the page sideways with it.
-    assert body.count('class="table-scroll" tabindex="0" role="region"') >= 5
+    assert body.count('tabindex="0" role="region"') >= 5
     assert 'aria-label="PP&amp;E and depreciation roll-forward"' in body
     assert "{{" not in body, "a template expression reached the rendered page"
 
@@ -804,7 +804,7 @@ def test_the_assumptions_page_keeps_the_accessibility_contract(
     body = _assumptions(three_statement_client).text
     assert body.count("<caption>") >= 3
     assert '<th scope="col"' in body and '<th scope="row"' in body
-    assert 'class="table-scroll" tabindex="0" role="region"' in body
+    assert 'table-scroll' in body and 'tabindex="0" role="region"' in body
     assert "{{" not in body
     # Every form control the screen renders has a label bound to it.
     import re
@@ -877,7 +877,7 @@ def test_the_forecast_page_keeps_the_accessibility_contract(forecast_client):
     body = client.get(f"/documents/{client.document_id}/forecast").text
     assert body.count("<caption>") >= 4
     assert '<th scope="col"' in body and '<th scope="row"' in body
-    assert 'class="table-scroll" tabindex="0" role="region"' in body
+    assert 'table-scroll' in body and 'tabindex="0" role="region"' in body
     assert "{{" not in body
 
 
@@ -961,5 +961,120 @@ def test_the_valuation_page_keeps_the_accessibility_contract(forecast_client):
     body = client.get(f"/documents/{client.document_id}/valuation").text
     assert body.count("<caption>") >= 4
     assert '<th scope="col"' in body and '<th scope="row"' in body
-    assert 'class="table-scroll" tabindex="0" role="region"' in body
+    assert 'table-scroll' in body and 'tabindex="0" role="region"' in body
     assert "{{" not in body
+
+
+# --- items 121-129: the dashboard and the navigation shell ------------------
+
+def test_the_portfolio_shows_a_computed_status_per_model(forecast_client):
+    """7.1.b, computed from what the model contains rather than stored."""
+    body = forecast_client.get("/").text
+    assert "Valuation Ready" in body
+    assert "Status is computed from what each" in body
+    assert "never stored" in body
+
+
+def test_the_portfolio_says_what_is_outstanding(client):
+    """7.1.c. A count with no sentence beside it is not actionable."""
+    body = client.get("/").text
+    assert "Needs Review" in body
+    assert "What is outstanding" in body
+    assert "facts decided" in body
+
+
+def test_the_portfolio_carries_the_four_metric_cards(forecast_client):
+    """Item 125: period, scenario, source and status on each."""
+    body = forecast_client.get("/").text
+    for label in ("Models", "Valuation ready", "Needs review", "Unresolved items"):
+        assert label in body
+    assert 'class="metric span-3"' in body
+    assert "computed from each model" in body
+
+
+def test_the_portfolio_chart_carries_its_summary_and_a_download(forecast_client):
+    """6.5.f and 6.6.h."""
+    body = forecast_client.get("/").text
+    assert 'class="chart"' in body
+    assert 'aria-describedby="chart-summary"' in body
+    assert "Projected periods are drawn with a dashed line" in body
+    assert "chart.csv" in body
+
+
+def test_the_chart_csv_downloads_at_full_precision(forecast_client):
+    client = forecast_client
+    response = client.get(f"/documents/{client.document_id}/chart.csv")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+    assert "period,revenue,unit,basis" in response.text
+    assert "2000000" in response.text
+
+
+def test_a_model_with_no_series_gives_a_reason_rather_than_an_empty_file(client):
+    response = client.get(f"/documents/{client.document_id}/chart.csv")
+    assert response.status_code in (200, 404)
+    if response.status_code == 404:
+        assert "two or more periods" in response.json()["detail"]
+
+
+def test_the_empty_portfolio_explains_what_is_missing(empty_client):
+    """6.5.i."""
+    body = empty_client.get("/").text
+    assert "No filing has been ingested yet" in body
+    assert "ingest_pdf.py" in body
+    assert 'class="empty"' in body
+
+
+def test_every_screen_carries_the_navigation_shell(forecast_client):
+    """Item 123: one shell, injected once, so no page can ship without a way back."""
+    client = forecast_client
+    for path in ("", "/mapping", "/statements", "/schedules", "/formulas",
+                 "/assumptions", "/forecast", "/valuation"):
+        body = client.get(
+            f"/documents/{client.document_id}{path}", follow_redirects=True
+        ).text
+        assert 'class="shell-nav" aria-label="Sections"' in body, path
+        assert 'href="/documents/' in body
+
+
+def test_the_current_section_is_marked_on_the_page_it_is_on(forecast_client):
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/schedules").text
+    assert 'aria-current="page"' in body
+    marker = body.index('aria-current="page"')
+    # The marked link is the Schedules one.
+    assert "schedules" in body[marker - 200:marker]
+
+
+def test_the_fonts_are_served_from_this_application(forecast_client):
+    """Item 122. Self-hosted, for the reasons in fonts.css."""
+    client = forecast_client
+    stylesheet = client.get("/static/app.css").text
+    assert "/tokens/fonts.css" in stylesheet
+
+    fonts = client.get("/tokens/fonts.css")
+    assert fonts.status_code == 200
+    assert "Source Serif 4" in fonts.text and "Inter" in fonts.text
+    assert "https://" not in fonts.text.split("*/")[-1], (
+        "no font is fetched from a third party at page load"
+    )
+
+    face = client.get("/tokens/fonts/inter-latin-400-normal.woff2")
+    assert face.status_code == 200 and len(face.content) > 10_000
+
+
+def test_the_font_licences_are_present(forecast_client):
+    """The OFL requires its text travel with the fonts."""
+    for name in ("OFL-Inter.txt", "OFL-SourceSerif4.txt"):
+        response = forecast_client.get(f"/tokens/fonts/{name}")
+        assert response.status_code == 200
+        assert "SIL Open Font License" in response.text
+
+
+def test_the_statement_tables_freeze_their_headers(forecast_client):
+    """6.3.e / item 127, on the screens with a column per period."""
+    client = forecast_client
+    for path in ("/statements", "/schedules", "/forecast"):
+        body = client.get(f"/documents/{client.document_id}{path}").text
+        assert 'class="table-scroll is-frozen"' in body, path

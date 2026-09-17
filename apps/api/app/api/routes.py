@@ -14,6 +14,7 @@ is *supposed* to fail -- so it is presented as an answer, not as a crash.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -40,6 +41,10 @@ from ..mapping.checks import all_findings, apply_findings
 from ..mapping.normalized import normalize, periods as ledger_periods, statement_of_fact
 from ..mapping.sets import MappingError
 from ..assumptions.gate import evaluate as evaluate_gate
+from ..dashboard.cards import STATUS_LEGEND, portfolio_cards
+from ..dashboard.charts import line_chart
+from ..dashboard.navigation import nav_items
+from ..dashboard.standing import standing_for
 from ..assumptions.impact import preview as preview_change
 from ..assumptions.proposals import propose_from_schedules, unproposable
 from ..assumptions.schema import AssumptionError, Status
@@ -56,6 +61,7 @@ from ..forecast.build import ForecastError, build_scenario_forecast
 from ..forecast.checks import check_every_scenario
 from ..forecast.views import columns as forecast_columns
 from ..forecast.views import comparison, driver_rows as forecast_driver_rows
+from ..forecast.build import forecast_ledger
 from ..forecast.views import statement_rows as forecast_statement_rows
 from ..formula.catalog import derivation_formulas, ledger_environment
 from ..valuation.build import ValuationError, build_scenario_valuation
@@ -81,8 +87,66 @@ from .rendering import render_page
 router = APIRouter()
 
 
+class _Shell:
+    """Adds the navigation shell to every render, in one place.
+
+    The alternative is a `nav_items` line in forty context dictionaries, which
+    is forty chances to forget one and ship a page with no way back. The
+    current section is derived from the request path rather than passed, for
+    the same reason: a hand-passed value is a value that can disagree with the
+    URL it is rendered under.
+    """
+
+    def __init__(self, request: Request):
+        self.request = request
+        self.templates = request.app.state.templates
+
+    def TemplateResponse(self, *, request: Request, name: str, context: dict, **kwargs):
+        document = context.get("document")
+        document_id = getattr(document, "id", None)
+        context = dict(context)
+        context.setdefault(
+            "nav_items",
+            nav_items(document_id, current=_current_section(request.url.path)),
+        )
+        context.setdefault("context_units", _context_units(context))
+        return self.templates.TemplateResponse(
+            request=request, name=name, context=context, **kwargs
+        )
+
+
+def _current_section(path: str) -> str:
+    """Which left-navigation entry this URL belongs to."""
+    if path == "/":
+        return "portfolio"
+    parts = [part for part in path.split("/") if part]
+    if len(parts) < 2 or parts[0] != "documents":
+        return ""
+    if len(parts) == 2:
+        return "source"
+    return "source" if parts[2] == "pages" else parts[2]
+
+
+def _context_units(context: dict) -> str:
+    """6.3.e asks that units be visible. The top bar is where they belong:
+    on the context bar, once, rather than in every column heading."""
+    result = context.get("result")
+    if result is None:
+        return ""
+    fields = getattr(getattr(result, "document", None), "metadata", None)
+    if fields is None:
+        return ""
+    parts = []
+    for name in ("reporting_currency", "scale"):
+        field = fields.fields.get(name)
+        if field is not None and field.value:
+            mark = "" if field.confirmed else " (unconfirmed)"
+            parts.append(f"{field.value}{mark}")
+    return " in ".join(parts)
+
+
 def _templates(request: Request):
-    return request.app.state.templates
+    return _Shell(request)
 
 
 def _repository(request: Request):
@@ -114,16 +178,141 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@dataclass(frozen=True)
+class _Model:
+    """One row of the 7.1 portfolio."""
+
+    document: object
+    standing: object
+    result: object
+    scenarios: object = None
+
+
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    """7.1 Portfolio. Every document held, and how far its review has got."""
+    """7.1 Portfolio: every model, its computed status, and what is outstanding.
+
+    The status is computed per model on every render rather than stored. That
+    is real work -- it builds the statements and attempts the forecast -- and
+    it is the trade worth making for the first thing a reader sees: a stored
+    status is wrong from the moment anything else changes, and a reader who
+    has once been misled by it stops trusting the column.
+    """
     repository = _repository(request)
-    documents = []
+    store = _scenario_store(request)
+
+    models = []
     for document_id in repository.document_ids():
         result = repository.load_result(document_id)
-        documents.append((result.document, review_progress(result)))
+        scenarios = store.load(document_id, owner=_actor(request))
+        models.append(
+            _Model(
+                document=result.document,
+                standing=standing_for(result, scenarios if scenarios.assumptions else None),
+                result=result,
+                scenarios=scenarios,
+            )
+        )
+    models.sort(key=lambda model: (-model.standing.status.rank, model.document.sanitized_filename))
+
+    chart, chart_document_id = _portfolio_chart(models)
     return _templates(request).TemplateResponse(
-        request=request, name="index.html", context={"documents": documents}
+        request=request, name="index.html",
+        context={
+            "models": models,
+            "cards": portfolio_cards(tuple((m.document, m.standing) for m in models)),
+            "status_legend": STATUS_LEGEND,
+            "chart": chart,
+            "chart_document_id": chart_document_id,
+        },
+    )
+
+
+def _portfolio_chart(models):
+    """Revenue for the furthest-along model, actuals and estimates together.
+
+    One chart rather than one per model: 6.3.d asks for deterministic widgets,
+    and a dashboard whose shape changes with the number of documents is one a
+    reader has to re-learn each visit.
+    """
+    for model in sorted(models, key=lambda m: -m.standing.status.rank):
+        series = _revenue_series(model.result, model.scenarios)
+        if series is not None:
+            return series, model.document.id
+    return None, ""
+
+
+def _revenue_series(result, scenarios=None):
+    """Revenue across every period, reported then projected.
+
+    The forecast half is included when a scenario produces one, because that
+    join is the thing the chart exists to make unmistakable: 6.2.e dashes the
+    projected segment and 1.19 forbids presenting it as a fact, and neither
+    means anything on a chart with no projection on it.
+    """
+    try:
+        built = build_statements(result, strict=False)
+    except BuildError:
+        return None
+    if len(built.years) < 2:
+        return None
+
+    income = built.ledgers[Statement.INCOME]
+    points = [
+        (year, income.get("revenue", year))
+        for year in built.years
+        if income.get("revenue", year) is not None
+    ]
+    if len(points) < 2:
+        return None
+
+    if scenarios is not None and scenarios.assumptions:
+        try:
+            forecast = build_scenario_forecast(built, scenarios, BASE)
+        except (ForecastError, BuildError):
+            forecast = None
+        if forecast is not None:
+            projected = forecast_ledger(forecast, Statement.INCOME)
+            points += [
+                (year, projected.get("revenue", year))
+                for year in forecast.periods.forecast
+                if projected.get("revenue", year) is not None
+            ]
+
+    return line_chart("Revenue", tuple(points), _units_for(result))
+
+
+def _units_for(result) -> str:
+    field = result.document.metadata.fields.get("scale")
+    scale = str(field.value) if field is not None and field.value else "reporting units"
+    currency = result.document.metadata.fields.get("reporting_currency")
+    money = str(currency.value) if currency is not None and currency.value else ""
+    return f"{scale} of {money}".strip() if money else scale
+
+
+@router.get("/documents/{document_id}/chart.csv")
+def chart_csv(request: Request, document_id: str):
+    """6.5.f: the chart's data, downloadable, at full stored precision.
+
+    Not the displayed values. 4.18 separates calculation precision from
+    display precision, and a reader who downloads a series to check it needs
+    the number the model holds rather than the one the axis had room for.
+    """
+    result = _load(request, document_id)
+    series = _revenue_series(
+        result, _scenario_store(request).load(document_id, owner=_actor(request))
+    )
+    if series is None:
+        raise HTTPException(
+            status_code=404,
+            detail="this model has no revenue series with two or more periods",
+        )
+    return Response(
+        content=series.csv,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{document_id}-revenue.csv"'
+        },
     )
 
 
