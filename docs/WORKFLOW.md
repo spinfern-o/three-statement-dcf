@@ -16,7 +16,7 @@ steps are referenced somewhere in `model/`.
 | 5 | Standardize the income statement; do not invent absent lines | `statements.Ledger` is sparse; `accounts.INCOME_ACCOUNTS` are all optional |
 | 6 | Standardize the balance sheet; `A = L + E`; no plug | `checks._balance_check` reports the delta and leaves it alone |
 | 7 | Standardize the cash flow statement into CFO/CFI/CFF | `accounts.OPERATING_ITEMS` / `INVESTING_ITEMS` / `FINANCING_ITEMS` |
-| 8 | Build supporting schedules before forecasting | `schedules.py` — `ppe_schedule`, `debt_schedule`, `retained_earnings_schedule` |
+| 8 | Build supporting schedules before forecasting | `model/schedules.py` — `ppe_schedule`, `debt_schedule`, `retained_earnings_schedule` (forecast); `apps/api/app/schedules/` — the same roll-forwards over the periods a filing reports, reconciled to it (13.8) |
 | 9 | Verify every historical linkage before forecasting | `Ledger.cross_check` (reported vs derived) and `checks.run_all_checks` |
 
 ## Assumptions and research

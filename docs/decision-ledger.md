@@ -598,6 +598,25 @@ engine's derivation and checks, which is why it is not folded into Phase 5.
 It should be done before the system is pointed at a filing with material
 goodwill, leases, or minority interests.
 
+**Phase 7 turned the cost of this from an argument into a count.** Three of
+the seven schedules Section 13 asks for cannot be built at all, and each says
+so on the screen rather than rendering an empty table:
+
+- **13.3 intangibles** — no `goodwill` or `intangibles` line, and no separate
+  amortization line either, so neither side of the roll-forward exists.
+- **13.5 leases** — no lease liability and no right-of-use asset. Worse than
+  absent: nothing can distinguish a company with no leases from one whose
+  leases sit inside `other_noncurrent_liabilities`.
+- **13.7 share counts** — basic and diluted share counts are not in the chart
+  at all. The chart holds currency amounts, and a share count is neither. STEP
+  34's last division is equity value per share, so a valuation needs this.
+
+A fourth consequence is subtler and shows up as a caveat rather than a gap:
+`depreciation_amortization` is one combined line, so the PP&E schedule charges
+amortization against PP&E. That is right only if the company amortizes
+nothing, and the schedule says so rather than quietly being wrong for any
+filing with intangibles.
+
 
 ### F-18 — RESOLVED in Phase 6. The extractor was truncating long row labels
 
@@ -652,6 +671,54 @@ unaffected. Two consequences worth noting:
 
 ---
 
+### F-20 — RESOLVED in Phase 7. A reconciliation reported "ties exactly" when
+it merely fell inside the tolerance
+
+Found by a unit test written to assert the opposite of what the code did.
+`schedules/checks.py:reconcile` compared a schedule's closing figure with the
+balance sheet's using `Tolerance.close`, and on PASS reported
+`"N period(s) tie exactly"` — counting every period that passed, including any
+that differed by less than the tolerance.
+
+That is a small wording bug with a specific, expensive failure behind it. The
+tolerance exists because a filing rounds its own figures, so a difference in
+the last printed digit is the company's rounding. A missing disposal that
+happens to be small is a different thing entirely, and the old message made
+the two indistinguishable at exactly the size where telling them apart
+matters. A reviewer reading "ties exactly" has been told the schedule accounts
+for the whole movement, and would have no reason to look.
+
+The check now counts exact ties separately, and a period inside the tolerance
+but not equal is reported with its amount and the tolerance it passed under.
+Specification 12.5 and STEP 6 say to keep differences visible; a difference
+described as an exact tie is not visible.
+
+---
+
+### F-21 — RESOLVED in Phase 7. The schedules screen scrolled sideways at 200%
+
+Caught by the accessibility test for the new screen, and only after that test
+was fixed. The first version of it ran against the `served` fixture, which
+holds a filing at the start of review — where the schedules screen correctly
+shows its empty state. A 200%-zoom test on an empty page passes and proves
+nothing.
+
+Pointed at a populated screen it failed immediately: 111px of horizontal page
+scroll at a 640px viewport, from the roll-forward tables, which carry a period
+per column plus a sentence of basis per row.
+
+The fix is not to reflow them. A reconciliation table is two-dimensional data,
+and WCAG 1.4.10 exempts exactly that — but only if the table scrolls inside
+its own region instead of taking the page with it. Each wide table is now in a
+focusable, named `role="region"`, so it can also be scrolled from the keyboard
+alone (2.1.1).
+
+Worth recording as a finding rather than a fix because of how it was found:
+the test that would have caught it was written first, and passed, against the
+wrong page.
+
+---
+
 ## Work that is NOT blocked
 
 Buildable now, because it depends on no OPEN decision:
@@ -682,6 +749,46 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 7 (items 69–77) is built**, in
+[`apps/api/app/schedules/`](../apps/api/app/schedules): the historical
+supporting schedules of Section 13, reconciled to the statements they claim to
+explain.
+
+The design decision that shapes the whole package is what to do about the
+movements a filing does not disclose. Every formula in Section 13 ends in a
+term like `+/- FX and Other Adjustments`, and a filing almost never puts a
+number beside that on the face of its statements. Solving for it would make
+every roll-forward tie, every reconciliation in 13.8 pass, and the entire
+phase worthless. So nothing here plugs: the schedule's closing figure is the
+opening balance plus what was disclosed, the balance sheet's figure is its
+own, and the gap between them is reported as **unexplained**.
+
+That choice is what the tests are built around. Four of them corrupt a
+different input — CapEx, a debt repayment, a dividend, a receivable — and
+assert the reconciliation catches it *with the right amount*, because a
+reconciliation that fails with the wrong number is still wrong.
+
+Two conventions are stated rather than assumed, both because the alternative
+is defensible and gives a different answer:
+
+- **Days drivers use year-end balances, not averages** (13.1.e). The average
+  is arguably the better description of the year, but this driver exists to be
+  inverted — `model/schedules.py:days_to_balance` forecasts a *closing*
+  balance — so an average-based DSO would not reproduce the balance sheet it
+  came from.
+- **Interest is implied on beginning debt** (13.4), because that is what
+  `model/forecast.py` charges it on. The average-debt rate is computed and
+  shown beside it, marked as not the one the forecast uses. A test reads
+  `model/forecast.py` and fails if that stops being true.
+
+Three of the seven schedules cannot be built at all — see **F-17**, which
+Phase 7 turns from an argument into a count.
+
+Phase 7 found two defects in its own work, both recorded: **F-20** (a
+reconciliation reported "ties exactly" for a difference merely inside the
+tolerance) and **F-21** (the new screen scrolled sideways at 200%, caught only
+after the accessibility test was fixed to run against a populated page).
 
 **Phase 6 (items 59–68) is built**, in
 [`apps/api/app/statements/`](../apps/api/app/statements), and with it **the two

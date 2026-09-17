@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block title %}Schedules &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Supporting schedules &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% macro amount(value) -%}
+  {% if value is none %}<span class="muted">&mdash;</span>{% else %}{{ "{:,}".format(value) }}{% endif %}
+{%- endmacro %}
+
+{% macro region(label) -%}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{% macro caveats(schedule) -%}
+  {% if schedule.caveats %}
+  <details>
+    <summary>{{ schedule.caveats | length }} thing(s) this schedule's numbers do not show</summary>
+    <ul class="small">
+      {% for caveat in schedule.caveats %}
+      <li><strong>{{ caveat.rule }}</strong> &mdash; {{ caveat.text }}</li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+{%- endmacro %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Supporting schedules</h1>
+
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="notice notice-ok" role="status">{{ ok }}</div>{% endif %}
+
+  <p class="muted">
+    How each balance moved between the periods this filing reports, built from
+    the movements it discloses and nothing else. Where the disclosed movements
+    do not reach the reported closing balance, the gap is shown as unexplained
+    rather than plugged (12.5, STEP 6).
+    <a href="/documents/{{ document.id }}/statements">Historical statements</a> &middot;
+    <a href="/documents/{{ document.id }}">Source room</a>
+  </p>
+
+  {% if blocked %}
+  <div class="card">
+    <h2>Nothing to show yet</h2>
+    <p class="muted">{{ blocked }}</p>
+  </div>
+  {% else %}
+
+  <section class="card" aria-labelledby="checks-heading">
+    <h2 id="checks-heading">Reconciliation to the statements (13.8)</h2>
+    <p class="small muted">
+      Every schedule reconciles to its related statement line for every period.
+      A schedule that could not be built says SKIP and why &mdash; an unrun
+      check is a reported gap, not a pass (1.14).
+    </p>
+    {% call region("Reconciliation results") %}
+    <table>
+      <caption>{{ check_summary }}</caption>
+      <thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        {% for check in checks %}
+        <tr>
+          <th scope="row">{{ check.name }}</th>
+          <td>
+            {% if check.status.value == 'PASS' %}<span class="badge badge-success">PASS</span>
+            {% elif check.status.value == 'FAIL' %}<span class="badge badge-danger">FAIL</span>
+            {% else %}<span class="badge badge-neutral">SKIP</span>{% endif %}
+          </td>
+          <td class="small">{{ check.detail }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- 13.1 working capital ------------------------------------------- #}
+  <section class="card" aria-labelledby="wc-heading">
+    <h2 id="wc-heading">{{ schedules.working_capital.title }}
+      <span class="small muted">(13.1)</span></h2>
+    <p class="small muted">
+      Operating current assets less operating current liabilities.
+      {{ schedules.working_capital.excluded | join(' and ') }} are excluded by
+      definition (13.1.c).
+      {% if schedules.working_capital.reason %}<br>{{ schedules.working_capital.reason }}{% endif %}
+    </p>
+    {% call region("Working capital by period") %}
+    <table>
+      <caption>Working capital by period, in the filing's own units</caption>
+      <thead>
+        <tr><th scope="col">Line</th>
+          {% for year in schedules.years %}<th scope="col" class="num">{{ year }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for row in wc_table %}
+        <tr{% if row.is_total %} class="total"{% endif %}>
+          <th scope="row">{{ row.label }}</th>
+          {% for value in row.values %}
+          <td class="num{% if row.is_total %} total{% endif %}">
+            {% if value is none %}
+              <span class="muted" title="{{ row.absent_reason }}">&mdash;</span>
+            {% else %}{{ "{:,}".format(value) }}{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+
+    <h3>Drivers (13.1.d)</h3>
+    <p class="small muted">
+      Denominator convention: a year-end balance over the full-year flow, times
+      {{ schedules.working_capital.days_in_year }} days (13.1.e). Year-end rather
+      than average, so a driver inverted by the forecast reproduces the balance
+      sheet it came from.
+    </p>
+    {% call region("Working capital days drivers") %}
+    <table>
+      <caption>Days drivers by period</caption>
+      <thead>
+        <tr><th scope="col">Driver</th><th scope="col">Basis</th>
+          {% for year in schedules.years %}<th scope="col" class="num">{{ year }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for row in wc_drivers %}
+        <tr>
+          <th scope="row">{{ row.name }}</th>
+          <td class="small muted">{{ row.numerator }} &divide; {{ row.denominator }}</td>
+          {% for driver in row.values %}
+          <td class="num">
+            {% if driver.days is none %}
+              <span class="muted" title="{{ driver.unavailable_reason }}">&mdash;</span>
+            {% else %}{{ driver.days }}{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    {{ caveats(schedules.working_capital) }}
+  </section>
+
+  {# --- the roll-forwards --------------------------------------------- #}
+  {% for schedule in rollforwards %}
+  <section class="card" aria-labelledby="rf-{{ schedule.key }}">
+    <h2 id="rf-{{ schedule.key }}">{{ schedule.title }}
+      <span class="small muted">({{ schedule.rule }})</span></h2>
+    <p class="small"><code>{{ schedule.formula }}</code></p>
+    {% if schedule.reason %}<p class="small muted">{{ schedule.reason }}</p>{% endif %}
+
+    {% if not schedule.years %}
+    <p class="muted">No period in this filing has a prior period to roll forward from.</p>
+    {% else %}
+    {% call region(schedule.title ~ " roll-forward") %}
+    <table>
+      <caption>{{ schedule.title }} roll-forward</caption>
+      <thead>
+        <tr><th scope="col">Movement</th>
+          {% for row in schedule.years %}<th scope="col" class="num">{{ row.year }}</th>{% endfor %}
+          <th scope="col">Basis</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Beginning balance</th>
+          {% for row in schedule.years %}<td class="num">{{ amount(row.beginning.value) }}</td>{% endfor %}
+          <td class="small muted">{{ schedule.years[0].beginning.basis }}</td>
+        </tr>
+        {% for index in range(schedule.years[0].movements | length) %}
+        <tr>
+          <th scope="row">{{ schedule.years[0].movements[index].label }}</th>
+          {% for row in schedule.years %}
+          <td class="num">
+            {% if row.movements[index].value is none %}
+              <span class="muted" title="{{ row.movements[index].absent_reason }}">not reported</span>
+            {% else %}{{ "{:,}".format(row.movements[index].value) }}{% endif %}
+          </td>
+          {% endfor %}
+          <td class="small muted">{{ schedule.years[0].movements[index].basis }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <th scope="row">Schedule ending balance</th>
+          {% for row in schedule.years %}<td class="num total">{{ amount(row.computed_ending) }}</td>{% endfor %}
+          <td class="small muted">beginning plus every movement above</td>
+        </tr>
+        <tr>
+          <th scope="row">Reported on the balance sheet</th>
+          {% for row in schedule.years %}<td class="num">{{ amount(row.reported_ending) }}</td>{% endfor %}
+          <td class="small muted">{{ schedule.years[0].reported_ending_line }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Unexplained difference</th>
+          {% for row in schedule.years %}
+          <td class="num">
+            {% if row.unexplained is none %}<span class="muted">&mdash;</span>
+            {% elif row.unexplained == 0 %}<span class="badge badge-success">0</span>
+            {% else %}<span class="badge badge-warning">{{ "{:,}".format(row.unexplained) }}</span>{% endif %}
+          </td>
+          {% endfor %}
+          <td class="small muted">reported, never plugged (12.5)</td>
+        </tr>
+      </tbody>
+    </table>
+    {% endcall %}
+    {% endif %}
+
+    {% if schedule.key == 'debt' %}
+    <h3>Implied interest rate (13.4)</h3>
+    {% if not schedules.interest %}
+    <p class="muted">No period has a prior-period debt balance to imply a rate from.</p>
+    {% else %}
+    {% call region("Implied interest rate") %}
+    <table>
+      <caption>Interest expense over debt, on each basis 13.4 names</caption>
+      <thead><tr><th scope="col">Period</th><th scope="col" class="num">Interest expense</th>
+        <th scope="col">Basis</th><th scope="col" class="num">Debt</th>
+        <th scope="col" class="num">Rate</th><th scope="col">Note</th></tr></thead>
+      <tbody>
+        {% for row in schedules.interest %}
+        {% for rate in row.rates %}
+        <tr>
+          <th scope="row">{{ row.year }}</th>
+          <td class="num">{{ amount(row.interest_expense) }}</td>
+          <td>{{ rate.basis }} debt
+            {% if rate.is_engine_basis %}<span class="badge badge-success">the basis the forecast uses</span>{% endif %}
+          </td>
+          <td class="num">{{ amount(rate.denominator) }}</td>
+          <td class="num">
+            {% if rate.percent is none %}<span class="muted">&mdash;</span>{% else %}{{ rate.percent }}%{% endif %}
+          </td>
+          <td class="small muted">{{ rate.unavailable_reason or rate.explanation }}</td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    {% endif %}
+    {% endif %}
+
+    {{ caveats(schedule) }}
+  </section>
+  {% endfor %}
+
+  {# --- 13.6 tax ------------------------------------------------------- #}
+  <section class="card" aria-labelledby="tax-heading">
+    <h2 id="tax-heading">{{ schedules.tax.title }} <span class="small muted">(13.6)</span></h2>
+    <p class="small muted">{{ schedules.tax.reason }}</p>
+    {% call region("Effective tax rate") %}
+    <table>
+      <caption>Effective tax rate by period</caption>
+      <thead><tr><th scope="col">Period</th><th scope="col" class="num">Pretax income</th>
+        <th scope="col" class="num">Tax expense</th><th scope="col" class="num">Effective rate</th>
+        <th scope="col">Usable as a STEP 16 assumption</th></tr></thead>
+      <tbody>
+        {% for row in schedules.tax.years %}
+        <tr>
+          <th scope="row">{{ row.year }}</th>
+          <td class="num">{{ amount(row.pretax_income) }}</td>
+          <td class="num">{{ amount(row.tax_expense) }}</td>
+          <td class="num">
+            {% if row.effective_rate_percent is none %}<span class="muted">&mdash;</span>
+            {% else %}{{ row.effective_rate_percent }}%{% endif %}
+          </td>
+          <td class="small">
+            {% if row.usable_as_assumption %}<span class="badge badge-success">yes</span>
+            {% else %}<span class="badge badge-warning">no</span> {{ row.reason }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    <p class="small muted">
+      Not available from the face of the statements, and asked for by 13.6:
+      {{ schedules.tax.missing_components | join(', ') }}.
+    </p>
+    {{ caveats(schedules.tax) }}
+  </section>
+
+  {# --- the schedules that cannot be built ----------------------------- #}
+  <section class="card" aria-labelledby="unavailable-heading">
+    <h2 id="unavailable-heading">Schedules this filing cannot support</h2>
+    <p class="small muted">
+      Shown rather than omitted: a blank table would claim the filing had
+      nothing to disclose, which is a different statement and usually a false
+      one (1.14).
+    </p>
+    <dl>
+      {% for schedule in schedules.unavailable %}
+      <dt><strong>{{ schedule.title }}</strong> <span class="small muted">({{ schedule.rule }})</span>
+        <span class="badge badge-neutral">not available</span></dt>
+      <dd class="small">{{ schedule.reason }}</dd>
+      {% endfor %}
+    </dl>
+  </section>
+
+  {% endif %}
+</main>
+{% endblock %}

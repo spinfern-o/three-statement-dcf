@@ -308,3 +308,95 @@ def test_reduced_motion_is_honoured(browser, served):
     )
     assert not durations, f"transitions still running under reduced motion: {durations[:3]}"
     context.close()
+
+
+# --- 7.6: the supporting schedules screen ----------------------------------
+
+@pytest.fixture(scope="module")
+def served_schedules(tmp_path_factory, three_statements):
+    """Serve the FULLY REVIEWED three-statement filing.
+
+    `served` holds a filing at the start of review, where the schedules screen
+    correctly shows its empty state. Testing 200% zoom against an empty state
+    proves nothing: the tables that overflow are the wide numeric ones, and
+    they only exist once the mappings are approved.
+    """
+    import uvicorn
+
+    from apps.api.app.api.main import create_app
+    from apps.api.app.persistence.json_store import JsonDocumentRepository
+
+    root = tmp_path_factory.mktemp("served-schedules")
+    JsonDocumentRepository(root).save(three_statements)
+
+    port = _free_port()
+    server = uvicorn.Server(
+        uvicorn.Config(create_app(root), host="127.0.0.1", port=port, log_level="warning")
+    )
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    for _ in range(200):
+        if server.started:
+            break
+        threading.Event().wait(0.05)
+    assert server.started, "the review server did not start"
+
+    yield {
+        "base": f"http://127.0.0.1:{port}",
+        "document_id": three_statements.document.id,
+    }
+
+    server.should_exit = True
+    thread.join(timeout=10)
+
+
+def test_the_schedules_screen_is_reachable_and_structured(browser, served_schedules):
+    """6.6: landmarks, a single h1, and every table with a caption.
+
+    The screen carries no controls -- it is read, not operated -- so the test
+    is about whether a screen reader can navigate it. Nine schedules of
+    numbers are exactly the content where jumping by heading and by table is
+    the difference between usable and not.
+    """
+    served = served_schedules
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/documents/{served['document_id']}/schedules")
+        assert "Nothing to show yet" not in page.content(), (
+            "this test is only meaningful against a populated screen"
+        )
+        assert page.locator("table").count() >= 5
+
+        assert page.get_by_role("main").count() == 1
+        assert page.get_by_role("heading", level=1).count() == 1
+
+        # Every data table is captioned and its levels do not skip.
+        levels = page.eval_on_selector_all(
+            "h1, h2, h3", "nodes => nodes.map(n => Number(n.tagName[1]))"
+        )
+        for previous, current in zip(levels, levels[1:]):
+            assert current <= previous + 1, f"heading level jumps {previous} -> {current}"
+        for index in range(page.locator("table").count()):
+            table = page.locator("table").nth(index)
+            assert table.locator("caption").count() == 1, f"table {index} has no caption"
+    finally:
+        context.close()
+
+
+def test_the_schedules_screen_does_not_scroll_sideways_at_200_percent(
+    browser, served_schedules
+):
+    """6.6.d / WCAG 1.4.10. Wide numeric tables are where this breaks first."""
+    served = served_schedules
+    context = browser.new_context(viewport={"width": 640, "height": 900})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/documents/{served['document_id']}/schedules")
+        assert "Nothing to show yet" not in page.content()
+        overflow = page.evaluate(
+            "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+        )
+        assert overflow <= 0, f"the page scrolls {overflow}px sideways"
+    finally:
+        context.close()
