@@ -879,3 +879,87 @@ def test_the_forecast_page_keeps_the_accessibility_contract(forecast_client):
     assert '<th scope="col"' in body and '<th scope="row"' in body
     assert 'class="table-scroll" tabindex="0" role="region"' in body
     assert "{{" not in body
+
+
+# --- items 109-120: the DCF valuation screen (7.9) --------------------------
+
+def test_the_valuation_page_says_why_it_cannot_value(three_statement_client):
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert "Nothing to value yet" in body
+
+
+def test_the_valuation_page_shows_the_wacc_build_with_its_sources(forecast_client):
+    """7.9.b and 16.6-16.10. Every input is a dated observation."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert "WACC build and its sources" in body
+    for code in ("risk_free_rate", "beta", "equity_risk_premium",
+                 "pretax_cost_of_debt", "market_value_equity", "market_value_debt"):
+        assert code in body, f"{code} is not on the WACC panel"
+    assert "https://example.test/beta" in body
+    assert "2026-09-17" in body, "every market input carries its observation date"
+
+
+def test_the_valuation_page_shows_the_fcff_bridge_and_the_discounting(forecast_client):
+    """7.9.a and 7.9.c, on one row per year so a reader can follow one flow."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert "FCFF bridge and discounted flows" in body
+    assert "NOPAT + D&amp;A" in body
+    assert "Year-end" in body, "the timing convention is stated (16.11)"
+
+
+def test_the_valuation_page_shows_the_terminal_share_and_its_threshold(
+    forecast_client,
+):
+    """16.21 and 16.22."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert "% of enterprise value (16.21)" in body
+
+
+def test_the_valuation_page_says_there_is_no_per_share_value(forecast_client):
+    """16.20: only when diluted shares are verified, and none are."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert "Implied value per share" in body
+    assert "not available" in body
+    assert "16.20 permits one only when" in body
+
+
+def test_the_valuation_page_lists_the_bridge_lines_taken_as_nil(forecast_client):
+    """16.19. Zero for most companies, and not zero for some."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert "taken as nil" in body
+    assert "minority_interest" in body
+    assert "lease liabilities" in body.lower(), "16.19's line the chart cannot build"
+
+
+def test_the_valuation_page_shows_the_sensitivity_grid_with_its_steps(
+    forecast_client,
+):
+    """7.9.g and 16.23: explicit step sizes and displayed assumptions."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert "WACC and growth sensitivity" in body
+    assert "0.0025 per step" in body
+    assert "exit-multiple sensitivity" in body, "7.9.h is answered, not omitted"
+
+
+def test_the_valuation_page_says_it_is_not_a_guarantee(forecast_client):
+    """1.19 and 1.20, on the screen a reader would quote from."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert "not a fact, a guarantee" in body
+    assert "investment advice" in body
+
+
+def test_the_valuation_page_keeps_the_accessibility_contract(forecast_client):
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/valuation").text
+    assert body.count("<caption>") >= 4
+    assert '<th scope="col"' in body and '<th scope="row"' in body
+    assert 'class="table-scroll" tabindex="0" role="region"' in body
+    assert "{{" not in body

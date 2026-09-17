@@ -24,7 +24,7 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4 to 10, items 39–108. A browser interface showing
+   specification Phases 4 to 11, items 39–120. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
@@ -37,7 +37,8 @@ Two documents govern this repository, and they are different things:
    own components, and shows the formula and the exact inputs it used; and the
    the assumption register, where every driver the forecast needs is listed
    whether or not anyone has entered it; and the forecast statements, built by
-   the engine from a scenario's approved assumptions.
+   the engine from a scenario's approved assumptions; and the DCF, where every
+   market input carries the URL and the date somebody observed it on.
 
 **The two halves are joined.** Phase 6 turns a verified, mapped document into
 the engine's own `Ledger` objects and writes the two YAML files `run_model.py`
@@ -77,7 +78,15 @@ a scenario's approved assumptions become the engine's inputs, the engine runs,
 and every check runs for every scenario and every period. A second
 implementation would produce a second answer to every question in Section 15.
 
-901 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**Discounting now offers the conventions Section 16 requires.** The engine
+discounted at whole-year periods; 16.11 asks for a documented choice between
+year-end and mid-year, and 16.12 for the exact time fraction from a valuation
+date. Both are supplied, with the precision policy for the resulting
+non-integer exponent stated and bounded by tests at 1e-40 relative — forty
+orders of magnitude inside the 0.0001% contract. The year-end path is unchanged
+to the digit.
+
+971 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -92,9 +101,8 @@ there was no mapping stage; Phase 5 built one. The application still evaluates
 all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
 
-**What does not exist yet:** the rest of the website. No database, no DCF
-screen, no dashboard, no exports. Phases 11 to 17 of the specification, in
-other words — all of them presentations of, or projections from, numbers this
+**What does not exist yet:** the rest of the website. No database, no
+dashboard, no exports. Phases 12 to 17 of the specification, in other words — all of them presentations of, or projections from, numbers this
 stage now certifies.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
@@ -430,6 +438,17 @@ Forecast statements (specification Phase 10, items 97–108):
 | `apps/api/app/forecast/checks.py` | 108 | 15.20 across every scenario, and 15.21's label withheld for a reason it can defend |
 | `apps/api/app/forecast/views.py` | — | 15.4's drivers by period, and 7.8.d's actual/estimate labels |
 | `apps/api/app/api/templates/forecast.html` | — | The 7.8 screen, with the scenario comparison |
+
+DCF valuation (specification Phase 11, items 109–120):
+
+| Path | Item | What it does |
+|---|---|---|
+| `model/timing.py` | 112, 113 | 16.11's convention, 16.12's exact fraction, 16.13's precision policy |
+| `apps/api/app/valuation/inputs.py` | 111 | Every WACC input as a dated, sourced observation |
+| `apps/api/app/valuation/build.py` | 109–118 | The DCF, driven from a scenario, refusing all at once |
+| `apps/api/app/valuation/checks.py` | 115 | 16.21's terminal share, and 16.22's warning that is not a failure |
+| `apps/api/app/valuation/sensitivity.py` | 119 | 16.23's grid, centred on the valuation it varies |
+| `apps/api/app/api/templates/valuation.html` | — | The 7.9 screen |
 
 Documentation:
 

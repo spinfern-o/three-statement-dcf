@@ -220,24 +220,50 @@ def forecastable(tmp_path_factory):
 def forecast_client(tmp_path, forecastable):
     """A client over the forecastable filing, with an approved base scenario.
 
-    Stored the way the application stores it, so the screen reads the same
-    JSON a reviewer's own session would.
+    Carries the forecast drivers AND the market inputs, so one client serves
+    the forecast screen and the valuation screen. Stored the way the
+    application stores it, so the screens read the same JSON a reviewer's own
+    session would.
     """
     from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
-    from apps.api.app.assumptions.schema import Assumption, Evidence, SourceType, Status
-    from apps.api.app.assumptions.scenarios import ScenarioSet, base_scenario
     from apps.api.app.assumptions.store import ScenarioStore
     from apps.api.app.persistence.json_store import JsonDocumentRepository
 
     root = tmp_path / "forecast"
     JsonDocumentRepository(root).save(forecastable)
+    ScenarioStore(root).save(forecastable.document.id, approved_scenario("owner"))
 
-    def approved(code, value, unit):
+    with TestClient(create_app(root)) as test_client:
+        test_client.document_id = forecastable.document.id
+        yield test_client
+
+
+#: 16.6-16.10 and 16.15, as decimal strings (4.2). None can be derived from the
+#: filing, which is why each one is EXTERNAL_MARKET_DATA with a URL and a date.
+MARKET_INPUTS = {
+    "risk_free_rate": ("0.042", "ratio"),
+    "beta": ("1.15", "ratio"),
+    "equity_risk_premium": ("0.055", "ratio"),
+    "pretax_cost_of_debt": ("0.05", "ratio"),
+    "market_value_equity": ("2500000", "currency"),
+    "market_value_debt": ("550000", "currency"),
+    "terminal_growth": ("0.02", "ratio"),
+}
+
+
+def approved_scenario(owner: str = "owner"):
+    """A base scenario with every forecast driver AND every market input."""
+    from apps.api.app.assumptions.drivers import BY_CODE
+    from apps.api.app.assumptions.scenarios import ScenarioSet, base_scenario
+    from apps.api.app.assumptions.schema import Assumption, Evidence, SourceType, Status
+
+    def driver(code, value):
+        unit = BY_CODE[code].unit
         fields = dict(
             code=code, name=code.replace("_", " "), value=value, unit=unit,
-            owner="owner", reviewer="owner", status=Status.APPROVED,
+            owner=owner, reviewer=owner, status=Status.APPROVED,
             rationale="entered for this test, with a stated source",
         )
         if unit == "days":
@@ -252,21 +278,20 @@ def forecast_client(tmp_path, forecastable):
             )
         return Assumption(**fields)
 
-    from apps.api.app.assumptions.drivers import BY_CODE
+    def market(code, value, unit):
+        return Assumption(
+            code=code, name=code.replace("_", " "), value=value, unit=unit,
+            owner=owner, reviewer=owner, status=Status.APPROVED,
+            rationale="observed on the valuation date and recorded with its source",
+            source_type=SourceType.EXTERNAL_MARKET_DATA,
+            evidence=Evidence(url=f"https://example.test/{code}", date="2026-09-17"),
+        )
 
-    ScenarioStore(root).save(
-        forecastable.document.id,
-        ScenarioSet(
-            (base_scenario("owner"),),
-            tuple(
-                approved(code, value, BY_CODE[code].unit)
-                for code, value in FORECAST_DRIVERS.items()
-            ),
-        ),
+    return ScenarioSet(
+        (base_scenario(owner),),
+        tuple(driver(code, value) for code, value in FORECAST_DRIVERS.items())
+        + tuple(market(code, value, unit) for code, (value, unit) in MARKET_INPUTS.items()),
     )
-    with TestClient(create_app(root)) as test_client:
-        test_client.document_id = forecastable.document.id
-        yield test_client
 
 
 #: The rates the forecastable filing itself implies, as decimal strings (4.2).

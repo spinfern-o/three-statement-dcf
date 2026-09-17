@@ -30,8 +30,14 @@ def sensitivity_grid(
     growth_values: list[Decimal],
     diluted_shares: Decimal | None = None,
     shares_source: str | None = None,
+    schedule=None,
 ) -> list[list[SensitivityCell]]:
     """Rows are WACC, columns are terminal growth.
+
+    `schedule` carries 16.11's timing convention through to every cell. A grid
+    discounted on a different convention from the valuation it surrounds is not
+    a sensitivity of that valuation, and the difference is roughly half a year
+    of discounting on every number in it.
 
     Combinations violating WACC > g (STEP 31) are returned as cells with a
     note rather than omitted, so the table shows why a corner is empty.
@@ -52,7 +58,8 @@ def sensitivity_grid(
                 continue
             shifted = _shift_wacc(base_cost_of_capital, w)
             valuation = run_dcf(
-                fcff_years, shifted, g, bridge, periods, diluted_shares, shares_source
+                fcff_years, shifted, g, bridge, periods, diluted_shares,
+                shares_source, schedule,
             )
             row.append(
                 SensitivityCell(
