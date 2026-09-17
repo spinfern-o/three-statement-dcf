@@ -8,7 +8,7 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–6 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–13 of 17** |
 
 ## Status, stated plainly
 
@@ -24,7 +24,7 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4 to 12, items 39–130. A browser interface showing
+   specification Phases 4 to 13, items 39–137. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
@@ -96,7 +96,31 @@ to eight found horizontal overflow on every screen with a table on it, and a
 browser test reading `document.fonts` found that two font families had been
 named in the tokens and never vendored (F-24, F-25).
 
-1051 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**Thirty checks, one panel, and a release gate that admits what it cannot
+know.** Section 17's checks were never missing — Phases 3 to 11 each built the
+ones its own stage needed — but a reader had to know which of six panels to
+look in. Phase 13 maps every clause onto the code that already answers it and
+reports PASS, FAIL, or **SKIP with its reason**, because rule 1.14 says an
+unresolved requirement must never appear as PASS.
+
+The gate on top of it cannot be built as specified: item 137 blocks release
+"when CRITICAL/ERROR checks remain", and Section 17 assigns a severity to none
+of its thirty checks (F-4). So the gate blocks on *every* outstanding check
+instead — failed and skipped alike, whatever severity has been proposed for it.
+That is strictly stricter than item 137 under any assignment the owner might
+make, so it cannot release something 137 would have stopped; it can only refuse
+something 137 would have allowed, and for a valuation that is the direction to
+err in. The screen says so, and says that ratifying the severities is what
+would let it tell a blocking failure from an acknowledged warning.
+
+The benchmark panel makes the weaker, true claim for the same reason. 4.20
+forbids claiming "less than 0.0001% error" until the suite passes *and* the
+report names the dataset and formulas — and a running web process does not
+observe the test suite. So it reports what it can establish: which of the
+required outputs are compared, against an implementation sharing no helper with
+the engine, and where each comparison lives.
+
+1093 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -472,6 +496,18 @@ Dashboard and design system (specification Phase 12, items 121–130):
 | `apps/api/app/dashboard/cards.py` | 125 | Period, scenario, source and status on every card |
 | `apps/api/app/dashboard/charts.py` | 126 | Charts that cannot be built without a text summary and a CSV |
 | `apps/api/app/api/templates/index.html` | 124 | The 12-column portfolio |
+
+Diagnostics, lineage and release readiness (specification Phase 13, items 131–137):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/diagnostics/registry.py` | 131 | Section 17's thirty checks as data, generated from `validation-policy.md` |
+| `apps/api/app/diagnostics/run.py` | 131 | Each clause mapped onto the code that already answers it; PASS, FAIL, or SKIP with its reason |
+| `apps/api/app/diagnostics/lineage.py` | 132 | A page to a valuation, in either direction, saying where the chain widens |
+| `apps/api/app/diagnostics/audit.py` | 134 | The audit log made searchable: who, what, which entity, when |
+| `apps/api/app/diagnostics/benchmark.py` | 135 | What the benchmark covers, without making the claim 4.20 forbids |
+| `apps/api/app/diagnostics/release.py` | 136, 137 | The checklist, and a gate that blocks on every outstanding check because F-4 is unratified |
+| `apps/api/app/api/templates/diagnostics.html` | 133 | The 7.10 screen, with the dependency graph |
 
 Documentation:
 

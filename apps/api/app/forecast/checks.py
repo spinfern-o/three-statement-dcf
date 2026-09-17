@@ -11,7 +11,7 @@ a single-scenario check panel hides.
 
 **15.21 -- not "Forecast Ready" until every CRITICAL check passes.** That word
 is the problem. Section 17 lists thirty checks and assigns a severity to none
-of them; `validation-policy.md` proposes twenty-six and labels every one a
+of them; `validation-policy.md` proposes twenty-five and labels every one a
 proposal, which is finding **F-4** and is still open. A gate that invented its
 own severities would be making a release decision on an assumption nobody
 approved.
