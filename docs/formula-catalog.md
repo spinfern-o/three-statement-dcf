@@ -7,10 +7,20 @@ formulas specification [Section 16](website-build-spec.md) requires that the
 engine does not implement.
 
 It is the source for the `FormulaDefinition` rows described in
-[`data-dictionary.md`](data-dictionary.md) §9.11. **Nothing in `model/` reads
-these codes yet** — the engine's formulas are Python expressions, not data. The
-codes are assigned here so they are stable when the formula engine (Phase 8) is
-built.
+[`data-dictionary.md`](data-dictionary.md) §9.11.
+
+**Phase 8 built the formula engine, and the derivation family is now data.**
+[`apps/api/app/formula/catalog.py`](../apps/api/app/formula/catalog.py) turns
+`IS-*-D`, `BS-*-D` and `CF-*-D` — the ten subtotal derivations — into
+`FormulaDefinition` rows the engine parses, orders and evaluates. They are
+**generated from `model/accounts.py:DERIVED`**, not retyped from this table, so
+a component added to a subtotal appears in both without anyone remembering to;
+a test asserts the expressions here match the chart's own components.
+
+Everything else in this catalogue is still a Python expression in `model/`.
+The `*-F` forecast families and the `DCF-*` valuation formulas are not yet
+data, and the codes below remain what they were assigned for: stable
+identifiers for when they are.
 
 ## Code scheme
 

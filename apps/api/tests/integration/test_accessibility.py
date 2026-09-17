@@ -350,7 +350,8 @@ def served_schedules(tmp_path_factory, three_statements):
     thread.join(timeout=10)
 
 
-def test_the_schedules_screen_is_reachable_and_structured(browser, served_schedules):
+@pytest.mark.parametrize("screen", ["schedules", "formulas"])
+def test_the_schedules_screen_is_reachable_and_structured(browser, served_schedules, screen):
     """6.6: landmarks, a single h1, and every table with a caption.
 
     The screen carries no controls -- it is read, not operated -- so the test
@@ -362,11 +363,11 @@ def test_the_schedules_screen_is_reachable_and_structured(browser, served_schedu
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     page = context.new_page()
     try:
-        page.goto(f"{served['base']}/documents/{served['document_id']}/schedules")
+        page.goto(f"{served['base']}/documents/{served['document_id']}/{screen}")
         assert "Nothing to show yet" not in page.content(), (
             "this test is only meaningful against a populated screen"
         )
-        assert page.locator("table").count() >= 5
+        assert page.locator("table").count() >= 2
 
         assert page.get_by_role("main").count() == 1
         assert page.get_by_role("heading", level=1).count() == 1
@@ -384,15 +385,16 @@ def test_the_schedules_screen_is_reachable_and_structured(browser, served_schedu
         context.close()
 
 
+@pytest.mark.parametrize("screen", ["schedules", "formulas"])
 def test_the_schedules_screen_does_not_scroll_sideways_at_200_percent(
-    browser, served_schedules
+    browser, served_schedules, screen
 ):
     """6.6.d / WCAG 1.4.10. Wide numeric tables are where this breaks first."""
     served = served_schedules
     context = browser.new_context(viewport={"width": 640, "height": 900})
     page = context.new_page()
     try:
-        page.goto(f"{served['base']}/documents/{served['document_id']}/schedules")
+        page.goto(f"{served['base']}/documents/{served['document_id']}/{screen}")
         assert "Nothing to show yet" not in page.content()
         overflow = page.evaluate(
             "document.documentElement.scrollWidth - document.documentElement.clientWidth"

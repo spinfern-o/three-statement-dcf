@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Formulas &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Formula engine &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% macro region(label) -%}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Formula engine</h1>
+
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+
+  <p class="muted">
+    Every subtotal this filing prints, recomputed from its own components by a
+    second implementation, with the formula and the exact inputs it used
+    (18.10, 18.11). Where the two agree, the filing's arithmetic is confirmed
+    by code that shares nothing with the code that read it.
+    <a href="/documents/{{ document.id }}/statements">Historical statements</a> &middot;
+    <a href="/documents/{{ document.id }}/schedules">Supporting schedules</a>
+  </p>
+
+  {% if blocked %}
+  <div class="card">
+    <h2>Nothing to show yet</h2>
+    <p class="muted">{{ blocked }}</p>
+  </div>
+  {% else %}
+
+  <section class="card" aria-labelledby="graph-heading">
+    <h2 id="graph-heading">The dependency graph (18.4&ndash;18.6)</h2>
+    <p class="small">
+      {{ report.formulas | length }} versioned formula definitions
+      (set version {{ report.formulas.version }}, fingerprint
+      <code>{{ report.formulas.fingerprint[:16] }}</code>),
+      {{ report.required_inputs | length }} required inputs.
+      {% if report.cycles %}
+      <span class="badge badge-danger">{{ report.cycles | length }} cycle(s)</span>
+      {% else %}
+      <span class="badge badge-success">no cycles</span>
+      {% endif %}
+    </p>
+    <p class="small muted">
+      Calculation order (18.5), which exists only because there is no cycle:
+      <code>{{ report.order | join(' &rarr; ') | safe }}</code>
+    </p>
+  </section>
+
+  {% for year in report.years %}
+  <section class="card" aria-labelledby="year-{{ year.year }}">
+    <h2 id="year-{{ year.year }}">{{ year.year }}
+      {% if year.disagreements %}
+      <span class="badge badge-danger">{{ year.disagreements | length }} disagreement(s)</span>
+      {% else %}
+      <span class="badge badge-success">every recomputed subtotal agrees</span>
+      {% endif %}
+    </h2>
+    <p class="small muted">
+      Calculation fingerprint <code>{{ year.fingerprint[:16] }}</code> over
+      {{ year.inputs | length }} input value(s) (18.7). The same inputs over the
+      same formula versions hash the same; one changed digit does not.
+    </p>
+
+    {% if not year.cells %}
+    <p class="muted">No subtotal on this period has all of its components reported.</p>
+    {% else %}
+    {% call region(year.year + " recomputed subtotals") %}
+    <table>
+      <caption>{{ year.year }}: each subtotal recomputed from its components</caption>
+      <thead>
+        <tr>
+          <th scope="col">Line</th>
+          <th scope="col">Formula (18.10)</th>
+          <th scope="col">Inputs used (18.11)</th>
+          <th scope="col" class="num">Computed</th>
+          <th scope="col" class="num">Reported</th>
+          <th scope="col">Agrees</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cell in year.cells %}
+        <tr>
+          <th scope="row">
+            {{ cell.target }}
+            <div class="small muted">{{ cell.code }} v{{ cell.version }} &middot; {{ cell.statement }}</div>
+          </th>
+          <td class="raw">{{ cell.formula }}</td>
+          <td class="raw">{{ cell.substituted }}</td>
+          <td class="num total">{{ "{:,}".format(cell.computed) }}</td>
+          <td class="num">
+            {% if cell.reported is none %}<span class="muted">not printed</span>
+            {% else %}{{ "{:,}".format(cell.reported) }}{% endif %}
+          </td>
+          <td>
+            {% if cell.agrees is none %}
+              <span class="badge badge-neutral">nothing to compare</span>
+            {% elif cell.agrees %}
+              <span class="badge badge-success">exactly</span>
+            {% else %}
+              <span class="badge badge-danger">out by {{ "{:,}".format(cell.difference) }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    {% endif %}
+
+    {% if year.assumed_nil %}
+    <details>
+      <summary>{{ year.assumed_nil | length }} residual line(s) taken as nil</summary>
+      <p class="small muted">
+        A residual &ldquo;and anything else&rdquo; line the filing omits is taken
+        as zero, because silence there means nothing else happened rather than
+        the figure being unknown. Every other absent line refuses (18.14). This
+        list exists because the engine&rsquo;s own derivation applies the same
+        policy silently, and a subtotal resting on an assumed nil otherwise
+        reads exactly like one resting on a reported figure.
+      </p>
+      <ul class="small">
+        {% for account, reason in year.assumed_nil.items() %}
+        <li><strong>{{ account }}</strong> &mdash; {{ reason }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+
+    {% if year.unavailable %}
+    <details>
+      <summary>{{ year.unavailable | length }} subtotal(s) not computed</summary>
+      <p class="small muted">Not zero, and not a partial sum (18.14).</p>
+      <ul class="small">
+        {% for target, reason in year.unavailable.items() %}
+        <li><strong>{{ target }}</strong> &mdash; {{ reason }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  {% endif %}
+</main>
+{% endblock %}
