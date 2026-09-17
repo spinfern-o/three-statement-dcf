@@ -313,6 +313,95 @@ def test_reduced_motion_is_honoured(browser, served):
 # --- 7.6: the supporting schedules screen ----------------------------------
 
 @pytest.fixture(scope="module")
+def served_forecast(tmp_path_factory, forecastable):
+    """The forecastable filing, served with an approved base scenario.
+
+    The forecast screen needs a scenario that passes the 14.1 gate, and
+    `served_schedules` deliberately does not have one. Testing 200% zoom
+    against a "nothing to forecast yet" page proves nothing.
+    """
+    import uvicorn
+
+    from apps.api.app.api.main import create_app
+    from apps.api.app.assumptions.drivers import BY_CODE
+    from apps.api.app.assumptions.scenarios import ScenarioSet, base_scenario
+    from apps.api.app.assumptions.schema import Assumption, Evidence, SourceType, Status
+    from apps.api.app.assumptions.store import ScenarioStore
+    from apps.api.app.persistence.json_store import JsonDocumentRepository
+    from apps.api.tests.conftest import FORECAST_DRIVERS
+
+    root = tmp_path_factory.mktemp("served-forecast")
+    JsonDocumentRepository(root).save(forecastable)
+
+    def approved(code, value):
+        unit = BY_CODE[code].unit
+        fields = dict(
+            code=code, name=code.replace("_", " "), value=value, unit=unit,
+            owner="owner", reviewer="owner", status=Status.APPROVED,
+            rationale="entered for this test, with a stated source",
+        )
+        if unit == "days":
+            fields.update(
+                source_type=SourceType.HISTORICAL_DRIVER,
+                evidence=Evidence(measured_over=("2025A",)),
+            )
+        else:
+            fields.update(
+                source_type=SourceType.COMPANY_GUIDANCE,
+                evidence=Evidence(document_id="doc-1", page=31, date="2026-02-14"),
+            )
+        return Assumption(**fields)
+
+    ScenarioStore(root).save(
+        forecastable.document.id,
+        ScenarioSet(
+            (base_scenario("owner"),),
+            tuple(approved(code, value) for code, value in FORECAST_DRIVERS.items()),
+        ),
+    )
+
+    port = _free_port()
+    server = uvicorn.Server(
+        uvicorn.Config(create_app(root), host="127.0.0.1", port=port, log_level="warning")
+    )
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    for _ in range(200):
+        if server.started:
+            break
+        threading.Event().wait(0.05)
+    assert server.started, "the review server did not start"
+
+    yield {
+        "base": f"http://127.0.0.1:{port}",
+        "document_id": forecastable.document.id,
+    }
+
+    server.should_exit = True
+    thread.join(timeout=10)
+
+
+def test_the_forecast_screen_does_not_scroll_sideways_at_200_percent(
+    browser, served_forecast
+):
+    """6.6.d / WCAG 1.4.10. Seven period columns is the widest table here."""
+    served = served_forecast
+    context = browser.new_context(viewport={"width": 640, "height": 900})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/documents/{served['document_id']}/forecast")
+        assert "Nothing to forecast yet" not in page.content(), (
+            "this test is only meaningful against a populated screen"
+        )
+        overflow = page.evaluate(
+            "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+        )
+        assert overflow <= 0, f"the page scrolls {overflow}px sideways"
+    finally:
+        context.close()
+
+
+@pytest.fixture(scope="module")
 def served_schedules(tmp_path_factory, three_statements):
     """Serve the FULLY REVIEWED three-statement filing.
 

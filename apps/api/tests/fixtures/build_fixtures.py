@@ -398,9 +398,106 @@ def build_truncated(path: Path, source: Path) -> None:
     path.write_bytes(data[: int(len(data) * 0.6)])
 
 
+
+def build_forecastable(path: Path) -> None:
+    """A filing whose balance sheet is complete enough to forecast from.
+
+    `three_statements.pdf` ties across all three statements and is the right
+    fixture for the historical checks. It cannot be forecast, and the refusal
+    is correct: `model/forecast.py` anchors its roll-forwards on the last
+    actual year's `other_current_assets`, `other_noncurrent_assets`,
+    `other_current_liabilities` and `other_noncurrent_liabilities`, that filing
+    reports none of them, and STEP 5 forbids substituting zero.
+
+    So this one reports all four. It exists because a phase whose main
+    deliverable never runs on any fixture is a phase nobody verified.
+
+    Every figure is derived from the ones above it, so the filing ties:
+
+        PP&E net            850,000 + 170,000 - 120,000   =   900,000
+        retained earnings   588,000 + 222,000 -  80,000   =   730,000
+        working capital     600,000 - 290,000             =   310,000
+                            551,000 - 267,000             =   284,000  (prior)
+        operating cash      222,000 + 120,000 -  26,000   =   316,000
+        cash                164,000 + 316,000 - 170,000 - 130,000 = 180,000
+        total assets 2025   1,740,000 = 910,000 + 830,000
+        total assets 2024   1,620,000 = 932,000 + 688,000
+    """
+    doc = pymupdf.open()
+
+    page = doc.new_page(width=PAGE_W, height=PAGE_H)
+    _prepare(page)
+    _text(page, LEFT, 120, "ARDEN FLOW SYSTEMS LIMITED", size=18, font=BOLD)
+    _text(page, LEFT, 150, "Annual Report and Consolidated Financial Statements", size=12)
+    _text(page, LEFT, 180, "For the fiscal year ended December 31, 2025", size=11)
+    _text(page, LEFT, 220, "(All amounts in thousands of U.S. dollars)", size=9)
+    _text(page, LEFT, 250, "Prepared in accordance with U.S. GAAP", size=9)
+    _text(page, LEFT, 280, "Report of Independent Registered Public Accounting Firm", size=9)
+
+    def statement(title, rows, bottom):
+        page = doc.new_page(width=PAGE_W, height=PAGE_H)
+        _prepare(page)
+        _text(page, LEFT, 80, title, size=11, font=BOLD)
+        _text(page, LEFT, 96, "(in thousands of U.S. dollars)", size=8)
+        _table_frame(page, 112, bottom, [COL_A, COL_B])
+        _row(page, 126, "", [(COL_A, "2025"), (COL_B, "2024")], font=BOLD)
+        _rule(page, 132)
+        y = 148
+        for label, a, b in rows:
+            _row(page, y, label, [(COL_A, a), (COL_B, b)])
+            y += 15
+        return page
+
+    statement("CONSOLIDATED STATEMENTS OF OPERATIONS", [
+        ("Revenue", "2,000,000", "1,800,000"),
+        ("Cost of goods sold", "(1,200,000)", "(1,080,000)"),
+        ("Gross profit", "800,000", "720,000"),
+        ("Operating expenses", "(480,000)", "(432,000)"),
+        ("Operating income", "320,000", "288,000"),
+        ("Interest expense", "(24,000)", "(26,000)"),
+        ("Income before income taxes", "296,000", "262,000"),
+        ("Income tax expense", "(74,000)", "(65,500)"),
+        ("Net income", "222,000", "196,500"),
+    ], 305)
+
+    statement("CONSOLIDATED BALANCE SHEETS", [
+        ("Cash and cash equivalents", "180,000", "164,000"),
+        ("Accounts receivable, net", "320,000", "290,000"),
+        ("Inventories", "240,000", "225,000"),
+        ("Other current assets", "40,000", "36,000"),
+        ("Property, plant and equipment, net", "900,000", "850,000"),
+        ("Other non-current assets", "60,000", "55,000"),
+        ("Total assets", "1,740,000", "1,620,000"),
+        ("Accounts payable", "200,000", "185,000"),
+        ("Other current liabilities", "90,000", "82,000"),
+        ("Long-term debt", "550,000", "600,000"),
+        ("Other non-current liabilities", "70,000", "65,000"),
+        ("Total liabilities", "910,000", "932,000"),
+        ("Common stock", "100,000", "100,000"),
+        ("Retained earnings", "730,000", "588,000"),
+        ("Total equity", "830,000", "688,000"),
+    ], 395)
+
+    statement("CONSOLIDATED STATEMENTS OF CASH FLOWS", [
+        ("Net income", "222,000", "196,500"),
+        ("Depreciation and amortization", "120,000", "110,000"),
+        ("Changes in operating working capital", "(26,000)", "(18,000)"),
+        ("Net cash provided by operating activities", "316,000", "288,500"),
+        ("Purchases of property and equipment", "(170,000)", "(150,000)"),
+        ("Net cash used in investing activities", "(170,000)", "(150,000)"),
+        ("Repayments of long-term debt", "(50,000)", "(40,000)"),
+        ("Dividends paid", "(80,000)", "(70,000)"),
+        ("Net cash used in financing activities", "(130,000)", "(110,000)"),
+        ("Net increase in cash", "16,000", "28,500"),
+    ], 320)
+
+    _finish(doc, path)
+
+
 BUILDERS = {
     "text_native_statements.pdf": build_statements,
     "three_statements.pdf": build_three_statements,
+    "forecastable.pdf": build_forecastable,
     "eu_locale_statements.pdf": build_eu_locale,
     "image_only_scan.pdf": build_image_only,
     "partly_scanned.pdf": build_partly_scanned,

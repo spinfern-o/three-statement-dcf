@@ -52,6 +52,11 @@ from ..assumptions.views import (
     status_choices,
 )
 from ..assumptions.workflow import WorkflowError, transition
+from ..forecast.build import ForecastError, build_scenario_forecast
+from ..forecast.checks import check_every_scenario
+from ..forecast.views import columns as forecast_columns
+from ..forecast.views import comparison, driver_rows as forecast_driver_rows
+from ..forecast.views import statement_rows as forecast_statement_rows
 from ..formula.catalog import derivation_formulas, ledger_environment
 from ..formula.views import formula_report
 from ..schedules.build import build_schedules
@@ -806,3 +811,86 @@ def preview_assumption(
         request.app.state.last_impact = {}
     request.app.state.last_impact[document_id] = impact
     return _assumptions_back(document_id, scenario_id)
+
+
+# --- items 97-108: the forecast statements screen (7.8) ---------------------
+
+FORECAST_ORDER = (
+    (Statement.INCOME, "Forecast income statement", "7.8.a"),
+    (Statement.BALANCE, "Forecast balance sheet", "7.8.b"),
+    (Statement.CASHFLOW, "Forecast cash flow statement", "7.8.c"),
+)
+
+#: The line the scenario comparison shows. Revenue, because it is the one every
+#: other forecast line descends from (STEP 13), so a divergence anywhere starts
+#: as a divergence here.
+COMPARISON_CODE = "revenue"
+
+
+@router.get("/documents/{document_id}/forecast", response_class=HTMLResponse)
+def forecast(request: Request, document_id: str, scenario_id: str = BASE, error: str = ""):
+    """7.8 Forecast Statements, for every scenario the model carries (15.20)."""
+    result = _load(request, document_id)
+
+    try:
+        built = build_statements(result, strict=False)
+    except BuildError as exc:
+        return _forecast_blocked(request, result, str(exc), scenario_id, error)
+
+    scenarios = _scenario_store(request).load(document_id, owner=_actor(request))
+
+    forecasts, not_built = [], {}
+    for scenario in scenarios.scenarios:
+        try:
+            forecasts.append(build_scenario_forecast(built, scenarios, scenario.id))
+        except ForecastError as exc:
+            not_built[scenario.id] = str(exc)
+
+    chosen = next((f for f in forecasts if f.scenario_id == scenario_id), None)
+    if chosen is None:
+        reason = not_built.get(
+            scenario_id, f"scenario {scenario_id!r} has no forecast yet"
+        )
+        return _forecast_blocked(request, result, reason, scenario_id, error)
+
+    readiness = check_every_scenario(tuple(forecasts), not_built)
+    return _templates(request).TemplateResponse(
+        request=request, name="forecast.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "blocked": "",
+            "scenario_id": scenario_id,
+            "forecast": chosen,
+            "columns": forecast_columns(chosen),
+            "driver_rows": forecast_driver_rows(chosen),
+            "tables": [
+                {
+                    "statement": statement,
+                    "title": title,
+                    "rule": rule,
+                    "rows": forecast_statement_rows(chosen, statement),
+                }
+                for statement, title, rule in FORECAST_ORDER
+            ],
+            "readiness": readiness,
+            "comparison_code": COMPARISON_CODE,
+            "comparison_rows": comparison(
+                tuple(forecasts), Statement.INCOME, COMPARISON_CODE,
+                readiness=readiness, scenarios=scenarios,
+            )
+            if len(forecasts) > 1
+            else (),
+            "error": error,
+        },
+    )
+
+
+def _forecast_blocked(request, result, reason: str, scenario_id: str, error: str):
+    return _templates(request).TemplateResponse(
+        request=request, name="forecast.html",
+        context={
+            "document": result.document, "result": result, "blocked": reason,
+            "scenario_id": scenario_id, "error": error,
+        },
+    )

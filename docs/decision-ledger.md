@@ -763,6 +763,32 @@ mean something.
 
 ---
 
+### F-23 — RESOLVED in Phase 10. "Other non-current assets" mapped to the
+CURRENT line
+
+Phase 5's proposal rules carried `^(other|prepaid|prepayments)` for
+`other_current_assets` and nothing that distinguished a non-current "other"
+line. A balance sheet reporting "Other non-current assets" was therefore
+offered `other_current_assets` as its best candidate, on nothing but the order
+the rules happened to be written in.
+
+The consequence is specific and quiet. A non-current balance mapped to a
+current line moves net working capital by the whole amount, changes the change
+in NWC, and changes free cash flow — while the balance sheet still balances,
+every subtotal still reconciles, and every Section 12 check still passes.
+Nothing downstream catches it, because nothing downstream is looking at
+current-versus-non-current.
+
+Found while building `forecastable.pdf`, which is the first fixture to report
+any of the four "other" lines — which is itself the lesson: the rule was
+written in Phase 5 and could not be wrong until a fixture exercised it.
+
+Four EXACT rules now match `other (non-current|long-term) (assets|liabilities)`
+and `other current (assets|liabilities)` explicitly, and they outrank the
+generic one by score rather than by position.
+
+---
+
 ## Work that is NOT blocked
 
 Buildable now, because it depends on no OPEN decision:
@@ -793,6 +819,64 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 10 (items 97-108) is built**, in
+[`apps/api/app/forecast/`](../apps/api/app/forecast): Section 15's forecast
+statements, driven from a scenario's approved assumptions.
+
+**Nothing in this phase forecasts anything.** `model/forecast.py` already
+implements all twenty-one of Section 15's steps -- revenue from a stated
+method, COGS and opex from documented drivers, D&A from the PP&E schedule
+rather than a disconnected input, working capital account by account, debt and
+interest from the debt schedule, taxes from the tax schedule, the three
+statements and the cash link -- with an independent benchmark and 0.0001%
+accuracy assertions behind it. Reimplementing it against the website's data
+structures would produce a second answer to every question in Section 15, and
+the two would disagree the first time either changed.
+
+So Phase 10 is a boundary, and the boundary has three obligations:
+
+- **14.1 is checked before the engine is touched.** The engine raises on a
+  missing driver, naming one at a time; the gate names all of them at once,
+  per period. A reviewer fixing eleven missing drivers one traceback at a time
+  is a reviewer the gate exists to spare.
+- **Only Reviewed and Approved assumptions cross.** A Draft is not an answer,
+  and letting one through would put an unsourced number into a valuation while
+  the screen still showed it as unfinished.
+- **The scenario travels with the result**, because 9.12 records a calculated
+  value against its `scenario_id` and 15.20 asks for every scenario.
+
+**A new fixture, `forecastable.pdf`, because a phase whose deliverable never
+runs is a phase nobody verified.** `three_statements.pdf` cannot be forecast,
+and the refusal is correct: the engine anchors its roll-forwards on the last
+actual year's `other_current_assets`, `other_noncurrent_assets`,
+`other_current_liabilities` and `other_noncurrent_liabilities`, that filing
+reports none of them, and STEP 5 forbids substituting zero. The new filing
+reports all four and ties across all three statements. Both fixtures are kept,
+and the refusal on the first one is now a test.
+
+Building it exposed a real defect in Phase 5's mapping rules, fixed here:
+**"Other non-current assets" was proposed as `other_current_assets`.** The
+generic `^other` rule won on nothing but ordering, and a non-current balance
+mapped to a current line moves working capital by its whole amount while the
+balance sheet still balances -- so nothing downstream catches it. Four EXACT
+rules now distinguish current from non-current on both sides.
+
+**15.21's word "critical" is the problem, and it is F-4.** Section 17 assigns a
+severity to none of its thirty checks, and `validation-policy.md`'s proposals
+are proposals. A gate that invented its own severities would make a release
+decision on an assumption nobody approved, so this one reads "every critical
+check" as **every check**: any failure, and any check that could not run,
+withholds Forecast Ready. That is strictly stricter than any severity
+assignment, so it cannot wrongly pass, and the panel says so out loud.
+
+With one carve-out that is not a loophole. Two of the engine's thirteen checks
+are about the *valuation*, and at this phase there is no valuation, so both
+skip. Counting that against Forecast Ready would report the forecast as
+unfinished because Phase 11 has not been built, which makes the label
+unreachable by construction. They are reported separately as `deferred`, and
+`VALUATION_CHECKS` names them explicitly so a test can assert the set has not
+silently grown.
 
 **Phase 9 (items 89-96) is built**, in
 [`apps/api/app/assumptions/`](../apps/api/app/assumptions): Section 14's
