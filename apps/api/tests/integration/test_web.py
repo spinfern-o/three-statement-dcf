@@ -436,3 +436,33 @@ def test_the_mapping_page_keeps_the_accessibility_contract(client):
     controls = re.findall(r'<(?:input|select|textarea)\b[^>]*id="([^"]+)"[^>]*>', body)
     labelled = set(re.findall(r'<label[^>]*for="([^"]+)"', body))
     assert not [c for c in controls if c not in labelled]
+
+
+# --- items 59-67: the historical statements screen (7.5) --------------------
+
+def test_the_statements_page_explains_itself_before_anything_is_mapped(client):
+    """6.5.i: an empty state says what is missing."""
+    response = client.get(f"/documents/{client.document_id}/statements")
+    assert response.status_code == 200
+    assert "Nothing to show yet" in response.text
+    assert "approved mappings" in response.text
+
+
+def test_the_mapping_page_links_to_the_statements(client):
+    assert f"/documents/{client.document_id}/statements" in client.get(
+        _mapping_url(client)
+    ).text
+
+
+def test_the_statements_page_shows_the_checks_and_their_skips(client):
+    _confirm(client)
+    client.post(_mapping_url(client, "propose"), follow_redirects=True)
+    body = client.get(f"/documents/{client.document_id}/statements").text
+    assert "Historical checks" in body
+    assert "SKIP" in body or "PASS" in body
+
+
+def test_the_equity_statement_says_it_is_not_available(client):
+    body = client.get(f"/documents/{client.document_id}/statements").text
+    assert "Statement of changes in equity" in body
+    assert "Not available" in body

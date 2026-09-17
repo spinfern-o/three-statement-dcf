@@ -24,6 +24,7 @@ GOLDEN = {
     "not_actually_a_pdf.pdf": "3b7b8a4b411ddf8db9bacc2f3aabf406f8e4c0c087829b336ca331c40adfdff1",
     "partly_scanned.pdf": "dc3a34921d20e18c31a644cb15314c88f5ddd8eae504c8c91b3baf3817f616ce",
     "text_native_statements.pdf": "01c5c71b8e358d52ea46d0012f240f20dae0097a9c1a69a3814a8818f28076c6",
+    "three_statements.pdf": "d4a527796b7cf58f95f6a4cb9600ddc79b86c4f1ff9a6b1935313b372ae37ae7",
     "truncated.pdf": "a816c02f2bacf367015727e1e55b48c551c3d04d9c14003700dbb99277ef2e93",
 }
 

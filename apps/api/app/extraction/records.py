@@ -110,6 +110,11 @@ class RawTable:
     repeated_header_rows: tuple[int, ...] = ()
     caption: str = ""
     split_across_pages: bool = False
+    #: Each row's label, re-read from the page rather than stitched from cells.
+    #: See the note in `text_native.py`: neither joining nor not joining the
+    #: cell fragments is right for both a split on a space and a split
+    #: mid-word, and the page has the answer to both.
+    row_labels: tuple[str, ...] = ()
 
     @classmethod
     def create(cls, **kwargs) -> "RawTable":

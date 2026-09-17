@@ -18,7 +18,8 @@
     definitions align</strong>. Every canonical line below carries a written
     definition; the proposal beside each raw line is a suggestion with the rule
     that produced it, and nothing is approved until you say so (11.10, 11.11).
-    <a href="/documents/{{ document.id }}">Back to the source room</a>
+    <a href="/documents/{{ document.id }}">Source room</a> &middot;
+    <a href="/documents/{{ document.id }}/statements">Historical statements</a>
   </p>
 
   <section class="card" aria-labelledby="state-heading">
@@ -249,47 +250,47 @@
       four figures you could read and calling it the total is the silent damage
       rule 1.2 exists to stop.
     </p>
-    {% if not ledger %}
+    {% if not ledger_rows %}
       <p class="muted">Nothing mapped yet.</p>
     {% else %}
     <table>
-      <caption>{{ ledger | length }} mapped line-period value(s).</caption>
+      <caption>
+        {{ ledger_rows | length }} canonical line(s). `net_income` appears twice
+        when a filing prints it on both statements &mdash; the same figure, and
+        the linkage check compares them.
+      </caption>
       <thead>
         <tr>
           <th scope="col">Canonical line</th>
+          <th scope="col">Statement</th>
           {% for period in ledger_periods %}<th scope="col" class="num">{{ period }}</th>{% endfor %}
         </tr>
       </thead>
       <tbody>
-        {% for item in chart %}
-          {% set present = [] %}
+        {% for row in ledger_rows %}
+        <tr>
+          <th scope="row">
+            {{ row.item.canonical_code }}
+            <div class="small muted">{{ row.item.display_name }}</div>
+          </th>
+          <td class="small muted">{{ row.statement.value }}</td>
           {% for period in ledger_periods %}
-            {% if (item.canonical_code, period) in ledger %}{% set _ = present.append(1) %}{% endif %}
-          {% endfor %}
-          {% if present %}
-          <tr>
-            <th scope="row">
-              {{ item.canonical_code }}
-              <div class="small muted">{{ item.display_name }}</div>
-            </th>
-            {% for period in ledger_periods %}
-              {% set value = ledger.get((item.canonical_code, period)) %}
-              <td class="num {% if item.is_subtotal %}total{% endif %}">
-                {% if value is none %}<span class="muted">&mdash;</span>
-                {% elif value.value is none %}
-                  <span class="badge badge-warning">absent</span>
-                  <div class="small muted">{{ value.absent_because }}</div>
-                {% else %}
-                  {{ '{:,}'.format(value.value) }}
-                  {% if value.contributors | length > 1 %}
-                    <div class="small muted">sum of {{ value.contributors | length }} lines</div>
-                  {% endif %}
-                  {% if not value.approved %}<div class="small muted">mapping unapproved</div>{% endif %}
+            {% set value = row.cells.get(period) %}
+            <td class="num {% if row.item.is_subtotal %}total{% endif %}">
+              {% if value is none %}<span class="muted">&mdash;</span>
+              {% elif value.value is none %}
+                <span class="badge badge-warning">absent</span>
+                <div class="small muted">{{ value.absent_because }}</div>
+              {% else %}
+                {{ '{:,}'.format(value.value) }}
+                {% if value.contributors | length > 1 %}
+                  <div class="small muted">sum of {{ value.contributors | length }} lines</div>
                 {% endif %}
-              </td>
-            {% endfor %}
-          </tr>
-          {% endif %}
+                {% if not value.approved %}<div class="small muted">mapping unapproved</div>{% endif %}
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
         {% endfor %}
       </tbody>
     </table>

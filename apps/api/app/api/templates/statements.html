@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Statements &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Historical statements &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Historical statements</h1>
+
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="notice notice-ok" role="status">{{ ok }}</div>{% endif %}
+
+  <p class="muted">
+    Built from approved mappings of verified facts. Every figure below traces
+    to a page of the filing &mdash; open any line to see where.
+    <a href="/documents/{{ document.id }}/mapping">Mapping review</a> &middot;
+    <a href="/documents/{{ document.id }}">Source room</a>
+  </p>
+
+  <section class="card" aria-labelledby="equity-heading">
+    <h2 id="equity-heading">Statement of changes in equity (12.2.l)</h2>
+    <p class="muted">{{ equity_note }}</p>
+  </section>
+
+  {% if blocked %}
+  <div class="card">
+    <h2>Nothing to show yet</h2>
+    <p class="muted">{{ blocked }}</p>
+  </div>
+  {% else %}
+
+  <section class="card" aria-labelledby="checks-heading">
+    <h2 id="checks-heading">Historical checks (12.4)</h2>
+    <p class="small muted">
+      A difference is reported, never plugged (12.5, STEP 6). A check that
+      cannot run says SKIP and why &mdash; a reconciliation with nothing to
+      reconcile is not a pass.
+    </p>
+    <table>
+      <caption>{{ check_summary }}</caption>
+      <thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        {% for check in checks %}
+        <tr>
+          <th scope="row">{{ check.name }}</th>
+          <td>
+            {% if check.status.value == 'PASS' %}<span class="badge badge-success">PASS</span>
+            {% elif check.status.value == 'FAIL' %}<span class="badge badge-danger">FAIL</span>
+            {% else %}<span class="badge badge-neutral">SKIP</span>{% endif %}
+          </td>
+          <td class="small">{{ check.detail }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {% for table in tables %}
+  <section class="card" aria-labelledby="stmt-{{ table.statement.value }}">
+    <h2 id="stmt-{{ table.statement.value }}">{{ table.title }} <span class="small muted">({{ table.rule }})</span></h2>
+    {% if not table.rows %}
+      <p class="muted">The filing presents no {{ table.title | lower }}, or none of it is mapped yet.</p>
+    {% else %}
+    <table>
+      <caption>
+        Values in the filing's own units. &ldquo;of base&rdquo; is the
+        common-size percentage; &ldquo;change&rdquo; is the movement on the
+        prior year. Both are undefined against a zero or absent base and say so
+        rather than showing a number (4.12).
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Line</th>
+          {% for year in built.years %}
+          <th scope="col" class="num">{{ year }}</th>
+          <th scope="col" class="num">of base</th>
+          <th scope="col" class="num">change</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      {% for row in table.rows %}
+      <tbody>
+        <tr>
+          <th scope="row">
+            {{ row.item.display_name }}
+            <div class="small muted">{{ row.item.canonical_code }}</div>
+          </th>
+          {% for cell in row.cells %}
+          <td class="num {% if row.item.is_subtotal %}total{% endif %}">
+            {% if cell.value is none %}<span class="muted">&mdash;</span>
+            {% else %}{{ '{:,}'.format(cell.value) }}{% endif %}
+          </td>
+          <td class="num small muted">
+            {% if cell.common_size is none %}
+              <span title="{{ cell.common_size_note }}">&mdash;</span>
+            {% else %}{{ cell.common_size }}%{% endif %}
+          </td>
+          <td class="num small muted">
+            {% if cell.growth is none %}
+              <span title="{{ cell.growth_note }}">&mdash;</span>
+            {% else %}{{ '%+g' % cell.growth }}%{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td colspan="{{ 1 + built.years | length * 3 }}">
+            <details>
+              <summary>Source and reported view for {{ row.item.display_name }} (10.31, 63)</summary>
+              <p class="small">{{ row.item.definition }}</p>
+              <table>
+                <caption>What the filing printed, and where.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Year</th>
+                    <th scope="col">Printed</th>
+                    <th scope="col">Stored</th>
+                    <th scope="col">Citation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for cell in row.cells %}
+                  <tr>
+                    <th scope="row">{{ cell.year }}</th>
+                    <td class="raw">{{ cell.reported or '—' }}</td>
+                    <td class="num">
+                      {% if cell.value is none %}<span class="muted">absent</span>
+                      {% else %}{{ '{:,}'.format(cell.value) }}{% endif %}
+                    </td>
+                    <td class="small">
+                      {% set sources = citations.get((row.item.canonical_code, cell.year), []) %}
+                      {% if not sources %}<span class="muted">no mapped source</span>{% endif %}
+                      {% for source in sources %}
+                      <div>
+                        {% if source.page %}
+                        <a href="/documents/{{ document.id }}/pages/{{ source.page }}#fact-{{ source.fact.id }}">page {{ source.page }}</a>
+                        {% else %}<span class="muted">no page</span>{% endif %}
+                        &mdash; &ldquo;{{ source.fact.raw_label }}&rdquo;
+                        {% if source.mapping.sign_normalization.value == 'negated' %}
+                          <span class="badge badge-neutral">sign flipped to the chart's convention (11.8)</span>
+                        {% endif %}
+                      </div>
+                      {% endfor %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </details>
+          </td>
+        </tr>
+      </tbody>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <section class="card" aria-labelledby="export-heading">
+    <h2 id="export-heading">Engine inputs</h2>
+    {% if engine_inputs %}
+    <p class="small muted">
+      The two files <code>run_model.py</code> reads, written from this document.
+      The other two &mdash; assumptions and valuation &mdash; are deliberately
+      not written: a risk-free rate and a beta are facts about a market on a
+      date, not lines in a filing, and the engine is supposed to refuse without
+      them.
+    </p>
+    {% if engine_inputs.source_map_gaps %}
+    <p class="small">
+      <span class="badge badge-warning">{{ engine_inputs.source_map_gaps | length }}</span>
+      of the twelve STEP 2 source-map sections have no page: no table caption
+      named them. They are left null rather than guessed.
+    </p>
+    {% endif %}
+    <details>
+      <summary>company_profile.yaml</summary>
+      <pre class="raw">{{ engine_inputs.company_profile }}</pre>
+    </details>
+    <details>
+      <summary>raw_historical.yaml</summary>
+      <pre class="raw">{{ engine_inputs.raw_historical }}</pre>
+    </details>
+    {% else %}
+    <p class="muted">Not exportable yet. {{ export_error }}</p>
+    {% endif %}
+  </section>
+
+  {% if built.omitted %}
+  <section class="card" aria-labelledby="omitted-heading">
+    <h2 id="omitted-heading">Left out</h2>
+    <p class="small muted">
+      12.5 and STEP 5: a line that could not be built is absent and named, not
+      defaulted to zero.
+    </p>
+    <ul class="reasons">
+      {% for code, year, why in built.omitted %}
+      <li><code>{{ code }}</code> {{ year }} &mdash; {{ why }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% endif %}
+</main>
+{% endblock %}

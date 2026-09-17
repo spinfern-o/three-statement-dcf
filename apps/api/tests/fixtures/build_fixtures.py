@@ -187,6 +187,95 @@ def build_statements(path: Path) -> None:
     _finish(doc, path)
 
 
+def build_three_statements(path: Path) -> None:
+    """All three statements, internally consistent. The Phase 6 golden fixture.
+
+    `text_native_statements.pdf` has an income statement and a balance sheet,
+    which is enough to exercise extraction and mapping. It is NOT enough to
+    exercise a cash roll-forward or a net-income linkage: with no cash flow
+    statement, both checks correctly skip, and a check that can only skip
+    proves nothing.
+
+    Every figure below is derived from the ones above it, so the filing ties:
+
+        retained earnings   469,500 + 136,500 - 36,500  = 569,500
+        PP&E net            588,000 + 107,000 -  75,000 = 620,000
+        total assets        530,000 + 619,500           = 1,149,500
+        operating cash      136,500 +  75,000 -  20,500 =   191,000
+        cash                142,000 + 191,000 - 107,000 - 61,500 = 164,500
+
+    A fixture that does not tie cannot tell a working check from a broken one.
+    """
+    doc = pymupdf.open()
+
+    # --- page 1: cover ------------------------------------------------------
+    page = doc.new_page(width=PAGE_W, height=PAGE_H)
+    _prepare(page)
+    _text(page, LEFT, 120, "MERIDIAN COMPONENTS INC.", size=18, font=BOLD)
+    _text(page, LEFT, 150, "Annual Report and Consolidated Financial Statements", size=12)
+    _text(page, LEFT, 180, "For the fiscal year ended December 31, 2025", size=11)
+    _text(page, LEFT, 220, "(All amounts in thousands of U.S. dollars)", size=9)
+    _text(page, LEFT, 250, "Prepared in accordance with U.S. GAAP", size=9)
+    _text(page, LEFT, 280, "Report of Independent Registered Public Accounting Firm", size=9)
+
+    def statement(title, rows, bottom):
+        page = doc.new_page(width=PAGE_W, height=PAGE_H)
+        _prepare(page)
+        _text(page, LEFT, 80, title, size=11, font=BOLD)
+        _text(page, LEFT, 96, "(in thousands of U.S. dollars)", size=8)
+        _table_frame(page, 112, bottom, [COL_A, COL_B])
+        _row(page, 126, "", [(COL_A, "2025"), (COL_B, "2024")], font=BOLD)
+        _rule(page, 132)
+        y = 148
+        for label, a, b in rows:
+            _row(page, y, label, [(COL_A, a), (COL_B, b)])
+            y += 15
+        return page
+
+    statement("CONSOLIDATED STATEMENTS OF OPERATIONS", [
+        ("Revenue", "1,250,000", "1,100,000"),
+        ("Cost of goods sold", "(750,000)", "(660,000)"),
+        ("Gross profit", "500,000", "440,000"),
+        ("Operating expenses", "(300,000)", "(270,000)"),
+        ("Operating income", "200,000", "170,000"),
+        ("Interest expense", "(18,000)", "(20,000)"),
+        ("Income before income taxes", "182,000", "150,000"),
+        ("Income tax expense", "(45,500)", "(37,500)"),
+        ("Net income", "136,500", "112,500"),
+    ], 305)
+
+    statement("CONSOLIDATED BALANCE SHEETS", [
+        ("Cash and cash equivalents", "164,500", "142,000"),
+        ("Accounts receivable, net", "205,000", "180,500"),
+        ("Inventories", "160,000", "155,000"),
+        ("Property, plant and equipment, net", "620,000", "588,000"),
+        ("Total assets", "1,149,500", "1,065,500"),
+        ("Accounts payable", "130,000", "121,000"),
+        ("Long-term debt", "400,000", "425,000"),
+        ("Total liabilities", "530,000", "546,000"),
+        ("Common stock", "50,000", "50,000"),
+        ("Retained earnings", "569,500", "469,500"),
+        ("Total equity", "619,500", "519,500"),
+    ], 335)
+
+    statement("CONSOLIDATED STATEMENTS OF CASH FLOWS", [
+        ("Net income", "136,500", "112,500"),
+        ("Depreciation and amortization", "75,000", "68,000"),
+        ("Changes in operating working capital", "(20,500)", "(15,000)"),
+        ("Net cash provided by operating activities", "191,000", "165,500"),
+        ("Purchases of property and equipment", "(107,000)", "(95,000)"),
+        ("Net cash used in investing activities", "(107,000)", "(95,000)"),
+        ("Repayments of long-term debt", "(25,000)", "(20,000)"),
+        ("Dividends paid", "(36,500)", "(30,000)"),
+        ("Net cash used in financing activities", "(61,500)", "(50,000)"),
+    ], 290)
+
+    doc.set_metadata({**METADATA, "title": "Meridian Components Inc. - Annual Report 2025"})
+    doc.subset_fonts(verbose=False)
+    doc.save(path, garbage=4, deflate=True, no_new_id=True)
+    doc.close()
+
+
 def build_eu_locale(path: Path) -> None:
     """The same figures printed `1.234.567,89`. Ambiguous until locale is confirmed."""
     doc = pymupdf.open()
@@ -311,6 +400,7 @@ def build_truncated(path: Path, source: Path) -> None:
 
 BUILDERS = {
     "text_native_statements.pdf": build_statements,
+    "three_statements.pdf": build_three_statements,
     "eu_locale_statements.pdf": build_eu_locale,
     "image_only_scan.pdf": build_image_only,
     "partly_scanned.pdf": build_partly_scanned,
