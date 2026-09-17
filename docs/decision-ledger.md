@@ -1038,19 +1038,25 @@ its value and status. The same model exported twice a week apart reads the same
 version; one changed digit anywhere changes it. The document hash alone would
 not do, because two different valuations of one filing are two different models.
 
-**A negative number starts with the character the CSV defence quotes.** 139's
-injection protection, applied the way it is usually written, prefixes an
-apostrophe to any cell beginning `=`, `+`, `-`, `@`, tab or carriage return.
-Every negative figure in a financial model begins with `-`, and a prefixed one
-becomes text: it sorts as text, sums as zero, charts as nothing, and *looks like
-a number*. The defence would have fired on every ordinary export of an ordinary
-company having an ordinary bad year, to prevent an attack that needs somebody to
-open a hostile file. So the rule here is narrower: a cell is neutralized only
-when it is not a number. Numeric cells are written from the exact `Decimal`, and
-a `Decimal` cannot contain a formula. The case that remains protected is the one
-worth protecting -- a printed label beginning `=`, which came out of somebody
-else's PDF -- and every neutralized cell is listed on the screen, because a
-reader who finds an apostrophe in their data is owed the reason.
+**20.13 says "raw text", and Phase 2 had already said why that matters.**
+[`security-model.md`](security-model.md) §20.13 recorded the trap before any
+export existed: prefixing an apostrophe to every cell beginning `=`, `+`, `-` or
+`@` would catch every negative figure in the model, turning each into text that
+sorts as text, sums as zero, and *looks like a number* -- and 21.8 forbids an
+export that does not equal the website. Phase 14 implements that: a cell is
+neutralized only when it is not a number, because a `Decimal` is not raw text.
+Every neutralized cell is listed on the screen, since a reader who finds an
+apostrophe in their data is owed the reason.
+
+**The XLSX half of 20.13 was a live hole, and openpyxl makes it sharper than
+the clause sounds.** Assigning a string beginning with `=` to a cell does not
+store text: openpyxl sets the cell's data type to *formula*. A filing whose
+printed label begins with `=` -- a label out of somebody else's PDF -- would
+have arrived in the workbook as something Excel evaluates on open. `+`, `-` and
+`@` are stored as inline strings and are inert; `=` alone is not. The workbook
+now applies the CSV's own `neutralize`, which closes it and keeps the two
+formats agreeing as 21.8 requires. A test asserts no cell in any of the sixteen
+sheets has the formula data type.
 
 **The workbook says what it cannot hold.** A spreadsheet number is an IEEE 754
 double; 4.11 promises 0.0001% end to end. Those cannot both be true inside a

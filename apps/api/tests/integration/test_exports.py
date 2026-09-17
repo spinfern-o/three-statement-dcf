@@ -309,6 +309,48 @@ def test_hardcodes_and_calculations_are_distinguishable_by_more_than_colour(mode
     assert len(set(fonts.values())) == 3
 
 
+def test_no_text_in_the_workbook_becomes_a_formula():
+    """20.13 in XLSX, where openpyxl makes it sharper than the clause sounds.
+
+    Assigning a string beginning with "=" sets the cell's data type to FORMULA,
+    not to text -- so a printed label out of somebody else's PDF would arrive
+    as something Excel evaluates on open.
+    """
+    import openpyxl
+
+    hostile = ExportModel(
+        document_id="doc-hostile",
+        company="Hostile Labels Limited",
+        scenario_id="base",
+        version_id="msv1:" + "0" * 64,
+        generated_at="2026-09-17T00:00:00+00:00",
+        currency="USD", units="units", valuation_date="",
+        limitations=("A synthetic model.",),
+        tables=tuple(
+            Table(
+                name=name, title=title,
+                columns=(Column("label", "Label"), Column("value", "Value", "currency")),
+                rows=(
+                    (Cell.text("=1+1"), Cell.number(Decimal("-5"))),
+                    (Cell.text("@SUM(A1)"), Cell.number(Decimal("1"))),
+                ),
+            )
+            for name, title in TAB_ORDER
+        ),
+    )
+    workbook = openpyxl.load_workbook(io.BytesIO(xlsx_bytes(hostile)))
+    for sheet in workbook:
+        for row in sheet.iter_rows():
+            for cell in row:
+                assert cell.data_type != "f", f"{sheet.title}!{cell.coordinate}"
+
+
+def test_the_workbook_and_the_csv_neutralize_the_same_cells():
+    """They must, or 21.8 fails on the cells the defence touched."""
+    for text in ("=1+1", "@SUM(A1)", "+A1", "-lease"):
+        assert neutralize(Cell.text(text))[1]
+
+
 def test_the_legend_explains_every_style_it_uses():
     assert len(LEGEND) == 4
     for name, meaning in LEGEND:

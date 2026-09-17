@@ -26,6 +26,13 @@ The alternative -- writing the exact string into the cell -- produces a
 workbook whose every figure is text, which sums to zero. Disclosing the loss
 beats either silently taking it or breaking the file to avoid it.
 
+**20.13 binds here too, and openpyxl makes it sharper than the clause sounds.**
+Assigning a string beginning with `=` to a cell does not store text: openpyxl
+sets the cell's data type to *formula*. A filing whose printed label begins
+with `=` would arrive in the workbook as something Excel evaluates on open. The
+same `neutralize` the CSV uses is applied to text cells here, which also keeps
+the two formats agreeing, as 21.8 requires.
+
 **21.2: hardcodes and formulas are distinguishable by more than colour.** The
 modelling convention is blue for an input and black for a calculation, and
 colour alone fails WCAG 1.4.1. So each numeric cell also carries a *named cell
@@ -44,6 +51,7 @@ from openpyxl.comments import Comment
 from openpyxl.styles import Alignment, Font, NamedStyle, PatternFill
 from openpyxl.utils import get_column_letter
 
+from .csv_export import neutralize
 from .gather import gather
 from .tables import CALCULATED, Cell, ExportModel, Table
 
@@ -125,7 +133,13 @@ def _write_cell(sheet, row: int, column: int, cell: Cell, styles) -> bool:
     """Write one cell. Returns True when precision had to be moved to a note."""
     target = sheet.cell(row=row, column=column)
     if cell.value is None:
-        target.value = ""
+        # 20.13 binds here as much as it binds the CSV, and openpyxl makes it
+        # sharper than the clause sounds: assigning a string that begins with
+        # "=" does not store text, it sets the cell's data type to FORMULA.
+        # A filing whose printed label starts with "=" would arrive in the
+        # workbook as something Excel evaluates. `neutralize` is the CSV's own
+        # function, used here so the two formats also cannot disagree (21.8).
+        target.value = neutralize(cell)[0]
         if cell.note:
             target.comment = Comment(cell.note, "Three-Statement DCF")
         return False

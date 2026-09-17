@@ -1,19 +1,24 @@
 """Item 139: CSV, and the injection defence that must not eat a minus sign.
 
-A CSV cell beginning `=`, `+`, `-`, `@`, a tab or a carriage return is executed
-as a formula by Excel, LibreOffice and Google Sheets when the file is opened.
-The published defence is to prefix such a cell with an apostrophe, which those
-programs read as "the rest is text".
+20.13: "Prefix spreadsheet values beginning with =, +, -, or @ when exporting
+**raw text**." Those characters start a formula in Excel, LibreOffice and
+Google Sheets, and the defence is to prefix an apostrophe, which they read as
+"the rest is text".
 
-**Applied naively that defence corrupts this export.** Every negative figure in
-a financial model starts with `-`. Prefixing them turns `-1234.56` into the
+The two emphasised words are load-bearing, and
+[`docs/security-model.md`](../../../../docs/security-model.md) §20.13 recorded
+why before any export existed.
+
+**Applied to everything, that defence corrupts this export.** Every negative
+figure in a financial model starts with `-`. Prefixing them turns `-1234.56` into the
 text `'-1234.56`, which sorts as text, sums as zero, and charts as nothing --
 and the reader sees plausible numbers, not an error. A defence that silently
 destroys the values it protects is worse than the risk: the injection needs
 somebody to open a hostile file, and this one would fire on every ordinary
 export of an ordinary company having an ordinary bad year.
 
-So the rule here is narrower and stated once:
+So the rule follows 20.13's own words -- *raw text*, and a `Decimal` is not
+raw text:
 
 **A cell is neutralized only when it is not a number.** Numeric cells are
 written from `Cell.value` -- the exact Decimal -- and a Decimal cannot contain
@@ -86,7 +91,7 @@ def header_lines(model: ExportModel, table: Table) -> "list[str]":
         f"# Column definitions: {DICTIONARY} (21.4); "
         f"JSON schema version {SCHEMA_VERSION}",
         f"# A cell beginning {PREFIX} was prefixed to stop a spreadsheet "
-        f"evaluating it as a formula (21.x, item 139). Numeric cells are never "
+        f"evaluating it as a formula (20.13). Numeric cells are never "
         f"prefixed.",
     ] + ([f"# NOTE: {table.note}"] if table.note else []) + (
         [f"# THIS TABLE IS EMPTY: {table.note}"] if table.unavailable else []

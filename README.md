@@ -145,7 +145,7 @@ the trip. Each carries its exact value in a cell note, is styled `Inexact`, and
 is counted on the cover tab — rather than being rounded away where nobody
 would notice.
 
-1184 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+1186 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
