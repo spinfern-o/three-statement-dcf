@@ -37,6 +37,10 @@ from model.accounts import Statement
 from ..mapping.checks import all_findings, apply_findings
 from ..mapping.normalized import normalize, periods as ledger_periods, statement_of_fact
 from ..mapping.sets import MappingError
+from ..schedules.build import build_schedules
+from ..schedules.checks import run_schedule_checks
+from ..schedules.checks import summarize as summarize_schedule_checks
+from ..schedules.views import driver_rows, working_capital_rows
 from ..review.actions import ACCEPT, CORRECT, REJECT, ReviewError, accept_fact, correct_fact, reject_fact
 from ..statements.build import BuildError, build_statements
 from ..statements.checks import run_historical_checks, summarize
@@ -481,6 +485,58 @@ def statements(request: Request, document_id: str, error: str = "", ok: str = ""
             "equity_note": equity_statement_status(),
             "engine_inputs": engine_inputs,
             "export_error": export_error,
+            "error": error,
+            "ok": ok,
+        },
+    )
+
+
+# --- items 69-77: the supporting schedules screen (7.6) ---------------------
+
+#: 7.6's order, minus the three that are never built and the tax schedule,
+#: which has its own shape. These are the roll-forwards, and the screen renders
+#: them from one template block.
+ROLLFORWARD_KEYS = ("ppe", "debt", "retained_earnings", "common_equity")
+
+
+@router.get("/documents/{document_id}/schedules", response_class=HTMLResponse)
+def schedules(request: Request, document_id: str, error: str = "", ok: str = ""):
+    """7.6 Supporting Schedules.
+
+    Built with `strict=False`, like the statements screen: a reviewer should
+    watch the schedules fill in as they work rather than meet a blank page
+    until the last fact is verified. The reconciliation results say what rests
+    on an unverified figure, and the export -- which is the thing that must not
+    move on unverified data -- builds strictly and separately.
+    """
+    result = _load(request, document_id)
+
+    try:
+        built = build_statements(result, strict=False)
+    except BuildError as exc:
+        return _templates(request).TemplateResponse(
+            request=request, name="schedules.html",
+            context={
+                "document": result.document, "result": result, "schedules": None,
+                "blocked": str(exc), "error": error, "ok": ok,
+            },
+        )
+
+    schedule_set = build_schedules(built)
+    checks = run_schedule_checks(schedule_set)
+
+    return _templates(request).TemplateResponse(
+        request=request, name="schedules.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "schedules": schedule_set,
+            "rollforwards": [schedule_set.by_key(key) for key in ROLLFORWARD_KEYS],
+            "wc_table": working_capital_rows(schedule_set.working_capital),
+            "wc_drivers": driver_rows(schedule_set.working_capital),
+            "checks": checks,
+            "check_summary": summarize_schedule_checks(checks),
+            "blocked": "",
             "error": error,
             "ok": ok,
         },

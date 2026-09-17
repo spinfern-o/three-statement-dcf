@@ -181,3 +181,17 @@ pre.raw {
   line-height: 1.45;
   white-space: pre;
 }
+
+/* 6.6.d / WCAG 1.4.10. A reconciliation table is two-dimensional data: a
+ * period per column, a movement per row, and a sentence of basis beside each.
+ * It cannot reflow to one column without ceasing to be a reconciliation, and
+ * 1.4.10 exempts exactly that content -- but only if it scrolls inside its own
+ * region rather than dragging the page sideways with it. The region is
+ * focusable so it can be scrolled from the keyboard alone (2.1.1), and named
+ * so a screen reader says what was landed in. */
+.table-scroll { overflow-x: auto; }
+.table-scroll:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}

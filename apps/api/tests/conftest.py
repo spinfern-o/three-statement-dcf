@@ -160,6 +160,26 @@ def three_statements(tmp_path_factory):
     return apply_findings(result)
 
 
+@pytest.fixture
+def three_statement_client(tmp_path, three_statements):
+    """A client serving the fully reviewed three-statement filing.
+
+    The `client` fixture serves the two-statement filing at the start of
+    review, which is the right subject for the source room and the wrong one
+    for a screen that only has something to show once mappings are approved.
+    """
+    from fastapi.testclient import TestClient
+
+    from apps.api.app.api.main import create_app
+    from apps.api.app.persistence.json_store import JsonDocumentRepository
+
+    root = tmp_path / "reviewed"
+    JsonDocumentRepository(root).save(three_statements)
+    with TestClient(create_app(root)) as test_client:
+        test_client.document_id = three_statements.document.id
+        yield test_client
+
+
 @pytest.fixture(scope="module")
 def built(three_statements):
     from apps.api.app.statements.build import build_statements

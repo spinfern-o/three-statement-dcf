@@ -466,3 +466,89 @@ def test_the_equity_statement_says_it_is_not_available(client):
     body = client.get(f"/documents/{client.document_id}/statements").text
     assert "Statement of changes in equity" in body
     assert "Not available" in body
+
+
+# --- items 69-77: the supporting schedules screen (7.6) ---------------------
+
+def test_the_schedules_page_explains_itself_before_anything_is_mapped(client):
+    """6.5.i: an empty state says what is missing, not an empty table."""
+    response = client.get(f"/documents/{client.document_id}/schedules")
+    assert response.status_code == 200
+    assert "Nothing to show yet" in response.text
+
+
+def test_the_statements_page_links_to_the_schedules(client):
+    assert f"/documents/{client.document_id}/schedules" in client.get(
+        f"/documents/{client.document_id}/statements"
+    ).text
+
+
+def test_the_schedules_page_shows_every_schedule_section_13_asks_for(
+    three_statement_client,
+):
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/schedules").text
+    for title in (
+        "Working capital", "PP&amp;E and depreciation", "Intangibles and amortization",
+        "Debt and interest", "Leases", "Taxes", "Retained earnings",
+        "Common equity", "Share count and dilution",
+    ):
+        assert title in body, f"{title} is missing from the schedules screen"
+
+
+def test_the_schedules_page_shows_the_roll_forward_and_its_difference(
+    three_statement_client,
+):
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/schedules").text
+    assert "Ending PP&amp;E = Beginning PP&amp;E + CapEx" in body
+    assert "588,000" in body and "107,000" in body and "620,000" in body
+    assert "Unexplained difference" in body
+    assert "never plugged" in body
+
+
+def test_the_schedules_page_shows_the_drivers_and_their_convention(
+    three_statement_client,
+):
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/schedules").text
+    assert "59.9" in body and "77.9" in body and "63.3" in body
+    assert "365 days (13.1.e)" in body
+    assert "cash and debt" in body.lower()
+
+
+def test_the_schedules_page_marks_the_interest_basis_the_forecast_uses(
+    three_statement_client,
+):
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/schedules").text
+    assert "beginning debt" in body and "average debt" in body
+    assert "the basis the forecast uses" in body
+
+
+def test_the_schedules_page_says_why_three_of_them_are_missing(
+    three_statement_client,
+):
+    """1.14: a gap is reported, not left blank."""
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/schedules").text
+    assert "Schedules this filing cannot support" in body
+    assert "not available" in body
+    assert "right-of-use asset" in body
+
+
+def test_the_schedules_page_keeps_the_accessibility_contract(
+    three_statement_client,
+):
+    """Every table captioned, every heading in order, every column scoped."""
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/schedules").text
+    assert body.count("<caption>") >= 5
+    assert '<th scope="col"' in body and '<th scope="row"' in body
+    assert 'aria-labelledby="checks-heading"' in body
+
+    # Each wide table scrolls inside a named, focusable region (WCAG 1.4.10,
+    # 2.1.1) rather than taking the page sideways with it.
+    assert body.count('class="table-scroll" tabindex="0" role="region"') >= 5
+    assert 'aria-label="PP&amp;E and depreciation roll-forward"' in body
+    assert "{{" not in body, "a template expression reached the rendered page"

@@ -24,14 +24,15 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4, 5 and 6, items 39–68. A browser interface showing
+   specification Phases 4 to 7, items 39–77. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
    onto a canonical chart of accounts, with human approval, split and combine,
    double-count prevention and subtotal reconciliation; and the three
    historical statements it all produces, every cell tracing back to the page
-   it was printed on.
+   it was printed on; and the supporting schedules that explain how each
+   balance moved, reconciled to the statement line each one claims to explain.
 
 **The two halves are joined.** Phase 6 turns a verified, mapped document into
 the engine's own `Ledger` objects and writes the two YAML files `run_model.py`
@@ -40,9 +41,20 @@ on `tax.source is required by STEP 16` — which is the right outcome: the
 history came from the document, and the forecast assumptions still need a
 person, because a beta and a risk-free rate are not lines in a filing.
 
-570 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
-suite driven through a real browser, and a golden historical model asserting
-every cell of all three statements. All arithmetic is exact decimal.
+**The schedules do not plug.** Every roll-forward in Section 13 ends in a term
+like "FX and Other Adjustments", and a filing rarely puts a number beside it.
+Solving for that term would make every schedule tie and every reconciliation
+pass, which is why nothing here does: a schedule's closing figure is the
+opening balance plus what the filing disclosed, and the gap to the reported
+balance is shown as **unexplained**. Three of the seven schedules cannot be
+built at all from the current chart, and each says why rather than rendering
+an empty table.
+
+636 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+suite driven through a real browser, a golden historical model asserting every
+cell of all three statements, and four tests that each break a different
+figure and assert the reconciliation catches it with the right amount. All
+arithmetic is exact decimal.
 
 **Facts can now reach `VERIFIED`.** Verification is a seven-part conjunction
 (`docs/source-policy.md` §9) whose seventh condition is a human-approved
@@ -51,10 +63,9 @@ there was no mapping stage; Phase 5 built one. The application still evaluates
 all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
 
-**What does not exist yet:** the rest of the website. No database, no
-schedules, no formula engine, no assumption or forecast screens, no DCF
-screen, no dashboard, no exports. Phases 7 to 17 of the specification, in
-other words — all of them presentations of, or projections from, numbers this
+**What does not exist yet:** the rest of the website. No database, no formula
+engine, no assumption or forecast screens, no DCF screen, no dashboard, no
+exports. Phases 8 to 17 of the specification, in other words — all of them presentations of, or projections from, numbers this
 stage now certifies.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
@@ -343,13 +354,26 @@ Historical statements (specification Phase 6, items 59–68):
 | `apps/api/app/statements/export.py` | — | The two YAML files `run_model.py` reads |
 | `apps/api/app/api/templates/statements.html` | 65 | The 7.5 screen |
 
+Supporting schedules (specification Phase 7, items 69–77):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/schedules/base.py` | — | The shared vocabulary: a line, a caveat, a reconciliation, and availability with a reason |
+| `apps/api/app/schedules/working_capital.py` | 69 | 13.1, with DSO, inventory days and DPO, and the day-count convention stated |
+| `apps/api/app/schedules/rollforward.py` | 70, 72, 75 | PP&E, debt and equity, built from disclosed movements only |
+| `apps/api/app/schedules/interest.py` | 72 | 13.4's stated basis: beginning debt, because that is what the forecast charges |
+| `apps/api/app/schedules/tax.py` | 74 | 13.6's effective rate, and the four components only a tax footnote carries |
+| `apps/api/app/schedules/unavailable.py` | 71, 73 | The three that cannot be built, each with its reason (F-17) |
+| `apps/api/app/schedules/checks.py` | 76 | 13.8: every schedule against its statement line, every period |
+| `apps/api/app/api/templates/schedules.html` | 77 | The 7.6 screen |
+
 Documentation:
 
 | Path | What it is |
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-13 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-21 |
 
 Specification Phase 2 contract documents. These are **definitions for the
 website, not descriptions of the engine** — each one states plainly where the
