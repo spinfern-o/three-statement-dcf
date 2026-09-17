@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Forecast &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Forecast statements &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% macro region(label) -%}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{% macro amount(value) -%}
+  {% if value is none %}<span class="muted">&mdash;</span>{% else %}{{ "{:,.0f}".format(value) }}{% endif %}
+{%- endmacro %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Forecast statements</h1>
+
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+
+  <p class="muted">
+    Projected figures. <strong>A scenario forecast is not a fact or a
+    guarantee</strong> (1.19), and nothing here is investment advice. Every
+    estimate column is labelled <code>E</code> and every projected cell carries
+    the driver that produced it.
+    <a href="/documents/{{ document.id }}/assumptions">Assumptions</a> &middot;
+    <a href="/documents/{{ document.id }}/statements">Historical statements</a>
+  </p>
+
+  {% if blocked %}
+  <div class="card">
+    <h2>Nothing to forecast yet</h2>
+    <p class="muted">{{ blocked }}</p>
+  </div>
+  {% else %}
+
+  {# --- 15.20, 15.21 ---------------------------------------------------- #}
+  <section class="card" aria-labelledby="ready-heading">
+    <h2 id="ready-heading">Forecast readiness (15.20, 15.21)</h2>
+    <p>
+      {% if readiness.is_forecast_ready %}
+      <span class="badge badge-success">Forecast Ready</span>
+      {% else %}
+      <span class="badge badge-danger">not Forecast Ready</span>
+      {% endif %}
+      {{ readiness.describe() }}
+    </p>
+    {% call region("Checks by scenario") %}
+    <table>
+      <caption>Every check, for every scenario and period</caption>
+      <thead><tr><th scope="col">Scenario</th><th scope="col">Result</th>
+        <th scope="col">Anything outstanding</th></tr></thead>
+      <tbody>
+        {% for item in readiness.by_scenario %}
+        <tr>
+          <th scope="row">{{ item.scenario_id }}</th>
+          <td class="small">
+            {% if item.is_forecast_ready %}
+            <span class="badge badge-success">{{ item.summarize() }}</span>
+            {% else %}
+            <span class="badge badge-danger">{{ item.summarize() }}</span>
+            {% endif %}
+          </td>
+          <td class="small">
+            {% for check in item.failed %}
+            <div><span class="badge badge-danger">FAIL</span> {{ check.name }}: {{ check.detail }}</div>
+            {% endfor %}
+            {% for check in item.skipped %}
+            <div><span class="badge badge-warning">SKIP</span> {{ check.name }}: {{ check.detail }}</div>
+            {% endfor %}
+            {% for check in item.deferred %}
+            <div><span class="badge badge-neutral">awaits the valuation</span> {{ check.name }}</div>
+            {% endfor %}
+            {% if item.is_forecast_ready %}<span class="muted">nothing</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% for scenario_id, reason in readiness.not_built.items() %}
+        <tr>
+          <th scope="row">{{ scenario_id }}</th>
+          <td><span class="badge badge-danger">not built</span></td>
+          <td class="small">{{ reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- 15.4: each driver, by period ------------------------------------ #}
+  <section class="card" aria-labelledby="drivers-heading">
+    <h2 id="drivers-heading">Drivers behind scenario <code>{{ scenario_id }}</code> (15.4)</h2>
+    <p class="small muted">
+      Every one read through the assumptions register, which is the only way a
+      number enters the forecast (14.5). The tax rate travels by its own route:
+      STEP 16 makes the model state which basis it uses, and this one is
+      <strong>{{ forecast.tax_basis }}</strong> &mdash; {{ forecast.tax_source }}.
+    </p>
+    {% call region("Forecast drivers") %}
+    <table>
+      <caption>{{ driver_rows | length }} driver(s), each with the step that reads it</caption>
+      <thead><tr><th scope="col">Driver</th><th scope="col">Applies to</th>
+        <th scope="col" class="num">Value</th><th scope="col">Step</th>
+        <th scope="col">Status</th></tr></thead>
+      <tbody>
+        {% for row in driver_rows %}
+        <tr>
+          <th scope="row"><code>{{ row.code }}</code></th>
+          <td class="small">{{ row.scope }}</td>
+          <td class="num">{{ row.value }}</td>
+          <td class="small">{{ row.step }}</td>
+          <td class="small"><span class="badge badge-success">{{ row.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    {% if forecast.unused %}
+    <p class="small"><span class="badge badge-warning">declared and never read</span>
+      {{ forecast.unused | join(', ') }} &mdash; usually a misspelled driver code.</p>
+    {% endif %}
+  </section>
+
+  {# --- 7.8.a-c: the three statements ----------------------------------- #}
+  {% for table in tables %}
+  <section class="card" aria-labelledby="fc-{{ table.statement.value }}">
+    <h2 id="fc-{{ table.statement.value }}">{{ table.title }}
+      <span class="small muted">({{ table.rule }})</span></h2>
+    {% call region(table.title) %}
+    <table>
+      <caption>{{ table.title }}, actuals and estimates</caption>
+      <thead>
+        <tr>
+          <th scope="col">Line</th>
+          {% for column in columns %}
+          <th scope="col" class="num">
+            {{ column.label }}
+            <div class="small muted">{{ column.kind }}</div>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table.rows %}
+        <tr>
+          <th scope="row">
+            {{ row.label }}
+            <div class="small muted">{{ row.code }}</div>
+          </th>
+          {% for cell in row.cells %}
+          <td class="num {% if row.is_subtotal %}total{% endif %}"
+              {% if cell.basis %}title="{{ cell.basis }}"{% endif %}>
+            {{ amount(cell.value) }}
+            {% if cell.is_projected %}
+            <div class="small muted">{{ cell.basis }}</div>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+  {% endfor %}
+
+  {# --- 7.8.e: scenario comparison -------------------------------------- #}
+  {% if comparison_rows %}
+  <section class="card" aria-labelledby="compare-heading">
+    <h2 id="compare-heading">Scenario comparison (7.8.e)</h2>
+    <p class="small muted">
+      One line across every scenario, with the drivers that differ beside it.
+      Two lines that diverge tell a reader something changed; the driver that
+      changed tells them what (14.5).
+    </p>
+    {% call region("Scenario comparison") %}
+    <table>
+      <caption>{{ comparison_code }} by scenario</caption>
+      <thead>
+        <tr><th scope="col">Scenario</th>
+          {% for column in columns %}<th scope="col" class="num">{{ column.label }}</th>{% endfor %}
+          <th scope="col">Drivers that differ</th></tr>
+      </thead>
+      <tbody>
+        {% for row in comparison_rows %}
+        <tr>
+          <th scope="row">{{ row.scenario_id }}
+            {% if not row.forecast_ready %}
+            <div><span class="badge badge-danger">not ready</span></div>
+            {% endif %}
+          </th>
+          {% for value in row.values %}<td class="num">{{ amount(value) }}</td>{% endfor %}
+          <td class="small">
+            {% if not row.differences %}<span class="muted">&mdash; (this is the base)</span>{% endif %}
+            {% for code, before, after in row.differences %}
+            <div><code>{{ code }}</code>:
+              {% if before is none %}<span class="muted">not in the parent</span>
+              {% else %}{{ before }}{% endif %} &rarr; {{ after }}</div>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+  {% endif %}
+
+  {% endif %}
+</main>
+{% endblock %}

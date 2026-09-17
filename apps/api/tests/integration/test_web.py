@@ -811,3 +811,71 @@ def test_the_assumptions_page_keeps_the_accessibility_contract(
 
     for control_id in re.findall(r'<(?:input|select)[^>]*id="([^"]+)"', body):
         assert f'for="{control_id}"' in body, f"{control_id} has no label"
+
+
+# --- items 97-108: the forecast statements screen (7.8) ---------------------
+
+def test_the_forecast_page_says_why_it_cannot_forecast(three_statement_client):
+    """`three_statements.pdf` reports no other-noncurrent lines, and the
+    refusal names the line and the step rather than showing an empty table."""
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/forecast").text
+    assert "Nothing to forecast yet" in body
+    assert "may not calculate yet (14.1)" in body or "other_noncurrent" in body
+
+
+def test_the_forecast_page_shows_all_three_statements(forecast_client):
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/forecast").text
+    assert "Forecast income statement" in body
+    assert "Forecast balance sheet" in body
+    assert "Forecast cash flow statement" in body
+    # 2026E revenue: 2,000,000 x 1.08, computed by hand.
+    assert "2,160,000" in body
+
+
+def test_every_column_is_labelled_actual_or_estimate(forecast_client):
+    """7.8.d and 1.19. A projection beside an actual in the same typeface is
+    the fastest way to describe a forecast as a fact."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/forecast").text
+    assert "2025A" in body and "2026E" in body
+    assert body.count("Estimate") >= 5
+    assert "Actual" in body
+    assert "not a fact or a\n    guarantee" in body or "not a fact or a guarantee" in body
+
+
+def test_every_projected_cell_shows_the_driver_that_produced_it(forecast_client):
+    """14.5: no assumption hidden inside a formula."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/forecast").text
+    assert "revenue_growth" in body
+    assert "beginning debt" in body, "interest says which balance it is charged on"
+    assert "STEP 18" in body or "STEP 13" in body
+
+
+def test_the_forecast_page_reports_readiness_per_scenario(forecast_client):
+    """15.20 and 15.21."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/forecast").text
+    assert "Forecast readiness (15.20, 15.21)" in body
+    assert "Forecast Ready" in body
+    assert "awaits the valuation" in body, "the valuation checks are deferred, not hidden"
+    assert "assigns a severity to none" in body, "F-4 is stated, not assumed away"
+
+
+def test_the_tax_basis_is_named_on_the_screen(forecast_client):
+    """STEP 16: state which rate the model uses, and why."""
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/forecast").text
+    assert "statutory" in body or "effective" in body
+    assert "STEP 16" in body
+
+
+def test_the_forecast_page_keeps_the_accessibility_contract(forecast_client):
+    client = forecast_client
+    body = client.get(f"/documents/{client.document_id}/forecast").text
+    assert body.count("<caption>") >= 4
+    assert '<th scope="col"' in body and '<th scope="row"' in body
+    assert 'class="table-scroll" tabindex="0" role="region"' in body
+    assert "{{" not in body

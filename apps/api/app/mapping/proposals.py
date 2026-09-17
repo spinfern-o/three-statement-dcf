@@ -163,12 +163,18 @@ RULES = (
     _rule(accounts.INVENTORY, r"^inventor(y|ies)", EXACT, "matched an inventories caption"),
     _rule(accounts.INVENTORY, r"^stock$", WEAK, "'stock' is inventory in UK usage and share capital in US usage -- confirm which"),
 
+    _rule(accounts.OTHER_CURRENT_ASSETS, r"^other\s+current\s+assets", EXACT, "the whole label names the other-current-asset line"),
     _rule(accounts.OTHER_CURRENT_ASSETS, r"^(other|prepaid|prepayments)", STRONG, "matched an other-current-asset caption"),
     _rule(accounts.OTHER_CURRENT_ASSETS, r"\b(short-?term\s+investments|restricted\s+cash|contract\s+assets)", STRONG, "an item this chart routes to other current assets"),
 
     _rule(accounts.PPE_NET, r"^property,?\s+(plant\s+and\s+)?equipment", EXACT, "matched a property, plant and equipment caption"),
     _rule(accounts.PPE_NET, r"^(fixed|tangible)\s+assets", STRONG, "matched the UK/IFRS tangible assets caption"),
 
+    # An EXACT rule, because `^other` alone proposes OTHER_CURRENT_ASSETS and
+    # wins on nothing but ordering. A non-current balance mapped to a current
+    # line moves working capital by its whole amount, and the balance sheet
+    # still balances -- so nothing downstream catches it.
+    _rule(accounts.OTHER_NONCURRENT_ASSETS, r"^other\s+(non-?current|long-?term)\s+assets", EXACT, "the label says NON-current, which the generic 'other' rule would miss"),
     _rule(accounts.OTHER_NONCURRENT_ASSETS, r"^(goodwill|intangible)", STRONG, "the chart has no goodwill or intangibles line (12.2.e); it routes here, and that is worth recording on the mapping"),
     _rule(accounts.OTHER_NONCURRENT_ASSETS, r"\b(right-?of-?use|deferred\s+tax\s+assets?|equity[- ]method\s+investments?)", STRONG, "a non-current asset this chart routes to the residual line"),
 
@@ -176,11 +182,13 @@ RULES = (
 
     _rule(accounts.ACCOUNTS_PAYABLE, r"^(accounts|trade)\s+payable", EXACT, "matched a trade payables caption"),
 
+    _rule(accounts.OTHER_CURRENT_LIABILITIES, r"^other\s+current\s+liabilit", EXACT, "the whole label names the other-current-liability line"),
     _rule(accounts.OTHER_CURRENT_LIABILITIES, r"^(accrued|deferred\s+revenue|contract\s+liabilit)", STRONG, "an item this chart routes to other current liabilities"),
 
     _rule(accounts.DEBT, r"^(long-?term\s+)?(debt|borrowings|loans)", EXACT, "matched a borrowings caption"),
     _rule(accounts.DEBT, r"\b(notes\s+payable|current\s+portion\s+of\s+long-?term\s+debt|finance\s+lease\s+liabilit|lease\s+liabilit)", STRONG, "interest-bearing, so it belongs in debt (decision 2.4.j for leases)"),
 
+    _rule(accounts.OTHER_NONCURRENT_LIABILITIES, r"^other\s+(non-?current|long-?term)\s+liabilit", EXACT, "the label says NON-current; the same trap as other non-current assets"),
     _rule(accounts.OTHER_NONCURRENT_LIABILITIES, r"\b(deferred\s+tax\s+liabilit|pension|post-?retirement|provisions)", STRONG, "a non-current liability this chart routes to the residual line"),
 
     _rule(accounts.TOTAL_LIABILITIES, r"^total\s+liabilities$", EXACT, "the whole label is total liabilities"),

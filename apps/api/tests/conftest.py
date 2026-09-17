@@ -16,6 +16,8 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 STATEMENTS = FIXTURES / "text_native_statements.pdf"
 #: All three statements, internally consistent. The Phase 6 golden fixture.
 THREE_STATEMENTS = FIXTURES / "three_statements.pdf"
+#: A complete balance sheet, so the forecast has everything it anchors on.
+FORECASTABLE = FIXTURES / "forecastable.pdf"
 EU_LOCALE = FIXTURES / "eu_locale_statements.pdf"
 IMAGE_ONLY = FIXTURES / "image_only_scan.pdf"
 PARTLY_SCANNED = FIXTURES / "partly_scanned.pdf"
@@ -158,6 +160,137 @@ def three_statements(tmp_path_factory):
     result = approve_all(result, actor="owner",
                          note="each label matches the canonical definition")
     return apply_findings(result)
+
+
+def _review_and_map(path, root):
+    """Everything Phases 3 to 5 do, in the order a reviewer does them."""
+    from apps.api.app.core.config import IngestionConfig
+    from apps.api.app.extraction.pipeline import ingest
+    from apps.api.app.extraction.records import confirm_metadata
+    from apps.api.app.extraction.storage import SourceStore
+    from apps.api.app.mapping.actions import approve_all, propose_all
+    from apps.api.app.mapping.checks import apply_findings
+    from apps.api.app.review.actions import accept_fact, correct_fact
+
+    outcome = ingest(
+        Path(path).read_bytes(),
+        original_filename=Path(path).name,
+        company_id="co-1",
+        config=IngestionConfig(storage_root=str(root)),
+        store=SourceStore(root),
+    )
+    assert outcome.accepted, outcome.describe()
+    result = outcome.result
+
+    result = confirm_metadata(
+        result,
+        {
+            name: None
+            for name, field in result.document.metadata.fields.items()
+            if field.value is not None
+        },
+        actor="owner", reason="checked the cover page",
+    )
+    for fact in list(result.facts):
+        if fact.raw_value in ("\u2014", "\u2013", "N/A"):
+            result = correct_fact(result, fact.id, "0", actor="owner",
+                                  reason="the filer reports nil here")
+    for fact in list(result.facts):
+        if fact.value is not None and fact.decision is None:
+            result = accept_fact(result, fact.id, actor="owner",
+                                 reason="matches the printed page")
+    result = propose_all(result)
+    result = approve_all(result, actor="owner",
+                         note="each label matches the canonical definition")
+    return apply_findings(result)
+
+
+@pytest.fixture(scope="module")
+def forecastable(tmp_path_factory):
+    """A reviewed filing whose balance sheet is complete enough to forecast.
+
+    `three_statements` cannot be forecast, and correctly so: the engine anchors
+    its roll-forwards on four balance-sheet lines that filing does not report,
+    and STEP 5 forbids substituting zero. This one reports all four.
+    """
+    return _review_and_map(FORECASTABLE, tmp_path_factory.mktemp("forecastable"))
+
+
+@pytest.fixture
+def forecast_client(tmp_path, forecastable):
+    """A client over the forecastable filing, with an approved base scenario.
+
+    Stored the way the application stores it, so the screen reads the same
+    JSON a reviewer's own session would.
+    """
+    from fastapi.testclient import TestClient
+
+    from apps.api.app.api.main import create_app
+    from apps.api.app.assumptions.schema import Assumption, Evidence, SourceType, Status
+    from apps.api.app.assumptions.scenarios import ScenarioSet, base_scenario
+    from apps.api.app.assumptions.store import ScenarioStore
+    from apps.api.app.persistence.json_store import JsonDocumentRepository
+
+    root = tmp_path / "forecast"
+    JsonDocumentRepository(root).save(forecastable)
+
+    def approved(code, value, unit):
+        fields = dict(
+            code=code, name=code.replace("_", " "), value=value, unit=unit,
+            owner="owner", reviewer="owner", status=Status.APPROVED,
+            rationale="entered for this test, with a stated source",
+        )
+        if unit == "days":
+            fields.update(
+                source_type=SourceType.HISTORICAL_DRIVER,
+                evidence=Evidence(measured_over=("2025A",)),
+            )
+        else:
+            fields.update(
+                source_type=SourceType.COMPANY_GUIDANCE,
+                evidence=Evidence(document_id="doc-1", page=31, date="2026-02-14"),
+            )
+        return Assumption(**fields)
+
+    from apps.api.app.assumptions.drivers import BY_CODE
+
+    ScenarioStore(root).save(
+        forecastable.document.id,
+        ScenarioSet(
+            (base_scenario("owner"),),
+            tuple(
+                approved(code, value, BY_CODE[code].unit)
+                for code, value in FORECAST_DRIVERS.items()
+            ),
+        ),
+    )
+    with TestClient(create_app(root)) as test_client:
+        test_client.document_id = forecastable.document.id
+        yield test_client
+
+
+#: The rates the forecastable filing itself implies, as decimal strings (4.2).
+FORECAST_DRIVERS = {
+    "revenue_growth": "0.08",
+    "cogs_pct_revenue": "0.60",
+    "opex_pct_revenue": "0.24",
+    "depreciation_pct_beginning_ppe": "0.1412",
+    "capex_pct_revenue": "0.085",
+    "dso": "58.4",
+    "inventory_days": "73",
+    "dpo": "60.8",
+    "other_current_assets_pct_revenue": "0.02",
+    "other_current_liabilities_pct_revenue": "0.045",
+    "interest_rate_on_debt": "0.04",
+    "tax_rate": "0.25",
+}
+
+
+@pytest.fixture(scope="module")
+def forecast_built(forecastable):
+    from apps.api.app.statements.build import build_statements
+
+    return build_statements(forecastable)
 
 
 @pytest.fixture
