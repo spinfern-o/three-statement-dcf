@@ -820,6 +820,64 @@ Buildable now, because it depends on no OPEN decision:
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
 
+**Phase 11 (items 109-120) is built**, in
+[`apps/api/app/valuation/`](../apps/api/app/valuation) and
+[`model/timing.py`](../model/timing.py): Section 16's DCF, driven from a
+scenario's approved inputs.
+
+**The engine was short of Section 16 in one place that mattered, and it is now
+fixed.** STEP 29 says year-end discounting and the engine implemented exactly
+that: integer periods, integer exponentiation. Section 16 asks for three things
+that convention alone does not give -- 16.11's documented choice between
+year-end and mid-year, 16.12's exact time fraction from a valuation date, and
+16.13's tested precision policy for the non-integer exponent both of those
+imply. `model/timing.py` supplies all three, and **the year-end path is
+unchanged**: a test asserts every discount factor on the fixture model is still
+what it was, so adopting the options cannot silently move a valuation that did
+not ask for them.
+
+The precision policy is stated once and pinned by tests rather than asserted in
+prose. An integer exponent routes through repeated multiplication and never
+touches a transcendental function. A fractional one is `exp(t * ln(1 + WACC))`,
+where `Decimal.ln` and `Decimal.exp` are *correctly rounded* to the 50-digit
+context -- so the residual is a few units in the last place of fifty, which the
+tests bound at 1e-40 relative, forty orders of magnitude inside 4.11's 0.0001%.
+
+**`CostOfCapital` already required a source string per input, and "Bloomberg"
+satisfies it.** The market inputs are now Section 14 assumptions, so
+`SourceType.EXTERNAL_MARKET_DATA`'s evidence rule does the work: a URL AND an
+observation date, because the same field observed a month later is a different
+number and a valuation nobody can reproduce is a valuation nobody can check.
+Decision 2.3.e forbids external retrieval, so the system never fetches any of
+it -- the reviewer supplies the number and says where it came from.
+
+**STEP 27's trap is named in words where a reviewer will read it.** "Do not
+automatically use book equity for market capitalization" -- the engine refuses
+a non-positive market equity and cannot tell book from market, because both are
+positive numbers. That distinction can only be made by a person, so the row
+says so.
+
+**16.22 is followed exactly as written.** A terminal value above the review
+threshold *warns* and does not fail, because a high terminal share is ordinary
+for a company still growing and a red flag for one that is not, and no
+threshold tells the two apart. What the warning says is where a reviewer's
+attention belongs: on the perpetual growth rate, which is carrying most of the
+answer.
+
+**Three things Section 16 asks for cannot be built, and each says so.**
+16.19's lease liability line (the chart has none, and decision 2.4.j treats
+leases as debt -- so a company with material leases is over-valued by their
+whole amount if this is left unsaid); 16.20's per-share value (no verified
+diluted share count, and no share count in the chart to cross-check one
+against); and 16.24's exit multiple (no EBITDA line to apply a multiple to).
+All three are F-17 again. 16.25's rule against averaging terminal methods has
+nothing to bind as a result, and that is stated rather than left to inference.
+
+Item 120's benchmark recomputes the whole valuation longhand -- no `model.dcf`,
+no `model.timing`, no `model.numeric` -- and asserts **exact equality** across
+every 4.16 valuation output, because every operation involved is addition,
+subtraction, multiplication or a terminating division.
+
 **Phase 10 (items 97-108) is built**, in
 [`apps/api/app/forecast/`](../apps/api/app/forecast): Section 15's forecast
 statements, driven from a scenario's approved assumptions.

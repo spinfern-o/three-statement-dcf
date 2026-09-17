@@ -16,8 +16,9 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from .forecast import ForecastResult
-from .numeric import D, ONE, ZERO, power
+from .numeric import D, ONE, ZERO
 from .profile import Periods
+from .timing import Schedule, Timing, build_schedule, discount_factor
 from .provenance import ProvenanceError
 
 
@@ -154,7 +155,11 @@ class DiscountedYear:
 
     year: str
     fcff: Decimal
-    period: int
+    #: The time fraction t. A whole number under the year-end convention, and
+    #: a fraction under mid-year or exact dates (16.11, 16.12). Stored as a
+    #: Decimal so the three conventions share one field rather than one
+    #: field each.
+    period: Decimal
     discount_factor: Decimal
 
     @property
@@ -245,8 +250,15 @@ def run_dcf(
     periods: Periods,
     diluted_shares: Decimal | None = None,
     shares_source: str | None = None,
+    schedule: "Schedule | None" = None,
 ) -> Valuation:
-    """STEP 29-35."""
+    """STEP 29-35.
+
+    `schedule` carries 16.11's timing convention. Omitted, it is built as
+    year-end -- t = 1, 2, 3 -- which is STEP 29's convention and reproduces
+    every discount factor this function produced before the option existed.
+    A model only leaves that path by asking to.
+    """
 
     wacc = cost_of_capital.wacc
     terminal_growth = D(terminal_growth, what="terminal_growth")
@@ -268,24 +280,26 @@ def run_dcf(
                 "STEP 35 requires the source and date for diluted shares outstanding."
             )
 
-    # STEP 29: year-end convention, PV = FCFF_t / (1 + WACC)^t
+    # STEP 29 / 16.14: PV = FCFF_t / (1 + WACC)^t, with t from the schedule.
+    span = schedule or build_schedule(periods.forecast, Timing.YEAR_END)
     discounted = []
     for item in fcff_years:
-        t = periods.discount_period(item.year)
+        t = span.fraction_for(item.year)
         discounted.append(
             DiscountedYear(
                 year=item.year,
                 fcff=item.fcff,
                 period=t,
-                discount_factor=ONE / power(ONE + wacc, t),
+                discount_factor=discount_factor(wacc, t),
             )
         )
 
-    # STEP 30-32: terminal cash flow, terminal value, and its present value
+    # STEP 30-32: terminal cash flow, terminal value, and its present value.
+    # 16.17: discounted on the SAME convention as the flows before it. A
+    # terminal value on a different basis is a different valuation.
     terminal_fcff = fcff_years[-1].fcff * (ONE + terminal_growth)
     terminal_value = terminal_fcff / (wacc - terminal_growth)
-    final_period = periods.discount_period(periods.terminal_year)
-    pv_terminal_value = terminal_value / power(ONE + wacc, final_period)
+    pv_terminal_value = terminal_value * discount_factor(wacc, span.terminal)
 
     # STEP 33-34
     enterprise_value = sum((d.present_value for d in discounted), ZERO) + pv_terminal_value

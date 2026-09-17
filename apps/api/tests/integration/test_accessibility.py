@@ -323,42 +323,14 @@ def served_forecast(tmp_path_factory, forecastable):
     import uvicorn
 
     from apps.api.app.api.main import create_app
-    from apps.api.app.assumptions.drivers import BY_CODE
-    from apps.api.app.assumptions.scenarios import ScenarioSet, base_scenario
-    from apps.api.app.assumptions.schema import Assumption, Evidence, SourceType, Status
     from apps.api.app.assumptions.store import ScenarioStore
     from apps.api.app.persistence.json_store import JsonDocumentRepository
-    from apps.api.tests.conftest import FORECAST_DRIVERS
+    from apps.api.tests.conftest import approved_scenario
 
     root = tmp_path_factory.mktemp("served-forecast")
     JsonDocumentRepository(root).save(forecastable)
 
-    def approved(code, value):
-        unit = BY_CODE[code].unit
-        fields = dict(
-            code=code, name=code.replace("_", " "), value=value, unit=unit,
-            owner="owner", reviewer="owner", status=Status.APPROVED,
-            rationale="entered for this test, with a stated source",
-        )
-        if unit == "days":
-            fields.update(
-                source_type=SourceType.HISTORICAL_DRIVER,
-                evidence=Evidence(measured_over=("2025A",)),
-            )
-        else:
-            fields.update(
-                source_type=SourceType.COMPANY_GUIDANCE,
-                evidence=Evidence(document_id="doc-1", page=31, date="2026-02-14"),
-            )
-        return Assumption(**fields)
-
-    ScenarioStore(root).save(
-        forecastable.document.id,
-        ScenarioSet(
-            (base_scenario("owner"),),
-            tuple(approved(code, value) for code, value in FORECAST_DRIVERS.items()),
-        ),
-    )
+    ScenarioStore(root).save(forecastable.document.id, approved_scenario("owner"))
 
     port = _free_port()
     server = uvicorn.Server(
@@ -381,16 +353,21 @@ def served_forecast(tmp_path_factory, forecastable):
     thread.join(timeout=10)
 
 
+@pytest.mark.parametrize(
+    "screen,empty_state",
+    [("forecast", "Nothing to forecast yet"), ("valuation", "Nothing to value yet")],
+)
 def test_the_forecast_screen_does_not_scroll_sideways_at_200_percent(
-    browser, served_forecast
+    browser, served_forecast, screen, empty_state
 ):
-    """6.6.d / WCAG 1.4.10. Seven period columns is the widest table here."""
+    """6.6.d / WCAG 1.4.10. Seven period columns is the widest table here, and
+    the sensitivity grid is the widest on the valuation screen."""
     served = served_forecast
     context = browser.new_context(viewport={"width": 640, "height": 900})
     page = context.new_page()
     try:
-        page.goto(f"{served['base']}/documents/{served['document_id']}/forecast")
-        assert "Nothing to forecast yet" not in page.content(), (
+        page.goto(f"{served['base']}/documents/{served['document_id']}/{screen}")
+        assert empty_state not in page.content(), (
             "this test is only meaningful against a populated screen"
         )
         overflow = page.evaluate(

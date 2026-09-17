@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Valuation &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}DCF valuation &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% macro region(label) -%}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{% macro money(value) -%}
+  {% if value is none %}<span class="muted">&mdash;</span>{% else %}{{ "{:,.0f}".format(value) }}{% endif %}
+{%- endmacro %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>DCF valuation</h1>
+
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+
+  <p class="muted">
+    A valuation of a scenario forecast. <strong>It is not a fact, a guarantee
+    or investment advice</strong> (1.19, 1.20). Every market input below is a
+    number somebody observed on a date, and none of them can be derived from
+    the filing.
+    <a href="/documents/{{ document.id }}/forecast">Forecast</a> &middot;
+    <a href="/documents/{{ document.id }}/assumptions">Assumptions</a>
+  </p>
+
+  {% if blocked %}
+  <div class="card">
+    <h2>Nothing to value yet</h2>
+    <p class="muted">{{ blocked }}</p>
+  </div>
+  {% else %}
+
+  <section class="card" aria-labelledby="headline-heading">
+    <h2 id="headline-heading">Scenario <code>{{ valuation.scenario_id }}</code></h2>
+    {% call region("Valuation headline") %}
+    <table>
+      <caption>The four figures the rest of this page explains</caption>
+      <thead><tr><th scope="col">Measure</th><th scope="col" class="num">Value</th>
+        <th scope="col">Where it comes from</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">WACC</th>
+          <td class="num">{{ valuation.valuation.wacc }}</td>
+          <td class="small">16.9, from the inputs below</td></tr>
+        <tr><th scope="row">Enterprise value</th>
+          <td class="num total">{{ money(valuation.valuation.enterprise_value) }}</td>
+          <td class="small">16.18: the discounted flows plus the discounted terminal value</td></tr>
+        <tr><th scope="row">Equity value</th>
+          <td class="num total">{{ money(valuation.valuation.equity_value) }}</td>
+          <td class="small">16.19: enterprise value through the bridge</td></tr>
+        <tr><th scope="row">Implied value per share</th>
+          <td class="num">
+            {% if valuation.has_per_share %}{{ valuation.valuation.implied_share_price }}
+            {% else %}<span class="muted">not available</span>{% endif %}
+          </td>
+          <td class="small">{{ valuation.per_share_status }}</td></tr>
+      </tbody>
+    </table>
+    {% endcall %}
+    <p class="small">{{ headroom.describe() }}</p>
+    <p class="small">
+      {% if terminal.is_above_threshold %}
+      <span class="badge badge-warning">terminal share above the review threshold</span>
+      {% endif %}
+      {{ terminal.describe() }}
+    </p>
+  </section>
+
+  {# --- 7.9.b: the WACC build ------------------------------------------- #}
+  <section class="card" aria-labelledby="wacc-heading">
+    <h2 id="wacc-heading">WACC build and its sources (7.9.b, 16.6&ndash;16.10)</h2>
+    <p class="small muted">
+      <code>CostOfEquity = {{ valuation.cost_of_capital.risk_free_rate }}
+      + {{ valuation.cost_of_capital.beta }}
+      &times; {{ valuation.cost_of_capital.equity_risk_premium }}
+      = {{ valuation.cost_of_capital.cost_of_equity }}</code>
+    </p>
+    {% call region("WACC inputs and their sources") %}
+    <table>
+      <caption>Every input, with the evidence a reader can go and check</caption>
+      <thead><tr><th scope="col">Input</th><th scope="col" class="num">Value</th>
+        <th scope="col">Clause</th><th scope="col">Source and date</th>
+        <th scope="col">Status</th></tr></thead>
+      <tbody>
+        {% for record in valuation.inputs %}
+        <tr>
+          <th scope="row">{{ record.name }}
+            <div class="small muted"><code>{{ record.code }}</code> &middot; {{ record.unit }}</div>
+          </th>
+          <td class="num">{{ record.value }}</td>
+          <td class="small">{{ record.rule }}</td>
+          <td class="small">
+            <div>{{ record.source_type }}</div>
+            <div class="muted">{{ record.evidence }}</div>
+            <div class="muted">{{ record.rationale }}</div>
+          </td>
+          <td class="small">
+            {% if record.assumed_nil %}
+            <span class="badge badge-warning">taken as nil</span>
+            {% else %}
+            <span class="badge badge-success">{{ record.status }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    <p class="small muted">{{ lease_note }}</p>
+  </section>
+
+  {# --- 7.9.a, 7.9.c: FCFF and the discounted flows --------------------- #}
+  <section class="card" aria-labelledby="fcff-heading">
+    <h2 id="fcff-heading">FCFF bridge and discounted flows (7.9.a, 7.9.c)</h2>
+    <p class="small muted">
+      <code>FCFF = NOPAT + D&amp;A &minus; CapEx &minus; &Delta;NWC</code> (16.5).
+      Timing: {{ valuation.schedule.basis }}
+    </p>
+    {% call region("FCFF and discounted cash flows") %}
+    <table>
+      <caption>Each forecast year, from EBIT to present value</caption>
+      <thead><tr><th scope="col">Year</th><th scope="col" class="num">EBIT</th>
+        <th scope="col" class="num">NOPAT</th><th scope="col" class="num">D&amp;A</th>
+        <th scope="col" class="num">CapEx</th><th scope="col" class="num">&Delta;NWC</th>
+        <th scope="col" class="num">FCFF</th><th scope="col" class="num">t</th>
+        <th scope="col" class="num">Factor</th>
+        <th scope="col" class="num">Present value</th></tr></thead>
+      <tbody>
+        {% for row in flows %}
+        <tr>
+          <th scope="row">{{ row.year }}</th>
+          <td class="num">{{ money(row.ebit) }}</td>
+          <td class="num">{{ money(row.nopat) }}</td>
+          <td class="num">{{ money(row.d_and_a) }}</td>
+          <td class="num">{{ money(row.capex) }}</td>
+          <td class="num">{{ money(row.change_in_nwc) }}</td>
+          <td class="num total">{{ money(row.fcff) }}</td>
+          <td class="num">{{ row.period }}</td>
+          <td class="num">{{ "%.6f"|format(row.discount_factor) }}</td>
+          <td class="num total">{{ money(row.present_value) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- 7.9.d, 7.9.e: terminal value and the bridge --------------------- #}
+  <section class="card" aria-labelledby="terminal-heading">
+    <h2 id="terminal-heading">Terminal value and the equity bridge (7.9.d, 7.9.e)</h2>
+    {% call region("Terminal value and equity bridge") %}
+    <table>
+      <caption>16.15 through 16.19, line by line</caption>
+      <thead><tr><th scope="col">Line</th><th scope="col" class="num">Amount</th>
+        <th scope="col">Clause</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Terminal FCFF</th>
+          <td class="num">{{ money(valuation.valuation.terminal_fcff) }}</td>
+          <td class="small">16.15: final-year FCFF &times; (1 + g)</td></tr>
+        <tr><th scope="row">Terminal value</th>
+          <td class="num">{{ money(valuation.valuation.terminal_value) }}</td>
+          <td class="small">16.15: terminal FCFF &divide; (WACC &minus; g)</td></tr>
+        <tr><th scope="row">Present value of terminal value</th>
+          <td class="num">{{ money(valuation.valuation.pv_terminal_value) }}</td>
+          <td class="small">16.17: the same timing convention as the flows</td></tr>
+        <tr><th scope="row">Present value of explicit flows</th>
+          <td class="num">{{ money(valuation.valuation.pv_explicit) }}</td>
+          <td class="small">16.14</td></tr>
+        <tr class="total"><th scope="row">Enterprise value</th>
+          <td class="num total">{{ money(valuation.valuation.enterprise_value) }}</td>
+          <td class="small">16.18</td></tr>
+        {% for label, amount in valuation.bridge.lines() %}
+        <tr><th scope="row">{{ label }}</th>
+          <td class="num">{{ money(amount) }}</td>
+          <td class="small">16.19</td></tr>
+        {% endfor %}
+        <tr class="total"><th scope="row">Equity value</th>
+          <td class="num total">{{ money(valuation.valuation.equity_value) }}</td>
+          <td class="small">16.19</td></tr>
+      </tbody>
+    </table>
+    {% endcall %}
+    {% if valuation.assumed_nil %}
+    <p class="small">
+      <span class="badge badge-warning">taken as nil</span>
+      {{ valuation.assumed_nil | join(', ') }} &mdash; nobody entered these, and
+      16.19 lists them. Each is zero for most companies and is not zero for
+      some, so they are shown rather than omitted.
+    </p>
+    {% endif %}
+    <p class="small muted">{{ exit_multiple }}</p>
+  </section>
+
+  {# --- 7.9.g: the sensitivity grid ------------------------------------- #}
+  <section class="card" aria-labelledby="grid-heading">
+    <h2 id="grid-heading">WACC and growth sensitivity (7.9.g, 16.23)</h2>
+    <p class="small muted">{{ grid.describe() }}</p>
+    {% call region("Sensitivity grid") %}
+    <table>
+      <caption>Enterprise value by WACC (rows) and terminal growth (columns)</caption>
+      <thead>
+        <tr><th scope="col">WACC \ g</th>
+          {% for g in grid.growth_values %}<th scope="col" class="num">{{ "%.4f"|format(g) }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in grid.rows %}
+        <tr>
+          <th scope="row">{{ "%.4f"|format(grid.wacc_values[loop.index0]) }}</th>
+          {% for cell in row %}
+          <td class="num">
+            {% if cell.note %}<span class="muted" title="{{ cell.note }}">n/a</span>
+            {% else %}{{ money(cell.enterprise_value) }}{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    <p class="small muted">
+      7.9.h asks for an optional exit-multiple sensitivity when explicitly
+      enabled. It is not enabled, for the reason above.
+    </p>
+  </section>
+
+  {% endif %}
+</main>
+{% endblock %}

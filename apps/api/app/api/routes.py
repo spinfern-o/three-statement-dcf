@@ -58,6 +58,11 @@ from ..forecast.views import columns as forecast_columns
 from ..forecast.views import comparison, driver_rows as forecast_driver_rows
 from ..forecast.views import statement_rows as forecast_statement_rows
 from ..formula.catalog import derivation_formulas, ledger_environment
+from ..valuation.build import ValuationError, build_scenario_valuation
+from ..valuation.checks import EXIT_MULTIPLE_STATUS, headroom, terminal_share
+from ..valuation.inputs import LEASE_LIABILITIES_NOTE
+from ..valuation.sensitivity import build_grid
+from ..valuation.views import flow_rows
 from ..formula.views import formula_report
 from ..schedules.build import build_schedules
 from ..schedules.checks import run_schedule_checks
@@ -892,5 +897,57 @@ def _forecast_blocked(request, result, reason: str, scenario_id: str, error: str
         context={
             "document": result.document, "result": result, "blocked": reason,
             "scenario_id": scenario_id, "error": error,
+        },
+    )
+
+
+# --- items 109-120: the DCF valuation screen (7.9) --------------------------
+
+@router.get("/documents/{document_id}/valuation", response_class=HTMLResponse)
+def valuation(request: Request, document_id: str, scenario_id: str = BASE, error: str = ""):
+    """7.9 DCF Valuation, for one scenario.
+
+    One scenario at a time, unlike the forecast screen: a valuation carries a
+    market view, and putting two side by side invites reading the difference as
+    a range when it is two different assumptions about the same company.
+    """
+    result = _load(request, document_id)
+
+    def blocked(reason: str):
+        return _templates(request).TemplateResponse(
+            request=request, name="valuation.html",
+            context={
+                "document": result.document, "result": result, "blocked": reason,
+                "scenario_id": scenario_id, "error": error,
+            },
+        )
+
+    try:
+        built = build_statements(result, strict=False)
+    except BuildError as exc:
+        return blocked(str(exc))
+
+    scenarios = _scenario_store(request).load(document_id, owner=_actor(request))
+    try:
+        scenario_forecast = build_scenario_forecast(built, scenarios, scenario_id)
+        built_valuation = build_scenario_valuation(scenario_forecast, scenarios)
+    except (ForecastError, ValuationError) as exc:
+        return blocked(str(exc))
+
+    return _templates(request).TemplateResponse(
+        request=request, name="valuation.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "blocked": "",
+            "scenario_id": scenario_id,
+            "valuation": built_valuation,
+            "flows": flow_rows(built_valuation),
+            "terminal": terminal_share(built_valuation),
+            "headroom": headroom(built_valuation),
+            "grid": build_grid(built_valuation),
+            "exit_multiple": EXIT_MULTIPLE_STATUS,
+            "lease_note": LEASE_LIABILITIES_NOTE,
+            "error": error,
         },
     )

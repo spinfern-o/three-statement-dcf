@@ -320,6 +320,8 @@ Check 17.14 therefore has nothing to reconcile.
 | `DCF-WACC-01` | `WACC = weight_equity × cost_of_equity + weight_debt × after_tax_cost_of_debt` | the four above | ratio | **ctx** | STEP 28; **16.9** |
 | `DCF-T-01` | `t = index of year in the forecast tuple + 1` | `Periods.forecast` | years | exact | STEP 29; **see 16.12 below** |
 | `DCF-DF-01` | `discount_factor_t = 1 / (1 + WACC)^t`, integer `t` | `WACC`, `DCF-T-01` | ratio | **ctx** | STEP 29; **16.13** |
+| `DCF-DF-02` | `discount_factor_t = 1 / exp(t x ln(1 + WACC))`, non-integer `t` | `WACC`, `DCF-T-02` | ratio | **ctx** | 16.11-16.13. Added in Phase 11 for the mid-year and exact-date conventions. `Decimal.ln` and `Decimal.exp` are correctly rounded to the 50-digit context, so the residual is units in the last place of fifty; `tests/test_timing.py` bounds it at 1e-40 relative |
+| `DCF-T-02` | `t = days(valuation_date -> cash_flow_date) / 365` | valuation date, fiscal year end | years | exact | **16.12**. Both terms are integers, so the fraction itself is exact; only the exponentiation that consumes it is not |
 | `DCF-PV-01` | `PV_FCFF_t = FCFF_t × discount_factor_t` | `DCF-FCFF-01`, `DCF-DF-01` | currency | exact | STEP 29; **16.14** |
 | `DCF-TFCFF-01` | `terminal_fcff = FCFF_N × (1 + terminal_growth)` | final-year FCFF, `g` | currency | exact | STEP 30; **16.15** |
 | `DCF-TV-01` | `terminal_value = terminal_fcff / (WACC − terminal_growth)` | `DCF-TFCFF-01`, `WACC`, `g` | currency | **ctx** | STEP 31; **16.15** |
