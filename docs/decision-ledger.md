@@ -789,6 +789,55 @@ generic one by score rather than by position.
 
 ---
 
+### F-24 — RESOLVED in Phase 12. Two font families were named and neither was
+present
+
+`packages/design-tokens/tokens.css` has declared
+`--font-serif: "Source Serif 4", ...` and `--font-sans: Inter, ...` since
+Phase 4, and neither font was ever added to the repository. Every screen had
+been rendering in the system fallback stack for four phases.
+
+It survived because the design-token tests read the CSS, and the CSS was
+correct: the families were named, the tokens resolved, the contrast ratios
+computed from the colour tokens all passed. Nothing asserted that a named
+family could actually be loaded.
+
+The cost is not cosmetic. 6.2.c requires tabular numerals for all financial
+values, and a fallback stack that lacks them misaligns every column of figures
+on every statement screen — which is the one thing a financial table cannot
+do.
+
+Both families are now vendored as Latin subsets with their OFL text, and a
+browser test reads `document.fonts` and asserts they load. That is the check
+that would have caught it: a test that reads a stylesheet can only confirm
+what the stylesheet claims.
+
+---
+
+### F-25 — RESOLVED in Phase 12. Every table screen scrolled the page sideways
+
+Found by widening item 130's sweep from two screens at one width to eight
+screens at three widths. Every screen with a statement table on it pushed the
+whole document sideways at 390px, and several did at 1000px.
+
+The cause is the `min-width: auto` default on grid and flex items: an item
+refuses to shrink below its content's intrinsic minimum, so a table whose
+numeric cells are `white-space: nowrap` sized its entire column. `min-width:
+0` down the chain from the shell to the cards fixed most of it.
+
+The remainder is the part worth recording. **`overflow-x: auto` makes a box
+scroll; it does not stop the box's contents contributing their min-content
+width to its ancestors.** The scroll container was doing its job and the page
+still overflowed. `contain: inline-size` is the declaration that actually says
+"this box's inline size is independent of its contents", and it is what makes
+the scroll happen inside the focusable, labelled region where WCAG 1.4.10
+intends it rather than on the document.
+
+The narrower tests that preceded this had passed for two phases. A layout test
+that covers one screen covers the screen that happened to be easy.
+
+---
+
 ## Work that is NOT blocked
 
 Buildable now, because it depends on no OPEN decision:
@@ -819,6 +868,65 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 12 (items 121-130) is built**, in
+[`apps/api/app/dashboard/`](../apps/api/app/dashboard),
+[`packages/design-tokens/`](../packages/design-tokens) and the templates:
+Section 6's design system, the navigation shell, and the 7.1 portfolio.
+
+**Item 122 found that `tokens.css` had named two font families since Phase 4
+and neither was present.** Every screen had been falling through to the system
+stack, which the design-token tests could not see because they read CSS.
+Source Serif 4 and Inter are now vendored as Latin subsets -- 114 KB for five
+faces -- with their SIL Open Font License text beside them. Self-hosted rather
+than fetched from a CDN, because the review server binds to 127.0.0.1 and
+holds an unreleased filing: a page that fetched its fonts from a third party
+would tell that third party when the model was being looked at. A browser test
+now asserts the faces actually load, which is the check that would have caught
+the original gap.
+
+6.2.c is why this is not a matter of taste: tabular numerals on every
+financial value. A fallback stack that happens to lack them misaligns every
+column of figures on every statement screen.
+
+**7.1.b's seven statuses are computed, never stored.** Each is the furthest
+stage whose gate is satisfied, and every gate is the entry condition of the
+one after it -- you cannot review what was not extracted, or value what did
+not forecast. That costs real work on every portfolio render (it builds the
+statements and attempts the forecast) and it is the trade worth making for the
+first thing a reader sees: a stored status is wrong from the moment anything
+else changes, and a reader who has once been misled by one stops trusting the
+column. `Archived` is deliberately never inferred -- a model nobody touched
+recently is not the same as a model somebody finished.
+
+**Item 130's sweep -- three viewports across eight screens -- found real
+horizontal overflow on every screen with a table on it.** The cause was the
+`min-width: auto` trap: a grid or flex item refuses to shrink below its
+content's intrinsic width, so a wide statement table pushed its whole column
+past the viewport and the PAGE scrolled sideways rather than the table, which
+is the one thing WCAG 1.4.10 does not exempt.
+
+`min-width: 0` down the shell chain fixed most of it. The last of it needed
+`contain: inline-size` on the scroll container: `overflow-x: auto` makes a box
+scroll, and does **not** stop its contents' min-content width propagating
+upward. That distinction is not obvious, and the earlier narrower tests had
+missed it because they covered two screens at one width.
+
+The sweep also found two bare tables in the source room and the mapping screen
+that had never been inside a scroll region at all, and a class collision:
+`source_room.html` has used `class="card sidenav"` since Phase 4, so the new
+shell's `.sidenav` rules were silently restyling it. The shell's class is now
+`.shell-nav`.
+
+**One accessibility test had to be rescoped, and the reasoning is recorded
+rather than the test quietly weakened.** `test_focus_moves_down_the_page_not_
+around_it` asserted tab order follows visual order across the whole document.
+With a persistent left navigation (6.3.a) the last navigation link sits
+visually above the first content control, which that test reads as a backwards
+jump -- and it is not: navigation-before-content is the correct reading order
+across landmarks, and is the reason a skip link exists at all. The test is now
+scoped to `<main>`, and a new test asserts the landmark ordering directly, so
+the property is still covered rather than dropped.
 
 **Phase 11 (items 109-120) is built**, in
 [`apps/api/app/valuation/`](../apps/api/app/valuation) and

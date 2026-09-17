@@ -106,6 +106,8 @@
           required field is confirmed or corrected (10.13).
         </p>
 
+        <div class="table-scroll" tabindex="0" role="region"
+             aria-label="Table">
         <table>
           <caption>
             {% if progress.metadata_confirmed %}
@@ -139,6 +141,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
 
         {% if not progress.metadata_confirmed %}
         <form class="decide" method="post" action="/documents/{{ document.id }}/metadata">
@@ -192,6 +195,8 @@
         {% if not facts %}
           <p class="muted">No values were extracted from this page.</p>
         {% else %}
+        <div class="table-scroll" tabindex="0" role="region"
+             aria-label="Table">
         <table>
           <caption>
             {{ facts | length }} value(s). &ldquo;Printed&rdquo; is the string as it
@@ -306,6 +311,7 @@
           </tbody>
           {% endfor %}
         </table>
+        </div>
         {% endif %}
       </section>
 

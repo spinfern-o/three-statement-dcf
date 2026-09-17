@@ -24,7 +24,7 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4 to 11, items 39–120. A browser interface showing
+   specification Phases 4 to 12, items 39–130. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
@@ -38,7 +38,9 @@ Two documents govern this repository, and they are different things:
    the assumption register, where every driver the forecast needs is listed
    whether or not anyone has entered it; and the forecast statements, built by
    the engine from a scenario's approved assumptions; and the DCF, where every
-   market input carries the URL and the date somebody observed it on.
+   market input carries the URL and the date somebody observed it on; and a
+   portfolio whose status column is computed from what each model actually
+   contains rather than stored.
 
 **The two halves are joined.** Phase 6 turns a verified, mapped document into
 the engine's own `Ledger` objects and writes the two YAML files `run_model.py`
@@ -86,7 +88,15 @@ non-integer exponent stated and bounded by tests at 1e-40 relative — forty
 orders of magnitude inside the 0.0001% contract. The year-end path is unchanged
 to the digit.
 
-971 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**The layout is tested in a real browser at three widths.** Item 130's sweep
+runs every screen at desktop, tablet and mobile and asserts the page never
+scrolls sideways — a wide table scrolls inside its own focusable region, which
+is the only place WCAG 1.4.10 permits it. Widening that sweep from two screens
+to eight found horizontal overflow on every screen with a table on it, and a
+browser test reading `document.fonts` found that two font families had been
+named in the tokens and never vendored (F-24, F-25).
+
+1051 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -102,7 +112,8 @@ all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
 
 **What does not exist yet:** the rest of the website. No database, no
-dashboard, no exports. Phases 12 to 17 of the specification, in other words — all of them presentations of, or projections from, numbers this
+diagnostics or lineage screens, no exports. Phases 13 to 17 of the
+specification, in other words — all of them presentations of, or projections from, numbers this
 stage now certifies.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
@@ -450,13 +461,25 @@ DCF valuation (specification Phase 11, items 109–120):
 | `apps/api/app/valuation/sensitivity.py` | 119 | 16.23's grid, centred on the valuation it varies |
 | `apps/api/app/api/templates/valuation.html` | — | The 7.9 screen |
 
+Dashboard and design system (specification Phase 12, items 121–130):
+
+| Path | Item | What it does |
+|---|---|---|
+| `packages/design-tokens/fonts.css` | 122 | Source Serif 4 and Inter, self-hosted with their OFL text |
+| `apps/api/app/dashboard/status.py` | — | 7.1.b's seven statuses |
+| `apps/api/app/dashboard/standing.py` | — | Each one computed from what the model contains |
+| `apps/api/app/dashboard/navigation.py` | 123 | The shell, with unreachable sections dimmed and still reachable |
+| `apps/api/app/dashboard/cards.py` | 125 | Period, scenario, source and status on every card |
+| `apps/api/app/dashboard/charts.py` | 126 | Charts that cannot be built without a text summary and a CSV |
+| `apps/api/app/api/templates/index.html` | 124 | The 12-column portfolio |
+
 Documentation:
 
 | Path | What it is |
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-23 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-25 |
 
 Specification Phase 2 contract documents. These are **definitions for the
 website, not descriptions of the engine** — each one states plainly where the

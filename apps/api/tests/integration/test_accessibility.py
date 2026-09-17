@@ -253,20 +253,46 @@ def test_no_positive_tabindex_overrides_the_document_order(page):
 
 
 def test_focus_moves_down_the_page_not_around_it(page):
-    """Tab order should follow the visual order: each stop at or below the last."""
+    """Tab order follows visual order WITHIN the main region.
+
+    Scoped to `<main>` deliberately. Since the persistent left navigation
+    (6.3.a), the document order is navigation then content, and the last
+    navigation link sits visually above the first content control -- so a
+    document-wide version of this test reads that as a backwards jump. It is
+    not: nav-before-content is the correct reading order across landmarks, and
+    is the reason a skip link exists at all. The next test asserts that
+    ordering directly, so the property is still covered.
+    """
     positions = page.evaluate(
         """() => {
           const focusable = [...document.querySelectorAll(
-            'a[href], button, input:not([type=hidden]), select, textarea'
+            'main a[href], main button, main input:not([type=hidden]),'
+            + ' main select, main textarea'
           )].filter(el => el.offsetParent !== null);
           return focusable.map(el => Math.round(el.getBoundingClientRect().top));
         }"""
     )
-    assert positions, "nothing focusable on the page"
+    assert positions, "nothing focusable in the main region"
     backwards = [
         (a, b) for a, b in zip(positions, positions[1:]) if b < a - 60
     ]
     assert not backwards, f"focus jumps back up the page at: {backwards[:3]}"
+
+
+def test_the_navigation_comes_before_the_content_and_the_skip_link_before_both(page):
+    """The ordering the test above no longer asserts, asserted here.
+
+    A reviewer tabbing into the page meets the skip link first, so the
+    navigation can be skipped in one keystroke; that is the whole arrangement
+    a persistent left navigation depends on.
+    """
+    order = page.evaluate(
+        """() => {
+          const nodes = [...document.querySelectorAll('.skip-link, nav.shell-nav, main')];
+          return nodes.map(n => n.tagName + '.' + (n.className || ''));
+        }"""
+    )
+    assert order == ["A.skip-link", "NAV.shell-nav", "MAIN.layout"], order
 
 
 def test_focus_is_always_visible(page):
@@ -324,11 +350,18 @@ def served_forecast(tmp_path_factory, forecastable):
 
     from apps.api.app.api.main import create_app
     from apps.api.app.assumptions.store import ScenarioStore
+    from apps.api.app.extraction.storage import SourceStore
     from apps.api.app.persistence.json_store import JsonDocumentRepository
-    from apps.api.tests.conftest import approved_scenario
+    from apps.api.tests.conftest import FORECASTABLE, approved_scenario
 
     root = tmp_path_factory.mktemp("served-forecast")
     JsonDocumentRepository(root).save(forecastable)
+    # The record alone is not enough: the source room renders a page image
+    # from the stored PDF, so the bytes have to be in this root's store too.
+    SourceStore(root).store(
+        Path(FORECASTABLE).read_bytes(),
+        original_filename=Path(FORECASTABLE).name,
+    )
 
     ScenarioStore(root).save(forecastable.document.id, approved_scenario("owner"))
 
@@ -466,5 +499,155 @@ def test_the_schedules_screen_does_not_scroll_sideways_at_200_percent(
             "document.documentElement.scrollWidth - document.documentElement.clientWidth"
         )
         assert overflow <= 0, f"the page scrolls {overflow}px sideways"
+    finally:
+        context.close()
+
+
+# --- items 129, 130: the responsive layouts, in a real browser -------------
+
+#: 6.3's three layouts, at the widths their media queries switch on.
+VIEWPORTS = (
+    ("desktop", 1440, 900),
+    ("tablet", 1000, 800),
+    ("mobile", 390, 844),
+)
+
+#: Every screen the application has. A layout test that covers one screen
+#: covers the one that happened to be easy.
+SCREENS = ("", "/mapping", "/statements", "/schedules", "/formulas",
+           "/assumptions", "/forecast", "/valuation")
+
+
+@pytest.mark.parametrize("name,width,height", VIEWPORTS, ids=lambda v: str(v))
+@pytest.mark.parametrize("screen", SCREENS)
+def test_no_screen_scrolls_sideways_at_any_supported_width(
+    browser, served_forecast, name, width, height, screen
+):
+    """6.6.d / WCAG 1.4.10, across 6.3's three layouts.
+
+    The page must not scroll sideways. A wide data table may, inside its own
+    focusable region -- 1.4.10 exempts two-dimensional data and `.table-scroll`
+    is where that exemption is taken.
+    """
+    served = served_forecast
+    context = browser.new_context(viewport={"width": width, "height": height})
+    page = context.new_page()
+    try:
+        page.goto(
+            f"{served['base']}/documents/{served['document_id']}{screen}",
+            wait_until="load",
+        )
+        overflow = page.evaluate(
+            "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+        )
+        assert overflow <= 0, f"{name} {screen or '/source'} scrolls {overflow}px sideways"
+    finally:
+        context.close()
+
+
+def test_the_navigation_becomes_a_rail_on_tablet(browser, served_forecast):
+    """6.3.b. The labels become screen-reader-only rather than being removed,
+    so every link keeps its accessible name through the layout change."""
+    served = served_forecast
+    context = browser.new_context(viewport={"width": 1000, "height": 800})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/documents/{served['document_id']}/statements")
+        link = page.get_by_role("link", name="Schedules")
+        assert link.count() >= 1, "the accessible name survives the collapse"
+        # The rail is narrow, and the label is clipped rather than display:none.
+        width = page.evaluate(
+            "document.querySelector('.shell-nav').getBoundingClientRect().width"
+        )
+        assert width < 100, f"the sidebar is {width}px wide on tablet"
+    finally:
+        context.close()
+
+
+def test_the_navigation_moves_below_the_content_on_mobile(browser, served_forecast):
+    """6.3.c: a bottom bar. The main content must come first in the flow."""
+    served = served_forecast
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/documents/{served['document_id']}/statements")
+        positions = page.evaluate(
+            "[document.querySelector('.shell-main').getBoundingClientRect().top,"
+            " document.querySelector('.shell-nav').getBoundingClientRect().top]"
+        )
+        assert positions[0] < positions[1], "the content must precede the navigation"
+    finally:
+        context.close()
+
+
+def test_the_portfolio_grid_collapses_to_one_column_on_mobile(browser, served_forecast):
+    """6.3.c: single-column cards."""
+    served = served_forecast
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/")
+        columns = page.evaluate(
+            "getComputedStyle(document.querySelector('.grid-12'))"
+            ".gridTemplateColumns.split(' ').length"
+        )
+        assert columns == 1, f"the dashboard is {columns} columns wide on mobile"
+    finally:
+        context.close()
+
+
+def test_the_statement_headers_stay_put_while_the_periods_scroll(
+    browser, served_forecast
+):
+    """6.3.e / item 127. The property a frozen header actually has: it does
+    not move when the region under it is scrolled."""
+    served = served_forecast
+    context = browser.new_context(viewport={"width": 900, "height": 700})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/documents/{served['document_id']}/forecast")
+        region = page.locator(".table-scroll.is-frozen").first
+        header = region.locator("thead th").first
+        before = header.bounding_box()["y"]
+        region.evaluate("node => node.scrollTop = 200")
+        after = header.bounding_box()["y"]
+        assert abs(after - before) < 2, (
+            f"the header moved {after - before}px when the table was scrolled"
+        )
+    finally:
+        context.close()
+
+
+def test_the_vendored_fonts_actually_load(browser, served_forecast):
+    """Item 122. `tokens.css` named these families for two phases while
+    neither was present, so every screen fell through to the system stack --
+    which is exactly the failure a test that only reads CSS would miss."""
+    served = served_forecast
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/documents/{served['document_id']}/statements")
+        page.wait_for_function("document.fonts.status === 'loaded'", timeout=5000)
+        loaded = page.evaluate(
+            "Array.from(document.fonts).map(f => f.family + ' ' + f.status)"
+        )
+        assert any("Inter" in item and "loaded" in item for item in loaded), loaded
+        assert any("Source Serif 4" in item for item in loaded), loaded
+    finally:
+        context.close()
+
+
+def test_financial_figures_use_tabular_numerals(browser, served_forecast):
+    """6.2.c. The reason the font choice is not a matter of taste: a column of
+    figures in proportional numerals does not line up."""
+    served = served_forecast
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        page.goto(f"{served['base']}/documents/{served['document_id']}/statements")
+        setting = page.evaluate(
+            "getComputedStyle(document.querySelector('td.num')).fontVariantNumeric"
+        )
+        assert "tabular-nums" in setting, setting
     finally:
         context.close()

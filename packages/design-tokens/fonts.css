@@ -1,0 +1,88 @@
+/* Item 122: the licensed open-source fonts of 6.2, self-hosted.
+ *
+ * `tokens.css` has named these families since Phase 4 and neither was
+ * present, so every screen fell through to the system stack. 6.2 recommends
+ * Source Serif 4 for titles and major financial figures and Inter for
+ * everything else, and the difference is not decorative: Inter's tabular
+ * numerals are what 6.2.c requires of every financial value, and a fallback
+ * stack that happens to lack them misaligns a column of figures.
+ *
+ * SELF-HOSTED, not fetched from a font CDN at page load. Three reasons, and
+ * the first is the one that decides it:
+ *
+ *   - The review server binds to 127.0.0.1 and holds an unreleased filing.
+ *     A page that fetches a font from a third party tells that third party
+ *     when the model is being looked at.
+ *   - 20.x asks that the application not depend on services it does not
+ *     control, and a font that fails to load takes the numeric alignment
+ *     with it.
+ *   - The subsets below are 116 KB in total for five faces, which is less
+ *     than one page image.
+ *
+ * Latin subsets only. The fixtures and the specification are in English, and
+ * a filing in another script needs its own subset added deliberately rather
+ * than 400 KB carried against the possibility.
+ *
+ * Both families are under the SIL Open Font License 1.1, whose text is in
+ * `fonts/OFL-Inter.txt` and `fonts/OFL-SourceSerif4.txt` as the licence
+ * requires. Neither is modified.
+ *
+ * `font-display: swap` -- a financial figure in a fallback face is readable
+ * and a financial figure that is invisible for three seconds is not. 6.5.h's
+ * rule against flashing fake zeros is about values, not about typefaces.
+ */
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/source-serif-4-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/source-serif-4-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/inter-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/inter-latin-500-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/inter-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

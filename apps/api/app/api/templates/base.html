@@ -9,21 +9,48 @@
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
 
-  <header class="topbar">
-    <span class="wordmark">{{ product_name }}</span>
-    <span class="context">{% block context %}{% endblock %}</span>
-    <nav aria-label="Primary" style="margin-left:auto">
-      <a href="/">All documents</a>
+  {# 6.3.a: a persistent left navigation plus a top context bar on desktop.
+     6.3.b/c: the same markup becomes a collapsible rail on tablet and a
+     bottom bar on mobile, by media query alone -- no JavaScript, so it
+     cannot break in a way that strands a reviewer mid-review. #}
+  <div class="shell">
+    <nav class="shell-nav" aria-label="Sections">
+      <span class="wordmark">{{ product_name }}</span>
+      <ul>
+        {% for item in nav_items %}
+        <li>
+          <a href="{{ item.href }}"
+             {% if item.current %}aria-current="page"{% endif %}
+             {% if not item.available %}class="is-unavailable"
+                title="{{ item.unavailable_reason }}"{% endif %}>
+            <span class="glyph" aria-hidden="true">{{ item.glyph }}</span>
+            <span class="label">{{ item.label }}</span>
+            {% if item.badge %}
+            <span class="badge badge-{{ item.badge_tone }}">{{ item.badge }}</span>
+            {% endif %}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
     </nav>
-  </header>
 
-  {% block body %}{% endblock %}
+    <div class="shell-main">
+      <header class="topbar">
+        <span class="context">{% block context %}{% endblock %}</span>
+        {% if document is defined and document %}
+        <span class="units small muted">{{ context_units }}</span>
+        {% endif %}
+      </header>
 
-  <footer>
-    {{ owner }} &middot; {{ footer }}
-    <br>
-    Scenario forecasts are not facts or guarantees, and nothing here is
-    investment advice (specification 1.19, 1.20).
-  </footer>
+      {% block body %}{% endblock %}
+
+      <footer>
+        {{ owner }} &middot; {{ footer }}
+        <br>
+        Scenario forecasts are not facts or guarantees, and nothing here is
+        investment advice (specification 1.19, 1.20).
+      </footer>
+    </div>
+  </div>
 </body>
 </html>

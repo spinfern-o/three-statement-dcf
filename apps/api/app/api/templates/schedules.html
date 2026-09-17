@@ -7,7 +7,7 @@
 {%- endmacro %}
 
 {% macro region(label) -%}
-  <div class="table-scroll" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
+  <div class="table-scroll is-frozen" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
 {%- endmacro %}
 
 {% macro caveats(schedule) -%}

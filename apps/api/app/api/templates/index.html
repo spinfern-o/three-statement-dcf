@@ -1,80 +1,146 @@
 {% extends "base.html" %}
-{% block title %}Documents &middot; {{ product_name }}{% endblock %}
+{% block title %}Portfolio &middot; {{ product_name }}{% endblock %}
 {% block context %}Portfolio{% endblock %}
 
 {% block body %}
 <main id="main" class="layout">
-  <h1>Source documents</h1>
+  <h1>Portfolio</h1>
 
-  {% if not documents %}
-    <div class="card">
-      <h2>Nothing ingested yet</h2>
-      <p class="muted">
-        Ingest a filing first. The review room reads what the extractor
-        produced; it has no upload form of its own yet.
-      </p>
-      <p class="raw">python3 ingest_pdf.py FILING.pdf --store var/sources</p>
-    </div>
-  {% else %}
-  <table>
-    <caption>{{ documents | length }} document(s). Review progress counts reviewer decisions, not verified facts.</caption>
-    <thead>
-      <tr>
-        <th scope="col">Document</th>
-        <th scope="col">Pages</th>
-        <th scope="col">Metadata</th>
-        <th scope="col" class="num">Facts</th>
-        <th scope="col" class="num">Unresolved</th>
-        <th scope="col">Review</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for document, progress in documents %}
-      <tr>
-        <th scope="row">
-          <a href="/documents/{{ document.id }}">{{ document.sanitized_filename }}</a>
-          <div class="raw">{{ document.immutable_hash[:16] }}&hellip;</div>
-        </th>
-        <td class="num">{{ document.page_count }}</td>
-        <td>
-          {% if progress.metadata_confirmed %}
-            <span class="badge badge-success">Confirmed</span>
-          {% else %}
-            <span class="badge badge-warning">Unconfirmed</span>
-            <span class="sr-only">{{ progress.unconfirmed_required | length }} required fields outstanding</span>
-          {% endif %}
-        </td>
-        <td class="num">{{ progress.total }}</td>
-        <td class="num">
-          {% if progress.unresolved %}
-            <span class="badge badge-warning">{{ progress.unresolved }}</span>
-          {% else %}
-            <span class="badge badge-success">0</span>
-          {% endif %}
-        </td>
-        <td>
-          <div class="meter" role="img"
-               aria-label="{{ progress.decided }} of {{ progress.total }} facts decided, {{ progress.percent_decided }} percent">
-            <span style="width: {{ progress.percent_decided }}%"></span>
-          </div>
-          <span class="small muted">{{ progress.decided }} / {{ progress.total }} decided</span>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <div class="card">
-    <h2>What "reviewed" does not mean</h2>
-    <p class="muted small">
-      No fact in this application is <strong>VERIFIED</strong>. Verification is
-      the seven-part conjunction in <code>docs/source-policy.md</code> §9, and
-      its seventh condition is a human-approved mapping to a normalized line
-      item. The mapping stage is Phase 5 and is not built, so a fully reviewed
-      document is reviewed, not verified. The difference is visible on every
-      fact.
+  {% if not models %}
+  {# 6.5.i: an empty state explains what source or decision is missing. #}
+  <div class="empty">
+    <h3>No filing has been ingested yet</h3>
+    <p>
+      This application reviews a filing that has already been through the
+      extractor. It has no upload form of its own: 10.x makes ingestion a
+      pipeline with a custody trail, and a browser upload that skipped it
+      would produce a document with no hash and no page geometry.
     </p>
+    <p class="raw">python3 ingest_pdf.py FILING.pdf --store var/sources</p>
   </div>
+  {% else %}
+
+  <div class="grid-12">
+    {# --- item 125: metric cards, each with period, scenario, source and
+         status (7.1.c) ----------------------------------------------------- #}
+    {% for card in cards %}
+    <div class="metric span-3">
+      <span class="metric-label" id="card-{{ loop.index }}">{{ card.label }}</span>
+      <span class="metric-value {% if card.is_absent %}is-absent{% endif %}"
+            aria-labelledby="card-{{ loop.index }}">{{ card.value }}</span>
+      <span class="metric-meta">{{ card.period }}{% if card.scenario %} &middot; scenario {{ card.scenario }}{% endif %}</span>
+      <span class="metric-meta">{{ card.source }}</span>
+      <span>
+        <span class="badge badge-{{ card.tone }}">{{ card.status }}</span>
+      </span>
+    </div>
+    {% endfor %}
+
+    {# --- 7.1.a-c: the models ------------------------------------------- #}
+    <section class="card span-12" aria-labelledby="models-heading">
+      <h2 id="models-heading">Models (7.1)</h2>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Models">
+        <table>
+          <caption>
+            {{ models | length }} model(s). Status is computed from what each
+            model contains, never stored &mdash; a stored one goes stale the
+            moment anything else changes.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col">Status</th>
+              <th scope="col">Last source</th>
+              <th scope="col">Owner</th>
+              <th scope="col" class="num">Unresolved</th>
+              <th scope="col">What is outstanding</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for model in models %}
+            <tr>
+              <th scope="row">
+                <a href="/documents/{{ model.document.id }}">{{ model.document.sanitized_filename }}</a>
+                <div class="raw">{{ model.document.immutable_hash[:16] }}&hellip;</div>
+              </th>
+              <td>
+                {# 6.2.e: the label carries the state; the badge tone only
+                   repeats it. #}
+                <span class="badge badge-{{ model.standing.status.tone }}">{{ model.standing.status.value }}</span>
+              </td>
+              <td class="small">{{ model.standing.source_date }}</td>
+              <td class="small">{{ model.standing.owner }}</td>
+              <td class="num">
+                {% if model.standing.unresolved_count %}
+                <span class="badge badge-warning">{{ model.standing.unresolved_count }}</span>
+                {% else %}
+                <span class="badge badge-success">0</span>
+                {% endif %}
+              </td>
+              <td class="small">
+                {% if model.standing.blocked_by %}{{ model.standing.blocked_by }}
+                {% else %}<span class="muted">nothing &mdash; every stage is complete</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# --- item 126: a chart, with its text summary and its data --------- #}
+    {% if chart %}
+    <section class="card span-8" aria-labelledby="chart-heading">
+      <h2 id="chart-heading">{{ chart.title }}</h2>
+      <figure style="margin:0">
+        <svg class="chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}"
+             role="img" aria-labelledby="chart-heading" aria-describedby="chart-summary">
+          {% for y, label in chart.y_ticks %}
+          <line class="grid-line" x1="72" y1="{{ "%.2f"|format(y) }}"
+                x2="{{ chart.width - 16 }}" y2="{{ "%.2f"|format(y) }}"></line>
+          <text x="64" y="{{ "%.2f"|format(y + 3) }}" text-anchor="end">{{ label }}</text>
+          {% endfor %}
+          {% if chart.actual_path %}
+          <path class="series-line" d="{{ chart.actual_path }}"></path>
+          {% endif %}
+          {% if chart.estimate_path %}
+          <path class="series-line is-estimate" d="{{ chart.estimate_path }}"></path>
+          {% endif %}
+          {% for point in chart.points %}
+          <circle class="series-point {% if point.is_estimate %}is-estimate{% endif %}"
+                  cx="{{ "%.2f"|format(point.x) }}" cy="{{ "%.2f"|format(point.y) }}" r="3"></circle>
+          <text x="{{ "%.2f"|format(point.x) }}" y="{{ chart.height - 12 }}"
+                text-anchor="middle">{{ point.label }}</text>
+          {% endfor %}
+        </svg>
+        {# 6.5.f and 6.6.h: the summary is on the page, not only in an
+           attribute, because a sighted reader benefits from it too. #}
+        <figcaption id="chart-summary" class="small muted">{{ chart.summary }}</figcaption>
+      </figure>
+      <p class="small">
+        <a href="/documents/{{ chart_document_id }}/chart.csv" download>
+          Download this series as CSV
+        </a>
+        &mdash; at full stored precision, not the rounded values on the axis (4.18).
+      </p>
+    </section>
+    {% endif %}
+
+    <section class="card span-4" aria-labelledby="legend-heading">
+      <h2 id="legend-heading">What the statuses mean</h2>
+      <dl class="small">
+        {% for name, meaning in status_legend %}
+        <dt><span class="badge badge-{{ name.tone }}">{{ name.value }}</span></dt>
+        <dd>{{ meaning }}</dd>
+        {% endfor %}
+      </dl>
+      <p class="small muted">
+        Each is the furthest stage whose gate is satisfied, and every gate is
+        the entry condition of the one after it: you cannot review what was not
+        extracted, or value what did not forecast.
+      </p>
+    </section>
+  </div>
+  {% endif %}
 </main>
-{% endif %}
 {% endblock %}
