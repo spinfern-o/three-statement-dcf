@@ -37,6 +37,7 @@ from model.accounts import Statement
 from ..mapping.checks import all_findings, apply_findings
 from ..mapping.normalized import normalize, periods as ledger_periods, statement_of_fact
 from ..mapping.sets import MappingError
+from ..formula.views import formula_report
 from ..schedules.build import build_schedules
 from ..schedules.checks import run_schedule_checks
 from ..schedules.checks import summarize as summarize_schedule_checks
@@ -539,5 +540,40 @@ def schedules(request: Request, document_id: str, error: str = "", ok: str = "")
             "blocked": "",
             "error": error,
             "ok": ok,
+        },
+    )
+
+
+# --- items 78-88: the formula engine screen (18.10, 18.11) ------------------
+
+@router.get("/documents/{document_id}/formulas", response_class=HTMLResponse)
+def formulas(request: Request, document_id: str, error: str = ""):
+    """Section 18's two "provide" clauses, provided.
+
+    18.10 asks for a human-readable formula for every calculated cell and
+    18.11 for the exact input values used. Both are written as obligations to
+    a person, and a trace that exists only inside a test satisfies neither.
+    """
+    result = _load(request, document_id)
+
+    try:
+        built = build_statements(result, strict=False)
+    except BuildError as exc:
+        return _templates(request).TemplateResponse(
+            request=request, name="formulas.html",
+            context={
+                "document": result.document, "result": result, "report": None,
+                "blocked": str(exc), "error": error,
+            },
+        )
+
+    return _templates(request).TemplateResponse(
+        request=request, name="formulas.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "report": formula_report(built),
+            "blocked": "",
+            "error": error,
         },
     )

@@ -750,6 +750,68 @@ Buildable now, because it depends on no OPEN decision:
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
 
+**Phase 8 (items 78-88) is built**, in
+[`apps/api/app/formula/`](../apps/api/app/formula): the formula engine of
+specification Section 18 — formulas as versioned definitions, parsed into a
+dependency graph, ordered, checked for cycles *before* evaluation, evaluated
+exactly in `Decimal`, unit-checked, and fingerprinted.
+
+**18.3 is a property of the implementation, not a promise about inputs.**
+There is no `eval`, `exec`, `compile` or `ast.literal_eval` anywhere in the
+package — a parametrised test greps the source for each of them, because
+grammar tests would still pass if someone added a fast path beside the parser.
+Numeric literals are built from their matched characters straight into
+`Decimal`; references resolve through a dictionary, never an attribute
+lookup, so a formula cannot reach a method or a dunder even before the
+tokenizer refuses dunder segments outright.
+
+**The unit system is the smaller half of a dimensional algebra, plus one rule
+it would miss.** Four base dimensions — currency, shares, days, years — with
+multiplication adding exponents catches `revenue * revenue` and
+`revenue + shares`. What it does not catch is `growth_rate + pe_multiple` or
+`revenue * growth_percent`, because all three are dimensionless; so addition
+additionally requires the same *named* unit, and `percent` refuses to
+multiply or divide at all. A percent is stored as the number a person reads —
+5, not 0.05 — and that error is a factor of 100 with nothing downstream to
+catch it.
+
+**The declared output unit is verified, not inferred.** `currency / currency`
+is dimensionless, and whether that is a margin or an EV/EBITDA is intent, not
+algebra.
+
+**The catalogue is generated, not transcribed.** The ten derivation formulas
+(`IS-*-D`, `BS-*-D`, `CF-*-D`) are built from `model/accounts.py:DERIVED`, so
+a component added to a subtotal appears in the catalogue without anyone
+remembering to. A hand-typed catalogue is a second chart of accounts, and two
+charts that disagree is worse than one — `mapping/chart.py` made the same call.
+
+**Items 87 and 88 are answered structurally rather than by assertion.** 4.15
+requires the primary engine and the benchmark not call the same helper.
+`Ledger._try_derive` walks tuples of account names into a running total; the
+formula engine parses text into a tree, topologically orders a graph and
+evaluates node by node. They share the `DERIVED` table deliberately and no
+arithmetic at all, and a test asserts they agree **exactly** — not within
+tolerance — on the golden filing, on eight extreme-input cases (4.17: zeros,
+all-negative, 1e-8, 1e30, mixed scales, 24-significant-digit decimals) and on
+125 randomized cases across five orders of magnitude.
+
+Where the two implementations genuinely differ is tested rather than papered
+over. `_try_derive` treats a residual "and anything else" line as zero when
+absent, silently. The formula engine refuses an unresolved reference outright
+(18.14), so the policy lives in `ledger_environment`, which supplies the zero
+**and records that it did** — and the screen lists them. A subtotal resting on
+an assumed-nil residual otherwise reads exactly like one resting on a reported
+figure.
+
+**18.10 and 18.11 are screens, not assertions.** Both clauses are written as
+obligations to a person. `/documents/{id}/formulas` recomputes every subtotal
+the filing prints, from its own components, and shows the formula, the
+substituted inputs, the computed figure, the printed figure and whether they
+agree — a real STEP 9 cross-check by a second implementation. A test corrupts
+a reported gross profit and asserts the screen flags it, and that it flags
+*only* it: because every subtotal is recomputed from leaf inputs rather than
+from the subtotal above it, one transcription error does not look like four.
+
 **Phase 7 (items 69–77) is built**, in
 [`apps/api/app/schedules/`](../apps/api/app/schedules): the historical
 supporting schedules of Section 13, reconciled to the statements they claim to

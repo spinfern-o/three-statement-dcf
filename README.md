@@ -24,7 +24,7 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4 to 7, items 39–77. A browser interface showing
+   specification Phases 4 to 8, items 39–88. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
@@ -32,7 +32,9 @@ Two documents govern this repository, and they are different things:
    double-count prevention and subtotal reconciliation; and the three
    historical statements it all produces, every cell tracing back to the page
    it was printed on; and the supporting schedules that explain how each
-   balance moved, reconciled to the statement line each one claims to explain.
+   balance moved, reconciled to the statement line each one claims to explain;
+   and a formula engine that recomputes every subtotal the filing prints, from
+   its own components, and shows the formula and the exact inputs it used.
 
 **The two halves are joined.** Phase 6 turns a verified, mapped document into
 the engine's own `Ledger` objects and writes the two YAML files `run_model.py`
@@ -50,10 +52,19 @@ balance is shown as **unexplained**. Three of the seven schedules cannot be
 built at all from the current chart, and each says why rather than rendering
 an empty table.
 
-636 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**Nothing evaluates arbitrary code.** The formula engine has no `eval`,
+`exec`, `compile` or `ast.literal_eval` anywhere in it, and a test greps the
+source for each of them — grammar tests would still pass if someone added a
+fast path beside the parser. Formulas are versioned definitions, parsed into a
+dependency graph, checked for cycles *before* evaluation, evaluated exactly in
+`Decimal`, and unit-checked so a percent cannot be multiplied by a currency.
+
+762 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
-cell of all three statements, and four tests that each break a different
-figure and assert the reconciliation catches it with the right amount. All
+cell of all three statements, four tests that each break a different figure and
+assert the reconciliation catches it with the right amount, and two independent
+implementations of the statement derivations asserted to agree **exactly** on
+the golden filing, on eight extreme-input cases and on 125 randomized ones. All
 arithmetic is exact decimal.
 
 **Facts can now reach `VERIFIED`.** Verification is a seven-part conjunction
@@ -63,9 +74,9 @@ there was no mapping stage; Phase 5 built one. The application still evaluates
 all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
 
-**What does not exist yet:** the rest of the website. No database, no formula
-engine, no assumption or forecast screens, no DCF screen, no dashboard, no
-exports. Phases 8 to 17 of the specification, in other words — all of them presentations of, or projections from, numbers this
+**What does not exist yet:** the rest of the website. No database, no
+assumption or forecast screens, no DCF screen, no dashboard, no exports.
+Phases 9 to 17 of the specification, in other words — all of them presentations of, or projections from, numbers this
 stage now certifies.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
@@ -366,6 +377,19 @@ Supporting schedules (specification Phase 7, items 69–77):
 | `apps/api/app/schedules/unavailable.py` | 71, 73 | The three that cannot be built, each with its reason (F-17) |
 | `apps/api/app/schedules/checks.py` | 76 | 13.8: every schedule against its statement line, every period |
 | `apps/api/app/api/templates/schedules.html` | 77 | The 7.6 screen |
+
+Formula engine (specification Phase 8, items 78–88):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/formula/parse.py` | 78 | A recursive-descent parser over an approved character, operator and function set. No `eval`, anywhere |
+| `apps/api/app/formula/units.py` | 82 | 18.12's algebra: four base dimensions, plus the rule that a percent may not be multiplied |
+| `apps/api/app/formula/graph.py` | 79, 80 | Topological order, and cycles named **before** evaluation |
+| `apps/api/app/formula/evaluate.py` | 81, 83, 86 | Exact `Decimal` evaluation, refusals for missing inputs and division by zero, and the trace |
+| `apps/api/app/formula/registry.py` | 78, 84 | Versioned definitions, and the two fingerprints 18.7 asks for |
+| `apps/api/app/formula/calculate.py` | 85 | Recalculating only the affected descendants, keeping the prior model |
+| `apps/api/app/formula/catalog.py` | 87 | The derivation family, generated from `model/accounts.py` so the two cannot drift |
+| `apps/api/app/api/templates/formulas.html` | 86 | 18.10 and 18.11 as a screen: the formula, the inputs, and whether the filing's own arithmetic holds |
 
 Documentation:
 

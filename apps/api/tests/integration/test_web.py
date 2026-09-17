@@ -552,3 +552,69 @@ def test_the_schedules_page_keeps_the_accessibility_contract(
     assert body.count('class="table-scroll" tabindex="0" role="region"') >= 5
     assert 'aria-label="PP&amp;E and depreciation roll-forward"' in body
     assert "{{" not in body, "a template expression reached the rendered page"
+
+
+# --- items 78-88: the formula engine screen (18.10, 18.11) ------------------
+
+def test_the_formulas_page_explains_itself_before_anything_is_mapped(client):
+    response = client.get(f"/documents/{client.document_id}/formulas")
+    assert response.status_code == 200
+    assert "Nothing to show yet" in response.text
+
+
+def test_the_statements_page_links_to_the_formulas(client):
+    assert f"/documents/{client.document_id}/formulas" in client.get(
+        f"/documents/{client.document_id}/statements"
+    ).text
+
+
+def test_the_formulas_page_shows_the_formula_and_the_exact_inputs(
+    three_statement_client,
+):
+    """18.10 and 18.11, which are obligations to a person, not to a test."""
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/formulas").text
+    assert "(revenue - cogs)" in body, "18.10: the human-readable formula"
+    assert "(1,250,000 - 750,000)" in body, "18.11: the exact inputs used"
+    assert "IS-GP-D v1" in body, "the versioned definition it came from (18.1)"
+
+
+def test_the_formulas_page_reports_the_cross_check_result(
+    three_statement_client,
+):
+    """A real STEP 9 comparison: recomputed against what the filing printed."""
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/formulas").text
+    assert "every recomputed subtotal agrees" in body
+    assert "exactly" in body
+
+
+def test_the_formulas_page_shows_the_order_and_that_there_is_no_cycle(
+    three_statement_client,
+):
+    """18.5 and 18.6. An order exists only because there is no cycle."""
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/formulas").text
+    assert "no cycles" in body
+    assert "gross_profit" in body and "ebit" in body
+    assert "Calculation order (18.5)" in body
+
+
+def test_the_formulas_page_names_the_residuals_it_took_as_nil(
+    three_statement_client,
+):
+    """The policy the engine's own derivation applies silently."""
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/formulas").text
+    assert "residual line(s) taken as nil" in body
+    assert "other_income_expense" in body
+
+
+def test_the_formulas_page_shows_a_fingerprint_per_period(
+    three_statement_client,
+):
+    """18.7: the same inputs over the same formula versions hash the same."""
+    client = three_statement_client
+    body = client.get(f"/documents/{client.document_id}/formulas").text
+    assert "Calculation fingerprint" in body
+    assert body.count("<code>") >= 3
