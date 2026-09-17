@@ -33,10 +33,16 @@ from ..mapping.actions import (
     why_no_proposal,
 )
 from ..mapping.chart import CHART
+from model.accounts import Statement
 from ..mapping.checks import all_findings, apply_findings
 from ..mapping.normalized import normalize, periods as ledger_periods, statement_of_fact
 from ..mapping.sets import MappingError
 from ..review.actions import ACCEPT, CORRECT, REJECT, ReviewError, accept_fact, correct_fact, reject_fact
+from ..statements.build import BuildError, build_statements
+from ..statements.checks import run_historical_checks, summarize
+from ..statements.export import ExportError, build_engine_inputs
+from ..statements.reported import citations, reported_strings
+from ..statements.views import equity_statement_status, statement_view
 from ..review.progress import review_progress, verification_gates
 from .bookmarks import bookmarks, unmapped_statements
 from .rendering import render_page
@@ -287,7 +293,7 @@ def mapping_review(request: Request, document_id: str, error: str = "", ok: str 
             "mappings": mappings,
             "chart": CHART,
             "findings": all_findings(result),
-            "ledger": ledger,
+            "ledger_rows": _ledger_rows(ledger),
             "ledger_periods": ledger_periods(ledger),
             "progress": review_progress(result),
             "error": error,
@@ -395,3 +401,87 @@ def approve_everything(request: Request, document_id: str, note: str = Form(""))
         return _mapping_back(document_id, error=str(exc))
     _repository(request).save(apply_findings(updated))
     return _mapping_back(document_id, ok="Approved every outstanding mapping.")
+
+
+def _ledger_rows(ledger: dict) -> list[dict]:
+    """The normalized ledger as rows a template can iterate.
+
+    Keyed by (canonical line, statement) rather than by code alone, because
+    `net_income` is printed on two statements and the two are separate rows --
+    which is the whole reason `normalize` keys on the statement.
+    """
+    order = {item.canonical_code: index for index, item in enumerate(CHART)}
+    grouped: dict = {}
+    for (code, period, statement), value in ledger.items():
+        grouped.setdefault((code, statement), {})[period] = value
+    rows = []
+    for (code, statement), cells in grouped.items():
+        item = next(i for i in CHART if i.canonical_code == code)
+        rows.append({"item": item, "statement": statement, "cells": cells})
+    rows.sort(key=lambda row: (order[row["item"].canonical_code], row["statement"].value))
+    return rows
+
+
+# --- items 59-67: the historical statements screen (7.5) --------------------
+
+STATEMENT_ORDER = (
+    (Statement.INCOME, "Income statement", "12.1"),
+    (Statement.BALANCE, "Balance sheet", "12.2"),
+    (Statement.CASHFLOW, "Cash flow statement", "12.3"),
+)
+
+
+@router.get("/documents/{document_id}/statements", response_class=HTMLResponse)
+def statements(request: Request, document_id: str, error: str = "", ok: str = ""):
+    """7.5 Historical Statements. Every cell traces back to a page."""
+    result = _load(request, document_id)
+
+    try:
+        built = build_statements(result, strict=False)
+    except BuildError as exc:
+        return _templates(request).TemplateResponse(
+            request=request, name="statements.html",
+            context={
+                "document": result.document, "result": result, "built": None,
+                "blocked": str(exc), "error": error, "ok": ok,
+                "equity_note": equity_statement_status(),
+            },
+        )
+
+    raw = reported_strings(result)
+    tables = [
+        {
+            "statement": statement,
+            "title": title,
+            "rule": rule,
+            "rows": statement_view(built, statement, raw_values=raw),
+        }
+        for statement, title, rule in STATEMENT_ORDER
+    ]
+    checks = run_historical_checks(built)
+
+    export_error = ""
+    engine_inputs = None
+    try:
+        engine_inputs = build_engine_inputs(result, build_statements(result, strict=True))
+    except (BuildError, ExportError) as exc:
+        export_error = str(exc)
+
+    return _templates(request).TemplateResponse(
+        request=request, name="statements.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "built": built,
+            "blocked": "",
+            "tables": tables,
+            "checks": checks,
+            "check_summary": summarize(checks),
+            "citations": citations(result),
+            "equity_note": equity_statement_status(),
+            "engine_inputs": engine_inputs,
+            "export_error": export_error,
+            "error": error,
+            "ok": ok,
+        },
+    )

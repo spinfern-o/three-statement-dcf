@@ -30,7 +30,7 @@ from apps.api.app.mapping.checks import (
     duplicate_counting,
     subtotal_reconciliation,
 )
-from apps.api.app.mapping.normalized import normalize
+from apps.api.app.mapping.normalized import lookup, normalize
 from apps.api.app.mapping.sets import MappingError, MappingType
 from apps.api.app.review.actions import accept_fact, correct_fact
 from apps.api.app.review.progress import review_progress, verification_gates
@@ -147,7 +147,7 @@ def test_a_double_counting_mapping_cannot_be_approved(proposed):
 def test_declaring_the_aggregation_clears_it(mapped):
     """11.5: show the aggregation, and it stops being a double count."""
     assert duplicate_counting(mapped) == ()
-    value = normalize(mapped)[(accounts.OPERATING_EXPENSES, "2025")]
+    value = lookup(normalize(mapped), accounts.OPERATING_EXPENSES, "2025")
     assert len(value.contributors) == 3
     assert value.mapping_type is MappingType.AGGREGATE
 
@@ -198,8 +198,8 @@ def test_a_line_mapped_to_the_wrong_canonical_code_breaks_a_subtotal(mapped):
 def test_a_mismatch_is_reported_never_corrected(mapped):
     """12.4 and STEP 6 agree: report the difference, do not plug it."""
     ledger = normalize(apply_findings(_misaggregate(mapped)))
-    assert ledger[(accounts.GROSS_PROFIT, "2025")].value == Decimal("500000")
-    assert ledger[(accounts.COGS, "2025")].value == Decimal("768000")
+    assert lookup(ledger, accounts.GROSS_PROFIT, "2025").value == Decimal("500000")
+    assert lookup(ledger, accounts.COGS, "2025").value == Decimal("768000")
 
 
 def test_a_mismatch_lands_on_the_facts_that_caused_it(mapped):
@@ -216,7 +216,7 @@ def test_an_absent_component_skips_the_check_rather_than_assuming_zero(mapped):
     """STEP 5: an absent line is unknown, not zero. Total assets needs
     `other_current_assets`, which this filing does not report."""
     ledger = normalize(mapped)
-    assert (accounts.OTHER_CURRENT_ASSETS, "2025") not in ledger
+    assert lookup(ledger, accounts.OTHER_CURRENT_ASSETS, "2025") is None
     assert not [f for f in subtotal_reconciliation(mapped)
                 if f.canonical_code == accounts.TOTAL_ASSETS]
 
@@ -312,7 +312,7 @@ def test_an_excluded_line_is_reviewed_and_out_of_the_model(mapped):
     progress = review_progress(after)
     assert progress.excluded >= 1
     assert not after.mappings.is_approved(fact.id)
-    assert (accounts.TOTAL_ASSETS, "2025") in normalize(after)  # unaffected
+    assert lookup(normalize(after), accounts.TOTAL_ASSETS, "2025") is not None
 
 
 def test_mapping_a_fact_rejected_in_source_review_is_refused(reviewed):

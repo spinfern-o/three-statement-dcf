@@ -18,6 +18,14 @@ about.
 source sign on the fact and the normalization on the mapping; this is where
 the two combine, once, in one place, so a value's sign has a single
 explanation.
+
+**The statement is part of the key.** `net_income` is printed on both the
+income statement and the top of the cash flow statement -- the same figure,
+twice, which is what the linkage check reconciles. Keying only on
+(code, period) would group those two facts and ADD them, doubling net income
+on any filing that presents a cash flow statement. Thirty-nine of the forty
+canonical codes belong to exactly one statement and are unaffected; the
+fortieth is the reason the key has three parts.
 """
 
 from __future__ import annotations
@@ -59,10 +67,11 @@ def statement_of_fact(result: ExtractionResult, fact: ReportedFact) -> Statement
 
 @dataclass(frozen=True)
 class NormalizedValue:
-    """One canonical line for one period, and where it came from."""
+    """One canonical line, on one statement, for one period."""
 
     canonical_code: str
     period_label: str
+    statement: StatementType
     #: None means absent. It never means zero (rule 1.2).
     value: Decimal | None
     #: The facts that produced it, in mapping order.
@@ -78,6 +87,21 @@ class NormalizedValue:
         return self.value is not None
 
 
+def statement_for(code: str, fact: ReportedFact, result: ExtractionResult) -> StatementType:
+    """Which statement this contribution belongs on.
+
+    For thirty-nine codes the chart answers it outright. For `net_income` the
+    answer is where the figure was printed, which the table's caption gives;
+    when even that is unknown the income statement is the documented fallback,
+    because that is where net income is defined and the cash flow statement
+    merely restates it.
+    """
+    item = line_item(code)
+    if len(item.statement_types) == 1:
+        return item.statement_types[0]
+    return statement_of_fact(result, fact) or item.statement_types[0]
+
+
 def _contribution(fact: ReportedFact, mapping: FactMapping) -> Decimal | None:
     """One mapping's contribution, with 11.8's sign normalization applied."""
     if mapping.mapping_type is MappingType.SPLIT:
@@ -91,8 +115,8 @@ def _contribution(fact: ReportedFact, mapping: FactMapping) -> Decimal | None:
 
 def normalize(
     result: ExtractionResult, mappings: MappingSet | None = None
-) -> dict[tuple[str, str], NormalizedValue]:
-    """Build `(canonical_code, period) -> NormalizedValue` from the mappings.
+) -> "dict[tuple[str, str, StatementType], NormalizedValue]":
+    """Build `(code, period, statement) -> NormalizedValue` from the mappings.
 
     Rejected mappings contribute nothing. A contributor with no parsed value
     makes the whole line absent, with the reason recorded.
@@ -102,7 +126,7 @@ def normalize(
         return {}
 
     facts = {f.id: f for f in result.facts}
-    grouped: dict[tuple[str, str], list[tuple[ReportedFact, FactMapping]]] = {}
+    grouped: dict = {}
 
     for mapping in mapping_set.mappings:
         if not mapping.contributes:
@@ -111,12 +135,15 @@ def normalize(
         if fact is None:
             continue
         line_item(mapping.canonical_code)  # refuses an unknown code
-        grouped.setdefault((mapping.canonical_code, fact.period_label), []).append(
-            (fact, mapping)
+        key = (
+            mapping.canonical_code,
+            fact.period_label,
+            statement_for(mapping.canonical_code, fact, result),
         )
+        grouped.setdefault(key, []).append((fact, mapping))
 
-    ledger: dict[tuple[str, str], NormalizedValue] = {}
-    for (code, period), pairs in grouped.items():
+    ledger: dict = {}
+    for (code, period, statement), pairs in grouped.items():
         contributions = [_contribution(fact, mapping) for fact, mapping in pairs]
         unreadable = [
             fact for (fact, _), value in zip(pairs, contributions) if value is None
@@ -129,9 +156,10 @@ def normalize(
 
         if unreadable:
             names = ", ".join(f"{f.raw_label!r} ({f.raw_value!r})" for f in unreadable)
-            ledger[(code, period)] = NormalizedValue(
+            ledger[(code, period, statement)] = NormalizedValue(
                 canonical_code=code,
                 period_label=period,
+                statement=statement,
                 value=None,
                 contributors=tuple(f.id for f, _ in pairs),
                 mapping_type=kind,
@@ -143,9 +171,10 @@ def normalize(
             )
             continue
 
-        ledger[(code, period)] = NormalizedValue(
+        ledger[(code, period, statement)] = NormalizedValue(
             canonical_code=code,
             period_label=period,
+            statement=statement,
             value=sum(contributions[1:], contributions[0]),
             contributors=tuple(f.id for f, _ in pairs),
             mapping_type=kind,
@@ -154,18 +183,35 @@ def normalize(
     return ledger
 
 
-def periods(ledger: dict[tuple[str, str], NormalizedValue]) -> tuple[str, ...]:
-    return tuple(sorted({period for _, period in ledger}))
+def periods(ledger: dict) -> tuple[str, ...]:
+    return tuple(sorted({key[1] for key in ledger}))
 
 
-def describe(ledger: dict[tuple[str, str], NormalizedValue]) -> str:
+def lookup(
+    ledger: dict, code: str, period: str, statement: "StatementType | None" = None
+) -> "NormalizedValue | None":
+    """Fetch one value, resolving the statement when the code has only one."""
+    if statement is None:
+        item = line_item(code)
+        if len(item.statement_types) != 1:
+            raise KeyError(
+                f"{code} appears on {len(item.statement_types)} statements; say "
+                f"which one you mean"
+            )
+        statement = item.statement_types[0]
+    return ledger.get((code, period, statement))
+
+
+def describe(ledger: dict) -> str:
     lines = []
     for period in periods(ledger):
         lines.append(f"  {period}")
-        for (code, other), value in sorted(ledger.items()):
+        for (code, other, statement), value in sorted(
+            ledger.items(), key=lambda kv: (kv[0][1], kv[0][0], kv[0][2].value)
+        ):
             if other != period:
                 continue
             shown = "(absent)" if value.value is None else f"{value.value:,}"
             flag = "" if value.approved else "  [mapping unapproved]"
-            lines.append(f"    {code:34} {shown:>16}{flag}")
+            lines.append(f"    {code:30} {statement.value:9} {shown:>16}{flag}")
     return "\n".join(lines)

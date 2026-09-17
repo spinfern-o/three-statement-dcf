@@ -22,6 +22,21 @@ an empty cell is `BLANK_CELL` and goes to review; a cell absent from the table
 entirely creates nothing to review. One value present and another empty is the
 first case, and the empty one becomes a fact with `BLANK_CELL`.
 
+**A row label is read from the page, not stitched from cells.** A wide
+statement title can put a column boundary in the middle of the label column,
+and then "Net cash provided by operating activities" arrives as two cells:
+`"Net cash provided by oper"` and `"ating activities"`. Taking column 0 alone
+truncates it silently -- the number is still right, the label is still
+plausible, and the mapping proposal quietly fails to match.
+
+Stitching the fragments does not work either, and the reason is worth
+recording. The table extractor strips each cell, so a split landing on a space
+("Purchases of property and" + "equipment") loses it, while a split landing
+mid-word ("Depreciation and amortiza" + "tion") must NOT gain one. Neither
+join is right for both. So the label is re-read from the page over the
+rectangle the label columns occupy, which is the text as printed, spaces and
+all.
+
 **Every fact inherits the document's unconfirmed metadata as blocking codes.**
 `SCALE_UNCONFIRMED` and `CURRENCY_UNCONFIRMED` sit on every fact until a
 reviewer confirms those fields (10.11-10.13). A fact extracted from a document
@@ -145,18 +160,23 @@ def _build_table(page, table, document_id: str, profile: PageProfile, order: int
 
     header_row = _find_header_row(rows)
     repeated = _repeated_headers(rows, header_row)
+    row_labels = _read_row_labels(page, table, rows, header_row)
     box = BoundingBox.from_parser(table.bbox)
     # The caption is whatever names this table: text printed above it, plus any
     # rows the text strategy swept in above the header. A statement title sits
     # close enough to the first column that it usually lands inside the table's
     # own bounding box, so looking only above it finds nothing.
     above = _caption_for(page, box)
+    # Join a row's cells with nothing, for the same reason labels are: a title
+    # split by a spurious column boundary is one text run, and "CONSOLIDATED
+    # STA" + "TEMENTS OF CASH FLOWS" is only the caption it should be when the
+    # pieces are put back without a separator between them.
     inside = " | ".join(
-        " ".join((cell or "").split())
+        stitched
         for index, row in enumerate(rows)
         if header_row is not None and index < header_row
-        for cell in row
-        if (cell or "").strip()
+        for stitched in [" ".join("".join(cell or "" for cell in row).split())]
+        if stitched
     )
     caption = " | ".join(part for part in (above, inside) if part)
 
@@ -170,7 +190,36 @@ def _build_table(page, table, document_id: str, profile: PageProfile, order: int
         header_row=header_row,
         repeated_header_rows=repeated,
         caption=caption or f"(no caption above table {order + 1})",
+        row_labels=row_labels,
     )
+
+
+def _read_row_labels(page, table, rows, header_row) -> tuple[str, ...]:
+    """Re-read each row's label from the page over its label columns."""
+    first_value = _first_value_column(rows, header_row)
+    labels: list[str] = []
+    for index in range(len(rows)):
+        geometry = table.rows[index].cells if index < len(table.rows) else []
+        boxes = [box for box in geometry[:first_value] if box]
+        if not boxes:
+            labels.append("")
+            continue
+        rect = pymupdf.Rect(
+            min(b[0] for b in boxes), min(b[1] for b in boxes),
+            max(b[2] for b in boxes), max(b[3] for b in boxes),
+        )
+        labels.append(" ".join(page.get_textbox(rect).split()))
+    return tuple(labels)
+
+
+def _first_value_column(rows, header_row) -> int:
+    """The leftmost column whose header is a period. Everything left is label."""
+    if header_row is None or header_row >= len(rows):
+        return 1
+    for column, cell in enumerate(rows[header_row]):
+        if column and normalize_period_label(cell or "")[0]:
+            return column
+    return 1
 
 
 def _find_header_row(rows) -> int | None:
@@ -244,8 +293,7 @@ def build_facts(
         for row in range(table.header_row + 1, table.row_count):
             if row in table.repeated_header_rows:
                 continue
-            label_cell = table.cell(row, 0)
-            label = label_cell.text if label_cell else ""
+            label, label_box = _row_label(table, row, headers)
             value_cells = {c: table.cell(row, c) for c in headers}
             if all(cell is None or not cell.text for cell in value_cells.values()):
                 continue  # a section heading, not a line with missing values
@@ -258,7 +306,7 @@ def build_facts(
                     table=table,
                     cell=cell,
                     label=label,
-                    label_box=label_cell.bounding_box if label_cell else cell.bounding_box,
+                    label_box=label_box or cell.bounding_box,
                     period=period,
                     mixes_basis=mixes_basis,
                     scope=scope,
@@ -272,6 +320,24 @@ def build_facts(
                 facts.append(fact)
 
     return tuple(locations), tuple(facts)
+
+
+def _row_label(table: RawTable, row: int, headers: dict) -> "tuple[str, BoundingBox | None]":
+    """The label read from the page, and the box the label columns occupy."""
+    first_value_column = min(headers) if headers else 1
+    label = table.row_labels[row] if row < len(table.row_labels) else ""
+    boxes = []
+    for column in range(first_value_column):
+        cell = table.cell(row, column)
+        if cell is not None:
+            boxes.append(cell.bounding_box)
+    if not boxes:
+        return label, None
+    box = BoundingBox(
+        x0=min(b.x0 for b in boxes), y0=min(b.y0 for b in boxes),
+        x1=max(b.x1 for b in boxes), y1=max(b.y1 for b in boxes),
+    )
+    return label, box
 
 
 def _column_periods(table: RawTable) -> dict[int, tuple[str, bool]]:

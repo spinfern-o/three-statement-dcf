@@ -598,6 +598,56 @@ engine's derivation and checks, which is why it is not folded into Phase 5.
 It should be done before the system is pointed at a filing with material
 goodwill, leases, or minority interests.
 
+
+### F-18 — RESOLVED in Phase 6. The extractor was truncating long row labels
+
+A wide statement title puts a column boundary in the middle of the label
+column, and the table extractor then returns a row's label as two cells:
+`"Net cash provided by oper"` and `"ating activities"`. Phase 3 took column
+zero and stopped.
+
+**The failure was silent, which is what makes it worth recording.** The number
+was right. The label was plausible. Nothing raised a reason code. What
+happened instead was that the mapping proposer stopped recognising the line,
+so the reviewer saw "no rule recognises 'Net cash provided by oper'" and would
+reasonably have mapped it by hand — never learning that a quarter of the label
+was missing from the citation, which is the thing that makes the figure
+checkable later.
+
+Two obvious fixes are both wrong, and the reason is worth keeping:
+
+- **Join the fragments with nothing.** Correct for a split landing mid-word
+  (`"amortiza" + "tion"`), wrong for one landing on a space, because the
+  extractor strips each cell and the space is already gone:
+  `"Purchases of property and" + "equipment"`.
+- **Join them with a space.** Exactly the opposite pair of outcomes.
+
+The label is now re-read from the page over the rectangle the label columns
+occupy, which has the text as printed, spaces and all. Found by Phase 6: the
+cash-flow lines it produced would not map, and the checks that depend on them
+could only skip.
+
+### F-19 — RESOLVED in Phase 6. `normalize()` summed net income across statements
+
+`net_income` is the one canonical code on two statements: the income statement
+defines it and the cash flow statement restates it as its opening line. Phase
+5 keyed the normalized ledger on `(code, period)` and **summed** the
+contributions, so any filing presenting a cash flow statement would have had
+its net income doubled.
+
+It was invisible because the only fixture available in Phase 5 had no cash
+flow statement. That is the general shape of the thing: a fixture that cannot
+exercise a path also cannot fail on it, and the test suite reported 534 green
+while this sat in the middle of the mapping stage.
+
+The key is now `(code, period, statement)`. Thirty-nine of the forty codes are
+unaffected. Two consequences worth noting:
+
+- The **net-income linkage check became real.** Before, it compared one figure
+  with itself and could not fail — a check that cannot fail is not one.
+- The Phase 6 fixture (`three_statements.pdf`) ties across all three
+  statements deliberately, so a check that passes is passing on evidence.
+
 ---
 
 ---
@@ -632,6 +682,25 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 6 (items 59–68) is built**, in
+[`apps/api/app/statements/`](../apps/api/app/statements), and with it **the two
+halves of this repository are joined**. Until Phase 6 they agreed and did not
+touch: `model/` built statements from YAML a human typed, `apps/api/` read a
+PDF into verified, mapped facts.
+[`build.py`](../apps/api/app/statements/build.py) takes the second and produces
+the first — real `model.statements.Ledger` objects whose every cell carries a
+`Figure` with the page it was printed on — and
+[`export.py`](../apps/api/app/statements/export.py) writes the two files
+`run_model.py` reads.
+
+The end-to-end test runs the engine's CLI on the exported files and asserts it
+**halts** with `MODEL HALTED ... required by STEP 16`. That is the right
+outcome: the historical half came from the filing, and the forecast half still
+needs a human, because a beta and a risk-free rate are not lines in a document.
+
+Phase 6 also found two bugs in the phases beneath it — F-18 and F-19 — both
+silent, both invisible to the fixtures that existed at the time.
 
 **Phase 5 (items 50–58) is built**, in
 [`apps/api/app/mapping/`](../apps/api/app/mapping): the canonical chart with a

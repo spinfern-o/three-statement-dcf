@@ -294,6 +294,7 @@ def _table(data: dict) -> RawTable:
         repeated_header_rows=tuple(data["repeated_header_rows"]),
         caption=data["caption"],
         split_across_pages=data["split_across_pages"],
+        row_labels=tuple(data.get("row_labels", ())),
     )
 
 

@@ -8,7 +8,7 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–5 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–6 of 17** |
 
 ## Status, stated plainly
 
@@ -23,16 +23,26 @@ Two documents govern this repository, and they are different things:
    text and table extraction with page geometry, metadata detection in the
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
-3. **The source-review room and mapping review** (`review_server.py`) —
-   specification Phases 4 and 5, items 39–58. A browser interface showing the
-   PDF page beside the values read from it, with every extracted number boxed
-   on the page it came from; accept / correct / reject actions that each
-   require a written reason; and a mapping screen that carries each reported
-   line onto a canonical chart of accounts, with human approval, split and
-   combine, double-count prevention and subtotal reconciliation.
+3. **The review and mapping application** (`review_server.py`) —
+   specification Phases 4, 5 and 6, items 39–68. A browser interface showing
+   the PDF page beside the values read from it, with every extracted number
+   boxed on the page it came from; accept / correct / reject actions that each
+   require a written reason; a mapping screen that carries each reported line
+   onto a canonical chart of accounts, with human approval, split and combine,
+   double-count prevention and subtotal reconciliation; and the three
+   historical statements it all produces, every cell tracing back to the page
+   it was printed on.
 
-534 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
-suite driven through a real browser. All arithmetic is exact decimal.
+**The two halves are joined.** Phase 6 turns a verified, mapped document into
+the engine's own `Ledger` objects and writes the two YAML files `run_model.py`
+reads. Run the engine on them and it loads the filing's history and then halts
+on `tax.source is required by STEP 16` — which is the right outcome: the
+history came from the document, and the forecast assumptions still need a
+person, because a beta and a risk-free rate are not lines in a filing.
+
+570 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+suite driven through a real browser, and a golden historical model asserting
+every cell of all three statements. All arithmetic is exact decimal.
 
 **Facts can now reach `VERIFIED`.** Verification is a seven-part conjunction
 (`docs/source-policy.md` §9) whose seventh condition is a human-approved
@@ -41,12 +51,11 @@ there was no mapping stage; Phase 5 built one. The application still evaluates
 all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
 
-**What does not exist yet:** most of the website. No database, no exports, no
-dashboard, no forecast or valuation screens. And the last mile is still open —
-**a verified, mapped document does not yet become an engine input.** The
-normalized ledger exists on screen; writing it into the YAML `run_model.py`
-consumes is the next piece of work, and it is small compared with everything
-that had to be true before it was worth doing.
+**What does not exist yet:** the rest of the website. No database, no
+schedules, no formula engine, no assumption or forecast screens, no DCF
+screen, no dashboard, no exports. Phases 7 to 17 of the specification, in
+other words — all of them presentations of, or projections from, numbers this
+stage now certifies.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
 1.15 and 4.4 prohibit binary floating point here, so the engine runs on
@@ -323,6 +332,17 @@ Normalization and mapping (specification Phase 5, items 50–58):
 | `apps/api/app/mapping/normalized.py` | — | What the approved mappings produce, sparse and unplugged |
 | `apps/api/app/api/templates/mapping.html` | 52 | The 7.4 review table |
 
+Historical statements (specification Phase 6, items 59–68):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/statements/build.py` | 59–61 | **The join.** Approved mappings become the engine's own `Ledger`, every cell citing its page |
+| `apps/api/app/statements/checks.py` | 66, 67 | The historical identities; a difference is reported, never plugged |
+| `apps/api/app/statements/views.py` | 62–64 | Reported and normalized, common-size, growth, and why there is no equity statement |
+| `apps/api/app/statements/reported.py` | 63, 65 | What the filing printed, and the drill-down behind each cell |
+| `apps/api/app/statements/export.py` | — | The two YAML files `run_model.py` reads |
+| `apps/api/app/api/templates/statements.html` | 65 | The 7.5 screen |
+
 Documentation:
 
 | Path | What it is |
@@ -408,6 +428,13 @@ And in the review suite:
   a split that loses three units is refused, a mapping that would double-count
   cannot be approved, and a finding raised against a wrong mapping does not
   survive the mapping being fixed.
+- `apps/api/tests/integration/test_statements.py` — the golden historical
+  model: every cell of all three statements, exact, built from a PDF. Plus the
+  tests that keep the checks honest — a corrupted total makes the balance
+  check FAIL rather than plugging, a corrupted subtotal breaks the cash
+  roll-forward, and the net-income linkage fails when the two statements
+  disagree. The last of those matters most: before Phase 6 that check compared
+  one figure with itself and could not fail.
 - `apps/api/tests/unit/test_chart.py` — asserts the canonical chart and
   `model/accounts.py` cannot drift apart, and that the chart's expected-sign
   and working-capital tags agree with the conventions the engine states in
@@ -427,13 +454,16 @@ It is labeled `FICTIONAL` in every file and is not derived from any filing.
 
 ## Scope
 
-The workflow starts at STEP 1 with a PDF already in hand. `ingest_pdf.py`
-reads that PDF and the mapping screen carries its lines onto the canonical
-chart, so the two halves now meet — but they are not yet **joined**. The
-normalized ledger exists as data and on screen; nothing writes it into the
-YAML `run_model.py` consumes, so STEP 4 transcription is still manual. That
-last step is small, and it was not worth building before a fact could be
-verified and a subtotal could be checked.
+The workflow starts at STEP 1 with a PDF already in hand, and the system now
+carries it from there to the engine's input files: extracted, reviewed,
+mapped, approved, checked, exported. STEP 4 transcription is no longer manual
+for a text-native filing.
+
+What it does not do is the forecast. `assumptions.yaml` and `valuation.yaml`
+are deliberately not written by the export — a beta, a risk-free rate and a
+terminal growth rate are facts about a market on a date, not lines in a
+document, and the engine refusing to run without them is the behaviour this
+repository exists to have.
 
 OCR is deliberately out of scope (decision 2.3.c). A scanned page refuses the
 document rather than being read badly — see finding F-11, which proposes

@@ -30,7 +30,7 @@ from model.numeric import D, relative_error
 
 from ..extraction.reasons import ReasonCode
 from ..extraction.records import ExtractionResult
-from .chart import in_sum_relationship, line_item
+from .chart import StatementType, in_sum_relationship, line_item
 from .normalized import normalize, statement_of_fact
 from .sets import MappingSet, MappingType
 
@@ -169,19 +169,24 @@ def subtotal_reconciliation(
     findings: list[Finding] = []
 
     for code, (plus, minus) in accounts.DERIVED.items():
-        for period in sorted({p for _, p in ledger}):
-            reported = ledger.get((code, period))
+        # The subtotal's own statement governs the whole derivation. Deriving
+        # operating cash flow uses the cash flow statement's net income;
+        # deriving net income uses the income statement's. Same code, two
+        # printings, and picking the wrong one compares a figure to itself.
+        statement = _derivation_statement(code)
+        for period in sorted({key[1] for key in ledger}):
+            reported = ledger.get((code, period, statement))
             if reported is None or reported.value is None:
                 continue  # nothing reported: 11.7's target is absent, not failed
 
             terms: list[Decimal] = []
             missing: list[str] = []
             for component in plus:
-                value = _term(ledger, component, period, missing)
+                value = _term(ledger, component, period, statement, missing)
                 if value is not None:
                     terms.append(value)
             for component in minus:
-                value = _term(ledger, component, period, missing)
+                value = _term(ledger, component, period, statement, missing)
                 if value is not None:
                     terms.append(-value)
             if missing:
@@ -209,7 +214,7 @@ def subtotal_reconciliation(
                     + tuple(
                         fid
                         for component in plus + minus
-                        for fid in _contributors(ledger, component, period)
+                        for fid in _contributors(ledger, component, period, statement)
                     ),
                     expected=derived,
                     actual=reported.value,
@@ -218,8 +223,15 @@ def subtotal_reconciliation(
     return tuple(findings)
 
 
-def _term(ledger, code: str, period: str, missing: list[str]) -> Decimal | None:
-    entry = ledger.get((code, period))
+def _derivation_statement(code: str) -> StatementType:
+    """Where a subtotal's derivation is defined. `net_income` is the income
+    statement's, even though it is also printed on the cash flow statement."""
+    types = line_item(code).statement_types
+    return types[0] if len(types) == 1 else StatementType.INCOME
+
+
+def _term(ledger, code: str, period: str, statement, missing: list[str]) -> Decimal | None:
+    entry = ledger.get((code, period, statement))
     if entry is None or entry.value is None:
         if code not in accounts.OPTIONAL_IN_DERIVATION:
             missing.append(code)
@@ -227,8 +239,8 @@ def _term(ledger, code: str, period: str, missing: list[str]) -> Decimal | None:
     return entry.value
 
 
-def _contributors(ledger, code: str, period: str) -> tuple[str, ...]:
-    entry = ledger.get((code, period))
+def _contributors(ledger, code: str, period: str, statement) -> tuple[str, ...]:
+    entry = ledger.get((code, period, statement))
     return entry.contributors if entry else ()
 
 
@@ -256,15 +268,18 @@ def cross_statement_reconciliation(
     ledger = normalize(result, mapping_set)
     findings: list[Finding] = []
 
-    findings.extend(_net_income_linkage(result, mapping_set, tol))
+    findings.extend(_net_income_linkage(ledger, tol))
 
-    years = sorted(p for p in {p for _, p in ledger} if _YEAR.match(p))
+    years = sorted(p for p in {key[1] for key in ledger} if _YEAR.match(p))
     for earlier, later in zip(years, years[1:]):
         if int(later) != int(earlier) + 1:
             continue
-        opening = ledger.get((accounts.CASH, earlier))
-        closing = ledger.get((accounts.CASH, later))
-        flows = [ledger.get((code, later)) for code in (accounts.CFO, accounts.CFI, accounts.CFF)]
+        opening = ledger.get((accounts.CASH, earlier, StatementType.BALANCE))
+        closing = ledger.get((accounts.CASH, later, StatementType.BALANCE))
+        flows = [
+            ledger.get((code, later, StatementType.CASHFLOW))
+            for code in (accounts.CFO, accounts.CFI, accounts.CFF)
+        ]
         if opening is None or closing is None or any(f is None for f in flows):
             continue
         if opening.value is None or closing.value is None or any(f.value is None for f in flows):
@@ -294,28 +309,23 @@ def cross_statement_reconciliation(
     return tuple(findings)
 
 
-def _net_income_linkage(result, mapping_set, tol) -> list[Finding]:
-    facts = {f.id: f for f in result.facts}
-    by_period: dict[str, dict] = {}
-    for mapping in mapping_set.mappings:
-        if mapping.canonical_code != accounts.NET_INCOME or not mapping.contributes:
-            continue
-        fact = facts.get(mapping.reported_fact_id)
-        if fact is None or fact.value is None:
-            continue
-        statement = statement_of_fact(result, fact)
-        if statement is None:
-            continue
-        by_period.setdefault(fact.period_label, {}).setdefault(statement, []).append(fact)
+def _net_income_linkage(ledger, tol) -> list[Finding]:
+    """The same figure printed on two statements. They should agree.
 
+    This compares the income statement's net income against the cash flow
+    statement's. It is meaningful only because `normalize` keys on the
+    statement: grouping them would have made this a comparison of a figure
+    with itself, which is a check that cannot fail and therefore is not one.
+    """
     findings: list[Finding] = []
-    for period, statements in by_period.items():
-        if len(statements) < 2:
+    for period in sorted({key[1] for key in ledger}):
+        on_income = ledger.get((accounts.NET_INCOME, period, StatementType.INCOME))
+        on_cashflow = ledger.get((accounts.NET_INCOME, period, StatementType.CASHFLOW))
+        if on_income is None or on_cashflow is None:
             continue
-        values = {s: sum(f.value for f in group) for s, group in statements.items()}
-        pairs = sorted(values.items(), key=lambda kv: kv[0].value)
-        (first_statement, first), (second_statement, second) = pairs[0], pairs[1]
-        if tol.close(first, second):
+        if on_income.value is None or on_cashflow.value is None:
+            continue
+        if tol.close(on_income.value, on_cashflow.value):
             continue
         findings.append(
             Finding(
@@ -323,16 +333,14 @@ def _net_income_linkage(result, mapping_set, tol) -> list[Finding]:
                 canonical_code=accounts.NET_INCOME,
                 period_label=period,
                 message=(
-                    f"net income is {first:,} on the {first_statement.value} statement "
-                    f"and {second:,} on the {second_statement.value} statement for "
-                    f"{period}. The same figure is printed twice and the two "
+                    f"net income is {on_income.value:,} on the income statement and "
+                    f"{on_cashflow.value:,} at the top of the cash flow statement "
+                    f"for {period}. The same figure is printed twice and the two "
                     f"readings disagree."
                 ),
-                fact_ids=tuple(
-                    f.id for group in statements.values() for f in group
-                ),
-                expected=first,
-                actual=second,
+                fact_ids=on_income.contributors + on_cashflow.contributors,
+                expected=on_income.value,
+                actual=on_cashflow.value,
             )
         )
     return findings
