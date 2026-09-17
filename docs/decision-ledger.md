@@ -271,7 +271,7 @@ proposal, so item 137 is blocked until the owner confirms the mapping.
 This is not a Section 2 decision — it is a gap in Section 17 — so it is
 recorded here rather than in the tables above.
 
-### F-5 — Section 9 references a Scenario entity it never defines
+### F-5 — RESOLVED BY DESIGN in Phase 9. Section 9 referenced a Scenario entity it never defined
 
 `Assumption.scenario_id` (9.10) and `CalculatedValue.scenario_id` (9.12) are
 required fields, and `ValidationResult.scenario_id_optional` (9.13) references
@@ -286,8 +286,27 @@ Section 9 also has nowhere to record the engine's `assumptions.Conflict`
 and rationale. The nearest Section 9 fit is a pair of `Assumption` rows plus an
 `AuditEvent`, which loses the structure that makes the conflict legible.
 
-Neither is answerable by inference. Both need the owner, or an amendment to
-Section 9.
+**Phase 9 designed the entity, because item 92 requires it.** The
+specification constrains its behaviour in four places and its schema in none,
+so `apps/api/app/assumptions/scenarios.py` is built from the behaviour and
+every choice is listed here for the owner to overrule:
+
+| Choice | Why | Where the specification says so |
+|---|---|---|
+| A scenario is a set of **overrides over a parent**, not a copy | 14.7 asks that a copied scenario retain inherited lineage. Copying values makes the child's provenance a snapshot that goes stale the moment the parent is corrected | 14.7 |
+| Exactly one root, `base`, with no parent | Every variant is a variant **of** something; without a root, "differs from its parent" has no meaning for the first scenario | 14.6, 14.7 |
+| Nearer scenario wins, and the parent's value stays reachable | What makes an override legible as an override rather than as a different number | 14.7 |
+| A variant with **no differences from its parent is refused** | An Upside identical to Base is a label, not a case | 14.6 |
+| A name asserting likelihood is **refused** unless a sourced probability is attached | This system models no distribution, so the claim would be unsupported | 14.9, 1.19 |
+| Fields: `id`, `name`, `parent_id`, `description`, `created_by`, `created_at`, optional `probability` | Section 9's own conventions for the rows it does define | 9.8, 9.10 |
+
+**The `Conflict` half of this finding is still open.** Section 9 still has
+nowhere to record two dated sources that disagree with an explicit choice and
+rationale, and `model/assumptions.py:Conflict` still has no Section 9 row.
+Phase 9 did not need it -- the assumptions it stores each have one source --
+but the moment two do, the nearest Section 9 fit is a pair of `Assumption`
+rows plus an `AuditEvent`, which loses the structure that makes the conflict
+legible. That remains an owner decision or a Section 9 amendment.
 
 ### F-6 — RESOLVED in #7. `--rel-tol` / `--abs-tol` crashed with an unhandled traceback
 
@@ -719,6 +738,31 @@ wrong page.
 
 ---
 
+### F-22 — RESOLVED in Phase 9. A division by zero was classed as a formula
+defect when 4.12 calls it a data state
+
+Phase 8's `calculate(strict=False)` tolerated a missing input and re-raised a
+division by zero. The reasoning written into the code was that a missing input
+is a fact about the filing while a division by zero is a fact about the
+formula, and it is wrong: `gross_profit / revenue` is a correct formula, and a
+company with no revenue has no gross margin. 4.12 says so directly — a
+relative measure against a zero expected value is **undefined**, which is a
+state a figure can legitimately be in.
+
+Found by building 14.8's impact preview, where it matters most. A reviewer
+asking "what would this do?" about a change that drives revenue to zero wants
+the answer "the gross margin becomes undefined". Under the old rule the
+preview raised instead, so the one case where the preview is most worth having
+was the one case it could not render.
+
+The rule is now: a missing input and a division by zero are both data states —
+reported with their reason when gaps are tolerated, refused when they are not,
+because an export must not move on a figure nobody has. A **unit error** stays
+a defect and is raised either way, because no data makes `revenue * revenue`
+mean something.
+
+---
+
 ## Work that is NOT blocked
 
 Buildable now, because it depends on no OPEN decision:
@@ -749,6 +793,69 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 9 (items 89-96) is built**, in
+[`apps/api/app/assumptions/`](../apps/api/app/assumptions): Section 14's
+assumption system, with the Scenario entity Section 9 references and never
+defines (see **F-5**, now resolved by design).
+
+**14.4 lists ten things every assumption must contain, and the engine's own
+`Assumption` carries four.** Name, value, a three-way basis and a source
+string is enough for a model run by the person who built it, and not enough
+for one somebody else has to review. The record here is a superset, and
+`engine_basis` narrows it back down so there is still exactly one place a
+number enters the forecast.
+
+**The evidence rules are the part worth reviewing.** Taken literally, 14.4.f
+and 14.4.g are two more string fields, and an assumption citing "the 10-K"
+with no page satisfies them. It should not -- STEP 2 makes the page the unit
+of evidence, and Phase 3 already refuses a fact without a location. So the
+requirement is per source type: a company filing needs a document AND a page;
+external market data needs a URL AND an observation date, because a beta is a
+fact about a date; a historical driver must name the periods it was measured
+over, because a DSO of 59.9 days means nothing without saying 59.9 days of
+which year.
+
+**Self-review is recorded, not refused.** 14.4.i wants an owner and a
+reviewer. This system is single-user, so requiring them to differ would block
+every approval and invite a made-up second name. Both are required, they may
+be the same person, and the gate reports how many approvals rest on it.
+
+**14.1 needed a definition of "required", and the only authoritative one is
+the engine.** `model/forecast.py` reads a structural driver through
+`assumptions.get`, which raises when it is absent, and a discretionary one
+through `_optional`, which defaults to zero because zero is the meaningful
+"this did not happen" value for a buyback. `drivers.py` is a reading of that,
+and two tests keep it one -- including one that greps `model/forecast.py` for
+`assumptions.get` calls the table does not carry, because a gate that misses
+one passes a model that then halts.
+
+That test earned its place immediately: **`tax_rate` was missing from the
+table**, because the engine takes it through `TaxSchedule` from
+`valuation.yaml` rather than through the assumptions register. It is the one
+required driver on a different route, and without it the gate would have said
+a forecast could calculate when running it halts on `tax.source is required by
+STEP 16`.
+
+**7.7.a is the join with Phase 7.** The historical driver analysis is not
+recomputed here: DSO, inventory days, DPO, the implied interest rate on
+BEGINNING debt (the basis the forecast charges on), the effective tax rate and
+depreciation on opening PP&E all come out of the Section 13 schedules, with
+`measured_over` already filled in -- which is exactly the field a hand-entered
+historical driver gets left blank. Every one arrives as a **Draft**, because a
+proposal that arrived Approved would make STEP 14's assumption -- that every
+driver stays where it was -- for all of them at once, silently.
+
+**The preview truthfully reports that nothing moves, and says why.** 14.8 asks
+that a change show every affected output *before saving*, and the
+implementation does exactly that on a copy. But the formula registry currently
+holds only the historical derivation family; the forecast formulas are still
+Python in `model/forecast.py` and become registry entries in Phase 10. So a
+forecast driver reaches nothing yet, and the screen says so rather than
+rendering an empty table as though it had looked.
+
+Phase 9 found one defect in Phase 8 -- **F-22**, a division by zero classed as
+a formula defect when 4.12 names it a data state.
 
 **Phase 8 (items 78-88) is built**, in
 [`apps/api/app/formula/`](../apps/api/app/formula): the formula engine of

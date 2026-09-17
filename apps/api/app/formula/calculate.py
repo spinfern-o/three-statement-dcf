@@ -25,7 +25,8 @@ A cell whose inputs are not all available is not computed and is not zero.
 With `strict=True` that is an error, because an export must not move on a
 value nobody has; with `strict=False` it is recorded in `unavailable` with the
 reason, and treated as absent for everything downstream. That is the same
-distinction `statements/build.py` draws, for the same reason.
+distinction `statements/build.py` draws, for the same reason. A division by
+zero is handled the same way and for the same reason -- see `_compute`.
 """
 
 from __future__ import annotations
@@ -33,7 +34,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from .evaluate import Environment, Evaluation, EvaluationError, MissingInput, evaluate
+from .evaluate import (
+    DivisionByZeroRefused,
+    Environment,
+    Evaluation,
+    EvaluationError,
+    MissingInput,
+    evaluate,
+)
 from .graph import DependencyGraph
 from .registry import FormulaDefinition, FormulaSet, calculation_fingerprint
 from .units import UnitError
@@ -128,18 +136,29 @@ def _compute(
     environment: Environment,
     strict: bool,
 ) -> "tuple[CalculatedCell | None, str]":
-    """Evaluate one definition, or say why it could not be."""
+    """Evaluate one definition, or say why it could not be.
+
+    Two kinds of failure, and the difference matters.
+
+    A **missing input** and a **division by zero** are facts about the data.
+    4.12 says outright that a relative measure against a zero expected value is
+    *undefined*, which is a legitimate state for a figure to be in, not a
+    defect in the formula that found it: `gross_profit / revenue` is a correct
+    formula and a company with no revenue has no gross margin. Not strict, both
+    are recorded with their reason; strict, both refuse, because an export must
+    not move on a figure nobody has.
+
+    A **unit error** is a fact about the formula. No data makes
+    `revenue * revenue` mean something, and tolerating it would hide a defect
+    rather than report a gap -- so it is raised either way.
+    """
     try:
         evaluation = evaluate(definition.tree, environment, definition.unit)
-    except MissingInput as exc:
+    except (MissingInput, DivisionByZeroRefused) as exc:
         if strict:
             raise
         return None, str(exc).split(". ")[0]
     except (EvaluationError, UnitError):
-        # A unit error or a division by zero is never tolerated, strict or
-        # not. A missing input is a fact about the filing; these two are
-        # facts about the formula, and a screen that quietly omitted them
-        # would hide a defect rather than a gap.
         raise
     return (
         CalculatedCell(

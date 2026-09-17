@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}Assumptions &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Assumptions &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% macro region(label) -%}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="{{ label }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Assumptions</h1>
+
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="notice notice-ok" role="status">{{ ok }}</div>{% endif %}
+
+  <p class="muted">
+    Every driver the forecast reads, whether or not anyone has entered it.
+    14.5 and 7.7.e are the same requirement read twice: an assumption that is
+    not on this screen is hidden, whether it is hidden inside a formula or
+    inside an absence.
+    <a href="/documents/{{ document.id }}/schedules">Supporting schedules</a> &middot;
+    <a href="/documents/{{ document.id }}/statements">Historical statements</a>
+  </p>
+
+  {% if blocked %}
+  <div class="card">
+    <h2>Nothing to show yet</h2>
+    <p class="muted">{{ blocked }}</p>
+  </div>
+  {% else %}
+
+  {# --- 14.1: may the forecast calculate? ------------------------------- #}
+  <section class="card" aria-labelledby="gate-heading">
+    <h2 id="gate-heading">May the forecast calculate? (14.1)</h2>
+    <p>
+      {% if gate.may_calculate %}
+      <span class="badge badge-success">yes</span>
+      {% else %}
+      <span class="badge badge-danger">no</span>
+      {% endif %}
+      {{ gate.describe() }}
+    </p>
+    <p class="small muted">
+      Read literally, 14.1 is satisfied by any status at all. Read as it is
+      meant, Draft, Needs Source and Rejected are not answers &mdash; so the
+      gate asks whether every required driver has one, for every forecast
+      period.
+    </p>
+  </section>
+
+  {# --- 7.7.d: scenarios ------------------------------------------------ #}
+  <section class="card" aria-labelledby="scenarios-heading">
+    <h2 id="scenarios-heading">Scenarios (7.7.d, 14.6&ndash;14.9)</h2>
+    {% call region("Scenarios") %}
+    <table>
+      <caption>Each scenario, what it holds of its own, and what it inherits</caption>
+      <thead>
+        <tr><th scope="col">Scenario</th><th scope="col">Varies</th>
+          <th scope="col" class="num">Own</th><th scope="col" class="num">Resolved</th>
+          <th scope="col">Differences from its parent (14.6)</th></tr>
+      </thead>
+      <tbody>
+        {% for row in scenario_rows %}
+        <tr>
+          <th scope="row">
+            {{ row.name }}
+            <div class="small muted">{{ row.scenario_id }}
+              {% if row.probability %}&middot; p = {{ row.probability }}{% endif %}</div>
+          </th>
+          <td class="small">{{ row.lineage | join(' &larr; ') | safe }}</td>
+          <td class="num">{{ row.own }}</td>
+          <td class="num">{{ row.resolved }}</td>
+          <td class="small">
+            {% if row.problem %}
+              <span class="badge badge-warning">no differences</span> {{ row.problem }}
+            {% elif not row.differences %}
+              <span class="muted">&mdash;</span>
+            {% else %}
+              {% for code, before, after in row.differences %}
+              <div><code>{{ code }}</code>:
+                {% if before is none %}<span class="muted">not in the parent</span>
+                {% else %}{{ before }}{% endif %} &rarr; {{ after }}</div>
+              {% endfor %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    <p class="small muted">
+      14.9: a scenario name may not imply probability unless the probability is
+      explicitly modelled and sourced. This system models no distribution, so
+      &ldquo;likely&rdquo;, &ldquo;expected&rdquo; and percentile shorthand are
+      refused at the point a scenario is named.
+    </p>
+  </section>
+
+  {# --- 7.7.b, 7.7.c: the required drivers ------------------------------ #}
+  <section class="card" aria-labelledby="required-heading">
+    <h2 id="required-heading">Required drivers, scenario <code>{{ scenario_id }}</code></h2>
+    {% call region("Required forecast drivers") %}
+    <table>
+      <caption>
+        {{ satisfied_count }} of {{ required_rows | length }} required drivers have an answer
+      </caption>
+      <thead>
+        <tr><th scope="col">Driver</th><th scope="col">Step</th>
+          <th scope="col" class="num">Value</th><th scope="col">Unit</th>
+          <th scope="col">Source and evidence (7.7.c)</th>
+          <th scope="col">Standing</th><th scope="col">Change status</th></tr>
+      </thead>
+      <tbody>
+        {% for row in required_rows %}
+        <tr>
+          <th scope="row">
+            {{ row.choice }}
+            {% if row.note %}<div class="small muted">{{ row.note }}</div>{% endif %}
+          </th>
+          <td class="small">{{ row.step }}</td>
+          <td class="num">
+            {% if row.assumption %}{{ row.assumption.value }}
+            {% else %}<span class="muted">&mdash;</span>{% endif %}
+          </td>
+          <td class="small">{{ row.unit }}</td>
+          <td class="small">
+            {% if row.assumption %}
+              <div>{{ row.standing.source_type }}</div>
+              <div class="muted">{{ row.standing.evidence }}</div>
+              <div class="muted">{{ row.assumption.rationale }}</div>
+              <div class="muted">owner {{ row.assumption.owner }},
+                reviewer {{ row.standing.reviewed_by }}</div>
+              {% if row.from_scenario != scenario_id %}
+              <div><span class="badge badge-neutral">inherited from {{ row.from_scenario }}</span></div>
+              {% endif %}
+            {% else %}
+              <span class="muted">nothing entered</span>
+            {% endif %}
+          </td>
+          <td class="small">
+            {% if row.problem %}
+              <span class="badge badge-danger">{{ row.problem }}</span>
+            {% else %}
+              <span class="badge badge-success">{{ row.standing.status }}</span>
+            {% endif %}
+            {% if row.standing %}
+              {% for concern in row.standing.concerns %}
+              <div><span class="badge badge-warning">{{ concern }}</span></div>
+              {% endfor %}
+            {% endif %}
+          </td>
+          <td>
+            {% if row.assumption and row.from_scenario == scenario_id %}
+            <form method="post"
+                  action="/documents/{{ document.id }}/assumptions/{{ row.assumption.code }}/status">
+              <input type="hidden" name="scenario_id" value="{{ scenario_id }}">
+              <label class="small" for="to-{{ row.assumption.code }}">New status</label>
+              <select id="to-{{ row.assumption.code }}" name="to">
+                {% for status in row.statuses %}
+                <option value="{{ status.value }}">{{ status.value }}</option>
+                {% endfor %}
+              </select>
+              <label class="small" for="reviewer-{{ row.assumption.code }}">Reviewer</label>
+              <input id="reviewer-{{ row.assumption.code }}" name="reviewer"
+                     value="{{ row.assumption.reviewer }}">
+              <label class="small" for="reason-{{ row.assumption.code }}">Reason</label>
+              <input id="reason-{{ row.assumption.code }}" name="reason" required>
+              <button type="submit">Change status</button>
+            </form>
+            {% else %}
+            <span class="muted small">&mdash;</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+  </section>
+
+  {# --- 7.7.a: historical driver analysis ------------------------------- #}
+  <section class="card" aria-labelledby="proposals-heading">
+    <h2 id="proposals-heading">Historical driver analysis (7.7.a)</h2>
+    <p class="small muted">
+      Measured by the Section 13 schedules, not re-derived here. Each arrives as
+      a <strong>Draft</strong>: a proposal that arrived Approved would make STEP
+      14&rsquo;s assumption &mdash; that every driver stays where it was &mdash;
+      for all of them at once, silently.
+    </p>
+    {% if not proposals %}
+    <p class="muted">No schedule on this filing can measure a forecast driver.</p>
+    {% else %}
+    {% call region("Historical driver proposals") %}
+    <table>
+      <caption>What the filing actually did, per driver</caption>
+      <thead>
+        <tr><th scope="col">Driver</th><th scope="col" class="num">Measured</th>
+          <th scope="col">Unit</th><th scope="col">Periods</th>
+          <th scope="col">What you are deciding</th><th scope="col">Accept</th></tr>
+      </thead>
+      <tbody>
+        {% for proposal in proposals %}
+        <tr>
+          <th scope="row">{{ proposal.assumption.name }}
+            <div class="small muted"><code>{{ proposal.assumption.code }}</code>
+              &middot; schedule {{ proposal.schedule }}</div></th>
+          <td class="num">{{ proposal.assumption.value }}</td>
+          <td class="small">{{ proposal.assumption.unit }}</td>
+          <td class="small">{{ proposal.assumption.evidence.measured_over | join(', ') }}</td>
+          <td class="small">{{ proposal.caution }}</td>
+          <td>
+            <form method="post" action="/documents/{{ document.id }}/assumptions/accept">
+              <input type="hidden" name="scenario_id" value="{{ scenario_id }}">
+              <input type="hidden" name="code" value="{{ proposal.assumption.code }}">
+              <button type="submit">Add as Draft</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    {% endif %}
+
+    {% if unmeasurable %}
+    <details>
+      <summary>{{ unmeasurable | length }} required driver(s) no schedule can measure</summary>
+      <p class="small muted">
+        Named rather than omitted. A driver missing from this screen is a driver
+        nobody decided (14.5).
+      </p>
+      <dl class="small">
+        {% for code, reason in unmeasurable.items() %}
+        <dt><code>{{ code }}</code></dt><dd>{{ reason }}</dd>
+        {% endfor %}
+      </dl>
+    </details>
+    {% endif %}
+  </section>
+
+  {# --- 14.8: preview before saving ------------------------------------- #}
+  <section class="card" aria-labelledby="preview-heading">
+    <h2 id="preview-heading">Preview a change before saving (14.8)</h2>
+    <p class="small muted">
+      Nothing is written. The change is calculated on a copy and discarded, so
+      closing this page leaves the model exactly as it is.
+    </p>
+    <p class="small muted">
+      The formula registry currently holds the historical derivations only
+      &mdash; the forecast formulas are still Python in
+      <code>model/forecast.py</code> and become registry entries in Phase 10.
+      Until then a forecast driver truthfully reaches nothing here, and the
+      preview says so rather than showing an empty table as though it had
+      looked.
+    </p>
+    <form method="post" action="/documents/{{ document.id }}/assumptions/preview">
+      <input type="hidden" name="scenario_id" value="{{ scenario_id }}">
+      <label for="preview-code">Driver</label>
+      <select id="preview-code" name="code">
+        {% for code in editable_codes %}
+        <option value="{{ code }}">{{ code }}</option>
+        {% endfor %}
+      </select>
+      <label for="preview-value">Proposed value</label>
+      <input id="preview-value" name="value" required
+             aria-describedby="preview-value-help">
+      <span id="preview-value-help" class="small muted">
+        A decimal, written as you would write it (4.2). Not a percentage sign.
+      </span>
+      <button type="submit">Show what would move</button>
+    </form>
+
+    {% if impact %}
+    <h3>{{ impact.describe() }}</h3>
+    {% if impact.moved %}
+    {% call region("Impact preview") %}
+    <table>
+      <caption>Outputs this change would move, before saving</caption>
+      <thead><tr><th scope="col">Output</th><th scope="col" class="num">Now</th>
+        <th scope="col" class="num">Would become</th>
+        <th scope="col" class="num">Change</th></tr></thead>
+      <tbody>
+        {% for moved in impact.moved %}
+        <tr>
+          <th scope="row">{{ moved.target }}</th>
+          <td class="num">{% if moved.before is none %}<span class="muted">&mdash;</span>
+            {% else %}{{ "{:,}".format(moved.before) }}{% endif %}</td>
+          <td class="num total">{% if moved.after is none %}<span class="muted">&mdash;</span>
+            {% else %}{{ "{:,}".format(moved.after) }}{% endif %}</td>
+          <td class="num">{% if moved.difference is none %}<span class="muted">&mdash;</span>
+            {% else %}{{ "{:,}".format(moved.difference) }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endcall %}
+    {% endif %}
+    {% if impact.unavailable %}
+    <p class="small"><span class="badge badge-warning">undefined after the change</span></p>
+    <ul class="small">
+      {% for target, reason in impact.unavailable.items() %}
+      <li><strong>{{ target }}</strong> &mdash; {{ reason }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% endif %}
+  </section>
+
+  {% endif %}
+</main>
+{% endblock %}

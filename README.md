@@ -24,7 +24,7 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4 to 8, items 39–88. A browser interface showing
+   specification Phases 4 to 9, items 39–96. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
@@ -33,8 +33,10 @@ Two documents govern this repository, and they are different things:
    historical statements it all produces, every cell tracing back to the page
    it was printed on; and the supporting schedules that explain how each
    balance moved, reconciled to the statement line each one claims to explain;
-   and a formula engine that recomputes every subtotal the filing prints, from
-   its own components, and shows the formula and the exact inputs it used.
+   a formula engine that recomputes every subtotal the filing prints, from its
+   own components, and shows the formula and the exact inputs it used; and the
+   assumption register, where every driver the forecast needs is listed whether
+   or not anyone has entered it.
 
 **The two halves are joined.** Phase 6 turns a verified, mapped document into
 the engine's own `Ledger` objects and writes the two YAML files `run_model.py`
@@ -59,7 +61,15 @@ fast path beside the parser. Formulas are versioned definitions, parsed into a
 dependency graph, checked for cycles *before* evaluation, evaluated exactly in
 `Decimal`, and unit-checked so a percent cannot be multiplied by a currency.
 
-762 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**An assumption must earn its status.** A company filing cited without a page
+is refused; a beta without the date it was observed is refused; a historical
+driver that does not say which periods it measured is refused. The historical
+drivers the Section 13 schedules measured are offered, already carrying their
+periods — and every one arrives as a **Draft**, because a proposal that
+arrived Approved would assume every driver stays where it was, for all of them
+at once, silently.
+
+863 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -74,9 +84,9 @@ there was no mapping stage; Phase 5 built one. The application still evaluates
 all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
 
-**What does not exist yet:** the rest of the website. No database, no
-assumption or forecast screens, no DCF screen, no dashboard, no exports.
-Phases 9 to 17 of the specification, in other words — all of them presentations of, or projections from, numbers this
+**What does not exist yet:** the rest of the website. No database, no forecast
+screens, no DCF screen, no dashboard, no exports. Phases 10 to 17 of the
+specification, in other words — all of them presentations of, or projections from, numbers this
 stage now certifies.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
@@ -390,6 +400,19 @@ Formula engine (specification Phase 8, items 78–88):
 | `apps/api/app/formula/calculate.py` | 85 | Recalculating only the affected descendants, keeping the prior model |
 | `apps/api/app/formula/catalog.py` | 87 | The derivation family, generated from `model/accounts.py` so the two cannot drift |
 | `apps/api/app/api/templates/formulas.html` | 86 | 18.10 and 18.11 as a screen: the formula, the inputs, and whether the filing's own arithmetic holds |
+
+Assumptions and scenarios (specification Phase 9, items 89–96):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/assumptions/schema.py` | 89, 91 | 14.4's ten fields, with evidence rules per source type |
+| `apps/api/app/assumptions/scenarios.py` | 92 | The Scenario entity Section 9 references and never defines (F-5), with lineage and 14.9's naming rule |
+| `apps/api/app/assumptions/drivers.py` | 96 | What the forecast actually requires, read out of `model/forecast.py` |
+| `apps/api/app/assumptions/workflow.py` | 95 | 14.2's statuses as legal transitions, each needing an actor and a reason |
+| `apps/api/app/assumptions/gate.py` | 96 | 14.1, evaluated per scenario and per period |
+| `apps/api/app/assumptions/impact.py` | 93, 94 | 14.8's preview, computed on a copy so nothing is saved |
+| `apps/api/app/assumptions/proposals.py` | — | 7.7.a: the historical drivers the Section 13 schedules measured |
+| `apps/api/app/api/templates/assumptions.html` | 90 | The 7.7 screen |
 
 Documentation:
 

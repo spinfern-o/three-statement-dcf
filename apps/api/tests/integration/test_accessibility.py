@@ -350,7 +350,7 @@ def served_schedules(tmp_path_factory, three_statements):
     thread.join(timeout=10)
 
 
-@pytest.mark.parametrize("screen", ["schedules", "formulas"])
+@pytest.mark.parametrize("screen", ["schedules", "formulas", "assumptions"])
 def test_the_schedules_screen_is_reachable_and_structured(browser, served_schedules, screen):
     """6.6: landmarks, a single h1, and every table with a caption.
 
@@ -385,7 +385,7 @@ def test_the_schedules_screen_is_reachable_and_structured(browser, served_schedu
         context.close()
 
 
-@pytest.mark.parametrize("screen", ["schedules", "formulas"])
+@pytest.mark.parametrize("screen", ["schedules", "formulas", "assumptions"])
 def test_the_schedules_screen_does_not_scroll_sideways_at_200_percent(
     browser, served_schedules, screen
 ):
