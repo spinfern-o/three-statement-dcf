@@ -286,11 +286,11 @@
         <tr>
           <th scope="row">{{ moved.target }}</th>
           <td class="num">{% if moved.before is none %}<span class="muted">&mdash;</span>
-            {% else %}{{ "{:,}".format(moved.before) }}{% endif %}</td>
+            {% else %}<span{% if moved.before | tooltip %} title="{{ moved.before | tooltip }}"{% endif %}>{{ moved.before | money }}</span>{% endif %}</td>
           <td class="num total">{% if moved.after is none %}<span class="muted">&mdash;</span>
-            {% else %}{{ "{:,}".format(moved.after) }}{% endif %}</td>
+            {% else %}<span{% if moved.after | tooltip %} title="{{ moved.after | tooltip }}"{% endif %}>{{ moved.after | money }}</span>{% endif %}</td>
           <td class="num">{% if moved.difference is none %}<span class="muted">&mdash;</span>
-            {% else %}{{ "{:,}".format(moved.difference) }}{% endif %}</td>
+            {% else %}<span{% if moved.difference | tooltip %} title="{{ moved.difference | tooltip }}"{% endif %}>{{ moved.difference | money }}</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

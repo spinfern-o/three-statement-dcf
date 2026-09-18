@@ -3,7 +3,7 @@
 {% block context %}Supporting schedules &middot; {{ document.sanitized_filename }}{% endblock %}
 
 {% macro amount(value) -%}
-  {% if value is none %}<span class="muted">&mdash;</span>{% else %}{{ "{:,}".format(value) }}{% endif %}
+  {% if value is none %}<span class="muted">&mdash;</span>{% else %}<span{% if value | tooltip %} title="{{ value | tooltip }}"{% endif %}>{{ value | money }}</span>{% endif %}
 {%- endmacro %}
 
 {% macro region(label) -%}
@@ -102,7 +102,7 @@
           <td class="num{% if row.is_total %} total{% endif %}">
             {% if value is none %}
               <span class="muted" title="{{ row.absent_reason }}">&mdash;</span>
-            {% else %}{{ "{:,}".format(value) }}{% endif %}
+            {% else %}<span{% if value | tooltip %} title="{{ value | tooltip }}"{% endif %}>{{ value | money }}</span>{% endif %}
           </td>
           {% endfor %}
         </tr>
@@ -177,7 +177,7 @@
           <td class="num">
             {% if row.movements[index].value is none %}
               <span class="muted" title="{{ row.movements[index].absent_reason }}">not reported</span>
-            {% else %}{{ "{:,}".format(row.movements[index].value) }}{% endif %}
+            {% else %}<span{% if row.movements[index].value | tooltip %} title="{{ row.movements[index].value | tooltip }}"{% endif %}>{{ row.movements[index].value | money }}</span>{% endif %}
           </td>
           {% endfor %}
           <td class="small muted">{{ schedule.years[0].movements[index].basis }}</td>
@@ -199,7 +199,7 @@
           <td class="num">
             {% if row.unexplained is none %}<span class="muted">&mdash;</span>
             {% elif row.unexplained == 0 %}<span class="badge badge-success">0</span>
-            {% else %}<span class="badge badge-warning">{{ "{:,}".format(row.unexplained) }}</span>{% endif %}
+            {% else %}<span class="badge badge-warning"><span{% if row.unexplained | tooltip %} title="{{ row.unexplained | tooltip }}"{% endif %}>{{ row.unexplained | money }}</span></span>{% endif %}
           </td>
           {% endfor %}
           <td class="small muted">reported, never plugged (12.5)</td>

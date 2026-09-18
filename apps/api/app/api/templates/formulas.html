@@ -89,10 +89,10 @@
           </th>
           <td class="raw">{{ cell.formula }}</td>
           <td class="raw">{{ cell.substituted }}</td>
-          <td class="num total">{{ "{:,}".format(cell.computed) }}</td>
+          <td class="num total"><span{% if cell.computed | tooltip %} title="{{ cell.computed | tooltip }}"{% endif %}>{{ cell.computed | money }}</span></td>
           <td class="num">
             {% if cell.reported is none %}<span class="muted">not printed</span>
-            {% else %}{{ "{:,}".format(cell.reported) }}{% endif %}
+            {% else %}<span{% if cell.reported | tooltip %} title="{{ cell.reported | tooltip }}"{% endif %}>{{ cell.reported | money }}</span>{% endif %}
           </td>
           <td>
             {% if cell.agrees is none %}
@@ -100,7 +100,7 @@
             {% elif cell.agrees %}
               <span class="badge badge-success">exactly</span>
             {% else %}
-              <span class="badge badge-danger">out by {{ "{:,}".format(cell.difference) }}</span>
+              <span class="badge badge-danger">out by <span{% if cell.difference | tooltip %} title="{{ cell.difference | tooltip }}"{% endif %}>{{ cell.difference | money }}</span></span>
             {% endif %}
           </td>
         </tr>

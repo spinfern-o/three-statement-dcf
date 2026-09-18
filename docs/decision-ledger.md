@@ -830,6 +830,97 @@ what the stylesheet claims.
 
 ---
 
+### F-27 — RESOLVED in Phase 14. Every export said the currency was unconfirmed
+
+`DetectedMetadata` is a dataclass holding **one field**, `fields: dict[str,
+DetectedField]`. The export read it as though the metadata were attributes:
+
+    getattr(result.document.metadata, "reporting_currency", "")
+
+which returns the default for every document, always, and never raises. 21.3
+requires an export to state its currency, units, dates, scenario and model
+version; three of those five were the string "(unconfirmed)" on a filing whose
+currency a human had confirmed.
+
+This is the third appearance of the same shape. Phase 13 had check 17.4 reading
+`scale` where the field is `displayed_scale`, and the Phase 12 context bar had
+the same. Each was a plausible name for a field that exists under a different
+one, and `getattr` with a default turns each into a silent wrong answer.
+
+The fix is one reader, `gather.metadata_field`, used everywhere, and it does
+one more thing than the broken code did: **it carries the confirmation state
+into the value.** 1.9 and 1.10 make a detected currency and a confirmed
+currency different claims, and an export printing them identically makes the
+stronger one for both. An unconfirmed value now reads `USD (unconfirmed)`.
+
+### F-28 — RESOLVED in Phase 14. The website displayed the same figure three ways
+
+Item 143 says "compare exports with website outputs", and doing it against the
+*rendered page* rather than against the view function both would call is what
+found this:
+
+| Screen | How it printed a currency figure |
+|---|---|
+| `statements.html` | `{{ cell.value }}` — full stored precision, no separators |
+| `schedules.html` | `{:,}` — separators, full precision |
+| `forecast.html` | `{:,.0f}` — separators, whole units |
+| `valuation.html` | `{:,.0f}` — separators, whole units |
+
+21.8 requires an export to equal the website "at the same display precision",
+and **that requirement cannot be met against a website that does not agree with
+itself.** It is also a reading problem before it is a compliance one: a reviewer
+comparing a forecast line to the historical line above it had one rounded to
+whole units and the other carrying forty-nine decimal places.
+
+Worse, **the two screens that rounded carried no tooltip.** 4.19 is not
+conditional: "label every displayed rounded value with a tooltip showing its
+full stored value". Enterprise value has been displayed as `2,873,867` since
+Phase 11 with the other forty-three digits reachable from nowhere on the page.
+
+[`apps/api/app/display.py`](../apps/api/app/display.py) is now the single
+policy -- currency at whole units, percentages at one place, ratios at four,
+days at one, discount factors at six -- registered as Jinja filters so a
+template cannot reach a different formatter, and called by `exports/gather.py`
+so the export and the page cannot disagree without somebody calling a different
+function. Every template that prints a figure emits 4.19's tooltip beside it,
+and `tooltip` returns empty where nothing was rounded, because a tooltip
+repeating what is already on screen teaches a reader that tooltips are noise.
+
+A test greps every template for a self-applied number format, so the second
+display precision cannot come back quietly.
+
+### F-29 — RESOLVED in Phase 14. Two wrong answers to "can a spreadsheet hold this"
+
+Item 140 has to disclose which exported values a workbook cannot carry exactly.
+Getting the predicate right took three attempts, and the two failures are the
+instructive part.
+
+**Ask the double.** `Decimal(repr(float(v))) == v` — `repr` of a float is the
+shortest string that round-trips, so this is exactly "is this value a double".
+It reports `153895.30421504256` safe. The file contains `153895.3042150426`,
+which is a different number.
+
+**Ask the string.** openpyxl writes every float as `"%.16g"`
+(`openpyxl/compat/strings.py`), so compare against that. It reports `0.085`
+lost, because the string is `0.08500000000000001`. Nothing was lost: that
+string parses back to the same double and displays as `0.085`.
+
+Each is a reasonable question and neither is the one that matters. **The
+question is about the whole round trip**: take the value to a double, write it
+the way the writer writes it, read that string back as a double, and ask whether
+the result is still what the model held. The first predicate under-reports,
+the second over-reports, and only the composition of both is the file's own
+answer.
+
+Both wrong answers are now tests, with the value that defeats each one, because
+the next person to simplify this function will reach for exactly one of them.
+
+The disclosure itself: 21.1 requires XLSX, so refusing the format is not
+available. The cell holds what the file can hold, a cell note carries the exact
+decimal wherever that is not the value, those cells are styled `Inexact`, and
+the Cover tab counts them. Around one numeric cell in eight, on the fixture
+model.
+
 ### F-26 — RESOLVED in Phase 13. A severity was marked settled on a shared word
 
 `validation-policy.md` was written in Phase 2 and says, in its own prose,
@@ -917,6 +1008,96 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 14 (items 138-144) is built**, in
+[`apps/api/app/exports/`](../apps/api/app/exports) with
+[`apps/api/app/display.py`](../apps/api/app/display.py) beside it: 21.1's
+sixteen tabs in four formats, the model version that identifies them, and the
+7.11 screen.
+
+**21.8 is the requirement the whole package is arranged around**, and it is met
+structurally rather than by testing. "Exported values must equal website values
+at the same model version and display precision" is a claim about four formats
+at once, and four formats built independently satisfy it only by coincidence --
+a coincidence that would hold on the fixture and stop holding on the first
+filing nobody tested. So the export is one *gather* and four *renderers*:
+`gather.py` calls the same view functions the screens call, and JSON, CSV, XLSX
+and PDF each render that object and never reach past it. They cannot disagree
+without one of them calling a different function, which is a change a reader of
+the module will see.
+
+That shape is also what made the phase's three findings findable.
+
+**Item 142's version is a digest, not a counter.** 21.7 asks for an *immutable*
+model version ID, and a number that increments on save is not one: it names an
+event rather than a state, so two exports can carry the same number and a
+reader re-exporting to check a figure cannot tell whether the model moved. The
+version is computed from what the model contains -- the document's hash, the
+approved mapping's decisions, the scenario, and every resolved assumption with
+its value and status. The same model exported twice a week apart reads the same
+version; one changed digit anywhere changes it. The document hash alone would
+not do, because two different valuations of one filing are two different models.
+
+**20.13 says "raw text", and Phase 2 had already said why that matters.**
+[`security-model.md`](security-model.md) §20.13 recorded the trap before any
+export existed: prefixing an apostrophe to every cell beginning `=`, `+`, `-` or
+`@` would catch every negative figure in the model, turning each into text that
+sorts as text, sums as zero, and *looks like a number* -- and 21.8 forbids an
+export that does not equal the website. Phase 14 implements that: a cell is
+neutralized only when it is not a number, because a `Decimal` is not raw text.
+Every neutralized cell is listed on the screen, since a reader who finds an
+apostrophe in their data is owed the reason.
+
+**The XLSX half of 20.13 was a live hole, and openpyxl makes it sharper than
+the clause sounds.** Assigning a string beginning with `=` to a cell does not
+store text: openpyxl sets the cell's data type to *formula*. A filing whose
+printed label begins with `=` -- a label out of somebody else's PDF -- would
+have arrived in the workbook as something Excel evaluates on open. `+`, `-` and
+`@` are stored as inline strings and are inert; `=` alone is not. The workbook
+now applies the CSV's own `neutralize`, which closes it and keeps the two
+formats agreeing as 21.8 requires. A test asserts no cell in any of the sixteen
+sheets has the formula data type.
+
+**The workbook says what it cannot hold.** A spreadsheet number is an IEEE 754
+double; 4.11 promises 0.0001% end to end. Those cannot both be true inside a
+numeric cell, and 21.1 requires XLSX, so refusing the format is not available.
+The cell holds what the file can hold, a cell note carries the exact decimal
+wherever that is not the value, those cells are styled `Inexact`, and the Cover
+tab counts them -- around one numeric cell in eight. Writing the exact string
+into the cell instead would produce a workbook whose every figure is text and
+sums to zero; disclosing the loss beats both taking it silently and breaking the
+file to avoid it. Getting the *predicate* for that disclosure right took three
+attempts and is **F-29**.
+
+**21.2 is not met by colour.** Blue for an input and black for a calculation is
+the modelling convention, and colour alone fails WCAG 1.4.1. Each numeric cell
+also carries a named cell style -- `Hardcode`, `Calculated`, `Inexact` -- which
+Excel shows by name and which survives a monochrome print, with the legend in
+words on the Cover tab.
+
+**The PDF report is written with PyMuPDF**, which Phase 3 already depends on to
+*read* filings. A reporting library would be a fifth dependency carrying its own
+fonts, for one file format, to draw text in boxes. 21.6's nine sections are each
+present whether or not they have content, because an omitted section reads as
+"nothing to report" and an unbuilt stage means the opposite.
+
+**21.6 asks for a valuation date and two of 16.11's three conventions do not
+have one.** Year-end and mid-year are defined relative to the last actual period
+end, not to a calendar, so the report names the convention rather than printing
+today's date as though something had been discounted from it. `ScenarioValuation`
+now carries the date it was given, or `None`, so the absence is reportable
+instead of being reconstructed by guesswork.
+
+Phase 14 found three defects in the phases beneath it: **F-27** (every export
+called the currency unconfirmed, because the metadata was read with `getattr` on
+a dict-backed object -- the third appearance of that shape), **F-28** (four
+screens displayed the same figure three different ways, and the two that rounded
+carried none of 4.19's tooltips), and **F-29** (two reasonable-looking answers to
+"can a spreadsheet hold this value", each wrong in a different direction).
+
+It also fixed a gap left by Phase 13: **the diagnostics screen had no navigation
+entry**, so the only way to reach it was to type the URL. It and the new exports
+screen are now in the shell.
 
 **Phase 13 (items 131-137) is built**, in
 [`apps/api/app/diagnostics/`](../apps/api/app/diagnostics): Section 17's thirty

@@ -14,3 +14,14 @@ jinja2>=3.1
 python-multipart>=0.0.9
 # Required by starlette's TestClient, which the web tests use.
 httpx>=0.27
+
+# The XLSX workbook (specification Phase 14, item 140; 21.1's sixteen tabs).
+# The PDF report needs no new dependency -- pymupdf above writes PDFs as well
+# as reading them, and a reporting library for one file format would be a
+# fifth dependency carrying its own fonts.
+#
+# Pinned below 3.2 deliberately: this export asserts what openpyxl writes into
+# the sheet XML ("%.16g", in openpyxl/compat/strings.py), because that
+# serialization decides which values the file can hold -- see F-29. A change to
+# it would change what the workbook contains, silently.
+openpyxl>=3.1,<3.2

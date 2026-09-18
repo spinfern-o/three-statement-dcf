@@ -226,7 +226,7 @@
                 {% if fact.value is none %}
                   <span class="muted">no value</span>
                 {% else %}
-                  {{ '{:,}'.format(fact.value) }}{% if fact.was_corrected %}<span class="sr-only"> (corrected by a reviewer)</span>{% endif %}
+                  <span{% if fact.value | tooltip %} title="{{ fact.value | tooltip }}"{% endif %}>{{ fact.value | money }}</span>{% if fact.was_corrected %}<span class="sr-only"> (corrected by a reviewer)</span>{% endif %}
                 {% endif %}
               </td>
               <td class="num">{{ fact.confidence.score }}</td>

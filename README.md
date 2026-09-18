@@ -8,7 +8,7 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–13 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–14 of 17** |
 
 ## Status, stated plainly
 
@@ -24,7 +24,7 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4 to 13, items 39–137. A browser interface showing
+   specification Phases 4 to 14, items 39–144. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
@@ -120,7 +120,32 @@ observe the test suite. So it reports what it can establish: which of the
 required outputs are compared, against an implementation sharing no helper with
 the engine, and where each comparison lives.
 
-1093 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**Four exports, one gathered model.** 21.8 requires an exported value to equal
+the website's at the same model version and display precision. Four formats
+built independently would satisfy that by coincidence, so they are not: one
+gather step calls the same view functions the screens call, and JSON, CSV, XLSX
+and PDF each render that object. They cannot disagree without one of them
+calling a different function.
+
+The model version is a digest of what the model contains — the document's hash,
+the mapping's decisions, the scenario, every resolved assumption — rather than a
+counter. The same model exported twice a week apart reads the same version, and
+one changed digit changes it.
+
+**The CSV defence leaves negative numbers alone.** A cell beginning `=`, `+`,
+`-` or `@` is run as a formula by every spreadsheet, and the usual fix prefixes
+an apostrophe. Every negative figure begins with a minus sign, and a prefixed
+one becomes text that sorts as text, sums as zero and looks like a number. So
+only non-numeric cells are neutralized, and every one of them is listed on the
+screen.
+
+**The workbook says what it cannot hold.** A spreadsheet number is a double and
+this model's decimals are exact; around one numeric cell in eight cannot survive
+the trip. Each carries its exact value in a cell note, is styled `Inexact`, and
+is counted on the cover tab — rather than being rounded away where nobody
+would notice.
+
+1186 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -508,6 +533,20 @@ Diagnostics, lineage and release readiness (specification Phase 13, items 131–
 | `apps/api/app/diagnostics/benchmark.py` | 135 | What the benchmark covers, without making the claim 4.20 forbids |
 | `apps/api/app/diagnostics/release.py` | 136, 137 | The checklist, and a gate that blocks on every outstanding check because F-4 is unratified |
 | `apps/api/app/api/templates/diagnostics.html` | 133 | The 7.10 screen, with the dependency graph |
+
+Exports (specification Phase 14, items 138–144):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/display.py` | — | One display precision for every screen and every export, with 4.19's tooltip |
+| `apps/api/app/exports/version.py` | 142 | 21.7's model version: a digest of what the model contains, not a counter |
+| `apps/api/app/exports/gather.py` | — | 21.1's sixteen tables, gathered once from the screens' own view functions |
+| `apps/api/app/exports/schema.py` | 138 | The versioned JSON schema, and a validator that refuses to check it partially |
+| `apps/api/app/exports/json_export.py` | 138 | Every number as a decimal string, validated on the way out |
+| `apps/api/app/exports/csv_export.py` | 139 | Injection protection that leaves negative numbers alone |
+| `apps/api/app/exports/xlsx_export.py` | 140 | The workbook, and a note on every value a spreadsheet cannot hold |
+| `apps/api/app/exports/pdf_export.py` | 141 | 21.6's nine sections, drawn with the PDF library already here |
+| `apps/api/app/api/templates/exports.html` | — | The 7.11 screen |
 
 Documentation:
 

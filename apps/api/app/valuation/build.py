@@ -77,6 +77,12 @@ class ScenarioValuation:
     assumed_nil: "tuple[str, ...]"
     #: 16.20: why there is no per-share value, when there is none.
     per_share_status: str
+    #: The calendar date this valuation counts from, when one was supplied.
+    #: None under year-end and mid-year, which 16.11 defines relative to the
+    #: last actual period rather than to a calendar -- and 21.6 asks the report
+    #: for a valuation date, so the absence has to be reportable rather than
+    #: guessed at from today.
+    valuation_date: "date | None" = None
 
     @property
     def has_per_share(self) -> bool:
@@ -261,6 +267,7 @@ def build_scenario_valuation(
         inputs=tuple(records),
         assumed_nil=tuple(assumed_nil),
         per_share_status=per_share_status,
+        valuation_date=valuation_date,
     )
 
 
