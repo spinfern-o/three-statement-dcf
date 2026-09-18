@@ -57,7 +57,27 @@ a { color: var(--color-accent-financial); }
 .topbar .wordmark { font-family: var(--font-serif); font-size: 1.125rem; font-weight: 600; }
 .topbar .context { color: var(--color-text-secondary); font-size: 0.875rem; }
 
-.layout { padding: var(--space-7); max-width: 1680px; margin: 0 auto; }
+/* `width: 100%` is load-bearing and not redundant with the max-width.
+ *
+ * `.layout` is a flex item of `.shell-main` (a column), and `margin: 0 auto`
+ * on a flex item OPTS IT OUT OF STRETCH -- an auto margin on the cross axis
+ * makes the item size to fit-content instead, which is
+ * max(min-content, min(max-content, available)). So its min-content won, and
+ * its min-content is whatever the widest table demands: at 390px the mapping
+ * screen's layout became 498px and the page scrolled sideways.
+ *
+ * That is F-25's failure returning through a different door. `min-width: 0`
+ * did not help, because the item was never being stretched-then-shrunk; it was
+ * being sized to its contents from the start. A definite `width: 100%` makes
+ * the cross size definite again, so the wide table overflows into its own
+ * `.table-scroll` as intended and the page does not move. */
+.layout {
+  padding: var(--space-7);
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
 
 /* 6.3.f: split view, PDF page on the left, values on the right. */
 .split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-7); align-items: start; }
@@ -128,8 +148,17 @@ form.decide {
 form.decide .small { font-size: 0.75rem; }
 .field { display: grid; gap: var(--space-2); }
 label { font-size: 0.8125rem; font-weight: 600; color: var(--color-text-secondary); }
-input[type="text"], input[type="search"], textarea, select {
+input[type="text"], input[type="search"], input[type="password"], textarea, select {
   font: inherit;
+  /* 22.6.e: a text input's default intrinsic width is about twenty characters
+     plus padding, and it does not shrink. Four of them stacked inside a table
+     cell demanded 431px at a 390px viewport, which widened the table, the
+     card and the page -- the `.table-scroll` around it was scrolling a box
+     that was already too wide for the screen.
+     `max-width: 100%` makes a control fluid, which is what every one of them
+     here wants: they are all full-width in their own container. */
+  max-width: 100%;
+  box-sizing: border-box;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
@@ -456,4 +485,23 @@ pre.raw {
 /* A long unbroken token -- a hash, a URL, a dotted reference path -- has no
  * break opportunity, so it sets a min-content width of its own. */
 .raw, code, .small { overflow-wrap: anywhere; }
+
+/* 22.6.e: every string a FILING supplied is arbitrary-length and outside this
+   application's control -- a company name, a printed line-item label, a
+   reviewer's note. "Aktiengesellschaft" is one unbreakable eighteen-character
+   word, and one of those in a table cell widened the source room and the
+   mapping screen by 48px at 390px wide.
+
+   So text cells wrap anywhere rather than only the ones that happen to carry
+   a `.small` or `.raw` class. `.num` is excluded deliberately: a figure broken
+   across two lines is unreadable, and numeric columns take WCAG 1.4.10's
+   exemption inside `.table-scroll` instead. */
+/* Extended to every prose container, not only table cells. The messages this
+   application writes embed tokens that have no break opportunity in them: a
+   twelve-digit figure with thousands separators, a canonical code, a SHA-256
+   prefix, a printed label out of a filing. "987,654,321,098" is one token to a
+   line-breaker, and one of those in a finding message overflowed a card by
+   108px at 390px wide. */
+p, li, dd, dt, figcaption,
+td:not(.num), th:not(.num) { overflow-wrap: anywhere; }
 pre.raw { white-space: pre-wrap; }

@@ -20,8 +20,10 @@ one stays green rather than red for the wrong reason.
 from __future__ import annotations
 
 import itertools
+import re
 import socket
 import threading
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -513,6 +515,10 @@ def test_the_schedules_screen_does_not_scroll_sideways_at_200_percent(
 #: 6.3's three layouts, at the widths their media queries switch on.
 VIEWPORTS = (
     ("desktop", 1440, 900),
+    # 22.6.b's laptop width. It is inside the desktop layout's media query, so
+    # it tests nothing about the breakpoints -- and it is the width most people
+    # actually use, which is where a table one column too wide shows up first.
+    ("laptop", 1280, 800),
     ("tablet", 1000, 800),
     ("mobile", 390, 844),
 )
@@ -659,5 +665,221 @@ def test_financial_figures_use_tabular_numerals(browser, served_forecast):
             "getComputedStyle(document.querySelector('td.num')).fontVariantNumeric"
         )
         assert "tabular-nums" in setting, setting
+    finally:
+        context.close()
+
+
+# --- 22.6.e-h: the content that breaks a layout -----------------------------
+#
+# The sweep above varies the viewport and holds the data fixed. These vary the
+# data and hold the viewport at the narrowest supported width, because that is
+# where a long string or an eleven-digit figure has least room to go wrong.
+#
+# 22.6 asks for four cases by name: long company names, negative values, very
+# large values, and empty and error states.
+
+#: A real company name at the long end, plus the suffixes filings actually
+#: carry. Not a lorem-ipsum string of the same length: a name breaks a layout
+#: at its longest unbreakable WORD, and "Aktiengesellschaft" is longer than
+#: anything a random string generator produces.
+LONG_COMPANY_NAME = (
+    "Consolidated Transcontinental Manufacturing and Distribution "
+    "Aktiengesellschaft (Reorganised) Incorporated"
+)
+
+
+@pytest.fixture(scope="module")
+def served_extremes(tmp_path_factory, forecastable):
+    """The forecastable filing with 22.6.e-g's content substituted in.
+
+    The company name is replaced with a very long one, and two reported
+    figures with a very large and a very negative one. Substituted onto a real
+    model rather than rendered from a synthetic one, so every screen still
+    builds: a fake model that cannot forecast would send half these tests to an
+    empty state and pass for the wrong reason.
+    """
+    import dataclasses
+    import threading
+
+    import uvicorn
+
+    from apps.api.app.api.main import create_app
+    from apps.api.app.assumptions.store import ScenarioStore
+    from apps.api.app.extraction.storage import SourceStore
+    from apps.api.app.persistence.json_store import JsonDocumentRepository
+    from apps.api.tests.conftest import FORECASTABLE, approved_scenario
+
+    root = tmp_path_factory.mktemp("served-extremes")
+
+    metadata = forecastable.document.metadata
+    fields = dict(metadata.fields)
+    fields["company_name"] = dataclasses.replace(fields["company_name"], value=LONG_COMPANY_NAME)
+    document = dataclasses.replace(
+        forecastable.document,
+        metadata=dataclasses.replace(metadata, fields=fields),
+    )
+
+    # 22.6.f and 22.6.g, on the two figures a reader looks at first: a very
+    # large revenue and a very negative net income.
+    facts = []
+    for fact in forecastable.facts:
+        label = fact.raw_label.lower()
+        if "revenue" in label and fact.value is not None:
+            fact = dataclasses.replace(fact, corrected_value=Decimal("987654321098"))
+        elif "net income" in label and fact.value is not None:
+            fact = dataclasses.replace(fact, corrected_value=Decimal("-876543210987"))
+        facts.append(fact)
+
+    result = dataclasses.replace(forecastable, document=document, facts=tuple(facts))
+
+    JsonDocumentRepository(root).save(result)
+    SourceStore(root).store(
+        Path(FORECASTABLE).read_bytes(), original_filename=Path(FORECASTABLE).name
+    )
+    ScenarioStore(root).save(result.document.id, approved_scenario("owner"))
+
+    port = _free_port()
+    server = uvicorn.Server(
+        uvicorn.Config(create_app(root), host="127.0.0.1", port=port, log_level="warning")
+    )
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    for _ in range(200):
+        if server.started:
+            break
+        threading.Event().wait(0.05)
+    assert server.started, "the review server did not start"
+    try:
+        yield {"base": f"http://127.0.0.1:{port}", "document_id": result.document.id}
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+
+
+@pytest.mark.parametrize("screen", SCREENS)
+def test_a_very_long_company_name_does_not_widen_any_screen(browser, served_extremes, screen):
+    """22.6.e, at the narrowest supported width."""
+    served = served_extremes
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        page.goto(
+            f"{served['base']}/documents/{served['document_id']}{screen}",
+            wait_until="load",
+        )
+        overflow = page.evaluate(
+            "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+        )
+        assert overflow <= 0, (
+            f"{screen or '/source'} scrolls {overflow}px sideways with a long name"
+        )
+    finally:
+        context.close()
+
+
+def test_a_long_company_name_is_not_truncated_into_a_different_name(browser, served_extremes):
+    """A name cut off mid-word reads as a different company.
+
+    Wrapping is fine and so is an ellipsis; silently dropping the second half
+    with neither is the failure -- somebody cites "Consolidated
+    Transcontinental Manufacturing" and means something else.
+
+    Checked on the statements screen, where the name reaches the page as part
+    of every citation. (The exports screen does not print it: it identifies a
+    model by version and filename, and the company name is inside the export
+    files rather than on the page offering them.)
+    """
+    served = served_extremes
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        page.goto(
+            f"{served['base']}/documents/{served['document_id']}/statements", wait_until="load"
+        )
+        assert LONG_COMPANY_NAME in page.content()
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("screen", ("/statements", "/forecast", "/valuation"))
+def test_very_large_and_very_negative_figures_stay_inside_their_table(
+    browser, served_extremes, screen
+):
+    """22.6.f and 22.6.g together, because they fail together.
+
+    A twelve-digit figure and a twelve-digit negative one in the same column
+    differ by one character, and the minus sign is the one that overflows.
+    """
+    served = served_extremes
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        page.goto(
+            f"{served['base']}/documents/{served['document_id']}{screen}",
+            wait_until="load",
+        )
+        overflow = page.evaluate(
+            "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+        )
+        assert overflow <= 0, f"{screen} scrolls {overflow}px with twelve-digit figures"
+
+        # And a twelve-digit figure is actually on the page, or this test
+        # passed by rendering an empty state.
+        #
+        # Matched on shape rather than on the exact substituted values: the
+        # statements show those, and the forecast and the valuation show what
+        # the engine derives FROM them -- 785,853,611,962 rather than
+        # 987,654,321,098. Asserting the inputs would only ever have passed on
+        # one of the three screens.
+        body = page.content()
+        assert re.search(r">-?\d{1,3}(?:,\d{3}){3,}<", body), (
+            f"{screen} shows no twelve-digit figure; this test proved nothing"
+        )
+    finally:
+        context.close()
+
+
+def test_an_empty_state_renders_without_overflowing(browser, served_schedules):
+    """22.6.h, first half. The three-statement fixture has no scenario, so the
+    forecast and valuation screens are empty states with a stated reason."""
+    served = served_schedules
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        for screen in ("/forecast", "/valuation"):
+            page.goto(
+                f"{served['base']}/documents/{served['document_id']}{screen}",
+                wait_until="load",
+            )
+            overflow = page.evaluate(
+                "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+            )
+            assert overflow <= 0, f"the {screen} empty state scrolls {overflow}px"
+            # 6.5.i: an empty state explains what is missing.
+            text = page.inner_text("main")
+            assert len(text.strip()) > 40, f"{screen} renders an empty state with no text"
+    finally:
+        context.close()
+
+
+def test_an_error_state_is_announced_and_does_not_overflow(browser, served_forecast):
+    """22.6.h, second half. A refused action returns to the page the reviewer
+    was on with an announced message (6.6.f), and that message is content the
+    layout has to survive."""
+    served = served_forecast
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        page.goto(
+            f"{served['base']}/documents/{served['document_id']}"
+            f"/assumptions?error=" + "A%20refusal%20long%20enough%20to%20wrap%20" * 6,
+            wait_until="load",
+        )
+        alert = page.query_selector('[role="alert"]')
+        assert alert is not None, "the error is not in a region that announces it"
+        overflow = page.evaluate(
+            "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+        )
+        assert overflow <= 0, f"a long error message scrolls {overflow}px sideways"
     finally:
         context.close()

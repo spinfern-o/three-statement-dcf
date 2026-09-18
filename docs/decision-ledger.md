@@ -852,6 +852,53 @@ what the stylesheet claims.
 
 ---
 
+### F-33 — RESOLVED in Phase 16. `margin: 0 auto` on a flex item opts out of stretch
+
+22.6.e asks for a visual test with long company names. Substituting one — a
+real-shaped name ending "Aktiengesellschaft (Reorganised) Incorporated" — made
+**two screens scroll sideways at 390px**, which is the one thing WCAG 1.4.10
+does not exempt. F-25 was supposed to have closed that in Phase 12.
+
+It had, for the reason F-25 identified. This is a different route to the same
+failure, and the mechanism is worth writing down because `min-width: 0` does
+nothing about it.
+
+    .layout { padding: var(--space-7); max-width: 1680px; margin: 0 auto; }
+
+`.layout` is a flex item of `.shell-main`, a column. **An auto margin on a flex
+item's cross axis opts the item out of `stretch`**: instead of being stretched
+to the container's inner width and then shrunk, it is sized to *fit-content*,
+which is `max(min-content, min(max-content, available))`. So its min-content
+won — and its min-content is whatever the widest table demands. At 390px the
+mapping screen's layout became **498px**.
+
+`min-width: 0` was already on that element and could not help, because the item
+was never being stretched-then-shrunk; it was being sized to its contents from
+the start. A definite `width: 100%` makes the cross size definite again, and
+the wide table then overflows into its own `.table-scroll` as intended.
+
+The lesson generalises past this rule: **`min-width: 0` fixes shrinking, not
+sizing.** An element sized to its content has no shrink step to constrain.
+
+Two content-level defects came out of the same test, both the same shape — a
+token with no break opportunity in it:
+
+- **a text input's default intrinsic width is about twenty characters and does
+  not shrink.** Four stacked inside a table cell demanded 431px at a 390px
+  viewport. `max-width: 100%` with `box-sizing: border-box` makes them fluid,
+  which is what every one of them here wants anyway.
+- **`987,654,321,098` is one token to a line-breaker.** So is a canonical code,
+  a hash prefix, and "Aktiengesellschaft". `overflow-wrap: anywhere` was on
+  `.raw`, `code` and `.small` only, so a figure in a finding message overflowed
+  a card by 108px. It is now on every prose container and every non-numeric
+  table cell — and deliberately **not** on `.num`, because a figure broken
+  across two lines is unreadable and numeric columns take 1.4.10's exemption
+  inside `.table-scroll` instead.
+
+None of the three was reachable by the Phase 12 sweep, which varies the
+viewport and holds the data fixed. These vary the data and hold the viewport at
+its narrowest. Both are needed, and 22.6 asks for both.
+
 ### F-31 — RESOLVED in Phase 16. A "strict for model/" config was strict for everything
 
 Item 155 asks for strict type checks. The decision recorded in
