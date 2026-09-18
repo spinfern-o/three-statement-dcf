@@ -466,3 +466,22 @@ def test_17_29_fails_when_a_rounded_value_is_owed_a_tooltip_and_has_none(
     outcome = broken.by_code(BY_CLAUSE["17.29"].code)
     assert outcome.status is Status.FAIL, outcome.detail
     assert "does not carry the stored" in outcome.detail
+
+
+def test_17_3_says_which_half_of_its_clause_it_verified(full):
+    """Rule 1.14 applied to a partially-verifiable clause.
+
+    17.3 asks that every period resolve to one unambiguous basis AND date
+    range. This model carries no dates and no cadence, so the second half
+    cannot be checked -- `validation-policy.md` has recorded that since Phase
+    13. The check passed on the first half with a message that read like full
+    compliance; it now names what it did not look at.
+
+    A bare PASS on a clause the policy says is unverified is the same shape as
+    F-38, one level milder: the row is true and the reader's conclusion is not.
+    """
+    outcome = full.by_code(BY_CLAUSE["17.3"].code)
+    assert outcome.status is Status.PASS
+    assert "labelled actual or estimate" in outcome.detail
+    assert "neither is verified" in outcome.detail
+    assert "VAL-017-003" in outcome.detail

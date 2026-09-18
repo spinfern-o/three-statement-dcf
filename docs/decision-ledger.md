@@ -457,6 +457,25 @@ defect to prove it fires.
 
 A sweep for the same shape across `model/` and `apps/api/app/` found no others.
 
+**A second sweep asked the more general question: which of the thirty checks
+can never report FAIL?** Three. Two are correct — 17.21 is the declared
+unevaluable clause and reports SKIP with its reason, and 17.14 is scoped "where
+data permits" so PASS-or-SKIP is the whole of it.
+
+The third, **17.3, was a milder instance of the same shape.** It recorded a
+bare PASS whose evidence read "each labelled actual or estimate" — a property
+it never looked at, true only because `Periods` enforces the A/E suffix at
+construction. And 17.3 asks for more than that: one unambiguous basis **and
+date range**. `validation-policy.md` has recorded since Phase 13 that the
+second half is not verified, because the model carries no period dates and no
+cadence. So the row was true and the reader's conclusion was not, which is
+rule 1.14's concern one level milder than a tautology.
+
+It now checks the labels rather than asserting them — cheap, and a check whose
+evidence names a property it never examined is exactly how 17.29 spent four
+phases passing on nothing — and its evidence states plainly which half of the
+clause it did not verify.
+
 ### F-9 — The engine's error messages conflict with 20.16 under hosted deployment
 
 Not a defect today, and worth recording before the website inherits it.

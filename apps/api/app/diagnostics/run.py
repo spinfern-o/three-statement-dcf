@@ -177,11 +177,25 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
         build_error = str(exc)
 
     if built is not None and built.years:
+        # Verified rather than asserted. `Periods` enforces the A/E suffix at
+        # construction, so this holds by construction today -- and a check
+        # whose evidence names a property it never looked at is how 17.29
+        # spent four phases passing on nothing (F-38). Checking something
+        # guaranteed upstream costs one pass over a handful of labels.
+        unlabelled = [year for year in built.years if not year.endswith(("A", "E"))]
         record(
             "17.3",
-            Status.PASS,
-            f"{len(built.years)} period(s), each labelled actual or estimate: "
-            + ", ".join(built.years),
+            Status.PASS if not unlabelled else Status.FAIL,
+            (
+                f"{len(built.years)} period(s), each labelled actual or estimate: "
+                + ", ".join(built.years)
+                + ". This clause also asks for an unambiguous BASIS and DATE "
+                "RANGE, and neither is verified: the model carries no period "
+                "dates and no cadence, so ambiguity of basis cannot arise here "
+                "or be detected (validation-policy.md VAL-017-003)"
+            )
+            if not unlabelled
+            else "period(s) with no actual/estimate label: " + ", ".join(unlabelled),
         )
     else:
         record(
