@@ -70,7 +70,6 @@ def test_ordinary_labels_are_proposed(label, statement, expected):
         "Total current assets",
         "Total current liabilities",
         "Total liabilities and stockholders' equity",
-        "Net increase in cash",
         "Cash and cash equivalents at beginning of year",
         "Basic earnings per share",
         "Weighted-average shares outstanding",
@@ -81,6 +80,25 @@ def test_the_traps_are_refused_with_a_reason(label):
     assert propose(label) == ()
     assert blocked_reason(label)
     assert "deliberately" in explain_no_proposal(label)
+
+
+def test_the_net_change_in_cash_is_no_longer_a_trap():
+    """It was blocked because the chart had no line for it (F-17).
+
+    12.3.m gave it one, and the block came off with the same reasoning the
+    other subtotals already use: mapping a reported subtotal does not weaken
+    the check it feeds, because 12.4.f compares the reported figure against
+    the sum of the three cash flow subtotals rather than substituting one for
+    the other. That is exactly how `total_assets` has always worked.
+    """
+    candidates = propose("Net increase in cash")
+    assert candidates, "12.3.m's line should now be proposable"
+    assert candidates[0].code == accounts.NET_CHANGE_IN_CASH
+    assert not blocked_reason("Net increase in cash")
+
+    # The opening and closing cash captions are STILL traps: they are the
+    # roll-forward's own endpoints, not the movement.
+    assert blocked_reason("Cash and cash equivalents at beginning of year")
 
 
 def test_a_label_nothing_recognises_says_so():

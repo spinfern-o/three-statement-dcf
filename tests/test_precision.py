@@ -340,16 +340,25 @@ def _random_case(rng: random.Random, scale: Decimal):
         inventory=cogs * r(0.05, 0.35),
         other_current_assets=rev * r(0.0, 0.05),
         ppe_net=rev * r(0.20, 1.50),
+        # 12.2.e, 12.2.i and 12.2.k, swept like every other line. A sweep that
+        # skipped them would assert the identity holds only for the shape of
+        # filer the chart could already describe.
+        goodwill=rev * r(0.0, 0.60),
+        intangibles=rev * r(0.0, 0.30),
         other_noncurrent_assets=rev * r(0.0, 0.20),
         accounts_payable=cogs * r(0.05, 0.25),
         other_current_liabilities=rev * r(0.0, 0.08),
         debt=rev * r(0.0, 0.80),
+        lease_liabilities=rev * r(0.0, 0.25),
         other_noncurrent_liabilities=rev * r(0.0, 0.10),
     )
     assets = sum((parts[k] for k in A.ASSET_ACCOUNTS), Decimal(0))
     liabs = sum((parts[k] for k in A.LIABILITY_ACCOUNTS), Decimal(0))
-    parts["common_equity"] = (assets - liabs) * r(0.2, 0.8)
-    parts["retained_earnings"] = assets - liabs - parts["common_equity"]
+    equity = assets - liabs
+    parts["minority_interest"] = equity * r(0.0, 0.10)
+    remaining = equity - parts["minority_interest"]
+    parts["common_equity"] = remaining * r(0.2, 0.8)
+    parts["retained_earnings"] = remaining - parts["common_equity"]
 
     src = Source("SWEEP", 1, "line")
     income = Ledger(Statement.INCOME, periods.historical)

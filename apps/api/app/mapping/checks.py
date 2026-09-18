@@ -27,7 +27,7 @@ from decimal import Decimal
 
 from model import accounts
 from model.checks import Tolerance
-from model.numeric import D, relative_error
+from model.numeric import relative_error
 
 from ..extraction.reasons import ReasonCode
 from ..extraction.records import ExtractionResult
@@ -196,8 +196,19 @@ def subtotal_reconciliation(
                     terms.append(-value)
             if missing:
                 continue  # STEP 5: an absent component is unknown, not zero
+            if not terms:
+                # Not one component mapped. This module's first line says a
+                # subtotal has nothing to reconcile against until its
+                # components are mapped, and this is that case -- reachable
+                # only for a derivation whose every term is optional, which
+                # `operating_expenses` became when 12.1.d's categories were
+                # added. Summing no terms to zero would report the whole
+                # reported subtotal as a discrepancy against a figure nobody
+                # supplied, which is rule 1.3's prohibition wearing a
+                # reconciliation's clothes.
+                continue
 
-            derived = sum(terms[1:], terms[0]) if terms else D("0")
+            derived = sum(terms[1:], terms[0])
             if tol.close(reported.value, derived):
                 continue
 

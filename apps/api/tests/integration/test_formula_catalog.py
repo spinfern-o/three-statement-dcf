@@ -31,6 +31,8 @@ import pytest
 from apps.api.app.formula.calculate import calculate
 from apps.api.app.formula.catalog import (
     CODES,
+    _derivable_here,
+    _some_sibling_is_present,
     computable_subset,
     derivation_formulas,
     ledger_environment,
@@ -82,6 +84,8 @@ def test_every_formula_carries_a_written_definition(formulas):
 #: file's subject -- the historical derivations -- is responsible for.
 SECTION_4_16_DERIVATIONS = (
     "gross_profit",
+    "operating_expenses",
+    "ebitda",
     "ebit",
     "pretax_income",
     "net_income",
@@ -91,19 +95,25 @@ SECTION_4_16_DERIVATIONS = (
     "cash_flow_from_operations",
     "cash_flow_from_investing",
     "cash_flow_from_financing",
+    "depreciation_amortization",
+    "net_change_in_cash",
 )
 
 
-def test_the_4_16_list_is_covered_except_the_line_the_chart_lacks(formulas):
-    """4.16 also names EBITDA, and the chart has no `ebitda` line (F-17).
+def test_every_4_16_derivation_this_file_covers_is_in_the_catalogue(formulas):
+    """4.16 names the outputs a benchmark must compare.
 
-    Recorded as an assertion rather than a comment so it stops being true the
-    day the chart grows one.
+    `ebitda` and `net_change_in_cash` were absent from this list while the
+    chart lacked the lines (F-17). The assertion that stood here asserted
+    their absence, so that the day the chart grew them it would fail and say
+    what to do; it did, and this is what replaced it.
     """
-    assert set(SECTION_4_16_DERIVATIONS) <= set(formulas.targets)
-    assert "ebitda" not in accounts.INCOME_ACCOUNTS, (
-        "the chart now has an EBITDA line; 4.16 requires it be compared against "
-        "the benchmark, so add it to this file and to the catalogue"
+    assert set(SECTION_4_16_DERIVATIONS) <= set(formulas.targets), set(
+        SECTION_4_16_DERIVATIONS
+    ) - set(formulas.targets)
+    # And nothing derived is quietly left out of the comparison.
+    assert set(formulas.targets) == set(SECTION_4_16_DERIVATIONS), set(formulas.targets) ^ set(
+        SECTION_4_16_DERIVATIONS
     )
 
 
@@ -154,8 +164,11 @@ def test_the_assumed_nil_residuals_are_named_rather_than_silent(built, formulas)
     """
     _, assumed_nil = ledger_environment(built.ledgers, built.years[-1])
     assert "other_income_expense" in assumed_nil
-    assert "residual" in assumed_nil["other_income_expense"]
     assert "OPTIONAL_IN_DERIVATION" in assumed_nil["other_income_expense"]
+    # And it says WHY the zero is legitimate here: a sibling term of the same
+    # subtotal is reported, so the subtotal has something to reconcile
+    # against. A derivation with no term reported at all is not zero-filled.
+    assert "sibling term IS reported" in assumed_nil["other_income_expense"]
 
 
 # --- 4.17: extremes, on inputs no filing would produce ---------------------
@@ -170,9 +183,19 @@ def _ledger_pair(values: dict[str, str]):
     environment = Environment()
     for account, value in values.items():
         environment.put(account, D(value), CURRENCY, origin=account)
+    # The same rule `ledger_environment` applies, imported rather than
+    # restated. This helper used to zero-fill EVERY optional income line
+    # unconditionally, and when 12.1.d's categories were added that made
+    # `operating_expenses` derivable from three zeros -- so the engine computed
+    # EBIT from an operating expense of nil while the ledger used the figure
+    # this helper had just set. A test fixture that builds "the matching
+    # environment" by its own rules matches nothing.
     for residual in accounts.OPTIONAL_IN_DERIVATION:
-        if residual in accounts.INCOME_ACCOUNTS and not environment.has(residual):
-            environment.put(residual, ZERO, CURRENCY, origin=f"{residual} nil")
+        if residual not in accounts.INCOME_ACCOUNTS or environment.has(residual):
+            continue
+        if not _some_sibling_is_present(residual, environment):
+            continue
+        environment.put(residual, ZERO, CURRENCY, origin=f"{residual} nil")
     return ledger, environment, year
 
 
@@ -211,8 +234,18 @@ def test_the_two_implementations_agree_on_extreme_inputs(case, formulas):
     )
     ledger.fill_derivable()
 
-    income_only = formulas.subset(frozenset(accounts.INCOME_ACCOUNTS))
+    # `computable_subset` rather than the income accounts alone: EBITDA is an
+    # income-statement line whose bridge crosses to the cash flow statement
+    # (EBIT + D&A), so in an environment holding only income lines it has
+    # nothing to run on and drops out. That IS 12.1.f -- "only when the
+    # precise bridge is visible" -- rather than a gap in this test.
+    income_only = computable_subset(
+        formulas.subset(frozenset(accounts.INCOME_ACCOUNTS)), environment
+    )
     model = calculate(income_only, environment, strict=True)
+    assert accounts.EBITDA not in model.cells, (
+        "no D&A is in this environment, so EBITDA has no visible bridge (12.1.f)"
+    )
 
     for target in ("gross_profit", "ebit", "pretax_income", "net_income"):
         engine = ledger.get(target, year)
@@ -258,7 +291,9 @@ def test_a_randomized_sweep_across_nine_orders_of_magnitude(scale, formulas):
         ledger, environment, year = _ledger_pair(values)
         ledger.fill_derivable()
         model = calculate(
-            formulas.subset(frozenset(accounts.INCOME_ACCOUNTS)), environment, strict=True
+            computable_subset(formulas.subset(frozenset(accounts.INCOME_ACCOUNTS)), environment),
+            environment,
+            strict=True,
         )
         for target in ("gross_profit", "ebit", "pretax_income", "net_income"):
             assert model.value(target) == ledger.get(target, year), (
@@ -329,3 +364,44 @@ def test_a_corrupted_subtotal_does_not_contaminate_the_others(three_statements):
     )
     ebit = next(cell for cell in year.cells if cell.target == "ebit")
     assert ebit.computed == D("200000") and ebit.agrees
+
+
+# --- F-17: a derivation with nothing to run on is not a derivation of zero ---
+
+
+def test_an_optional_term_is_not_assumed_nil_when_no_sibling_is_reported():
+    """The formula environment's half of the guard `Ledger._try_derive` had.
+
+    Zero-filling every optional term unconditionally lets a derivation whose
+    terms are ALL optional produce a subtotal out of nothing: three zeros go
+    in, a zero comes out, and a reader sees a derived figure no part of the
+    filing supports.
+    """
+    environment = Environment()
+    # Nothing of the operating expense group is reported.
+    assert not _some_sibling_is_present(accounts.SGA, environment)
+
+    # With one category reported, the group has something to reconcile against
+    # and the others are the zeros they claim to be.
+    environment.put(accounts.SGA, D("300000"), CURRENCY, origin="test")
+    assert _some_sibling_is_present(accounts.RESEARCH_DEVELOPMENT, environment)
+    assert _some_sibling_is_present(accounts.OTHER_OPERATING_EXPENSES, environment)
+
+
+def test_a_reported_subtotal_it_cannot_derive_is_still_an_input():
+    """12.1.d's other shape, and the regression it caused.
+
+    A filer reporting one operating expense line and no categories has nothing
+    to derive the total from. Excluding it from the environment as "derived"
+    left EBIT to be computed from three absent categories -- zero -- instead of
+    the figure the filing printed, and EBIT came out too high by the whole of
+    operating expenses.
+    """
+    available = {accounts.REVENUE, accounts.COGS, accounts.OPERATING_EXPENSES}
+    assert _derivable_here(accounts.GROSS_PROFIT, available)
+    assert not _derivable_here(accounts.OPERATING_EXPENSES, available)
+
+    # And when the categories ARE there, the total is derived rather than read,
+    # which is what makes the recomputation a check on the reported figure.
+    with_categories = available | {accounts.SGA}
+    assert _derivable_here(accounts.OPERATING_EXPENSES, with_categories)

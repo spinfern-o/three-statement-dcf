@@ -92,12 +92,6 @@ BLOCKED = (
         "by the whole of equity",
     ),
     (
-        re.compile(r"(?i)^(net\s+)?(increase|decrease|change)\s+in\s+cash\b"),
-        "the chart has no net-change-in-cash line: the cash roll-forward "
-        "produces it from the three subtotals, and mapping it in would make it "
-        "an input to the check that is supposed to test it",
-    ),
-    (
         re.compile(r"(?i)cash\s+(and\s+cash\s+equivalents\s+)?at\s+(the\s+)?(beginning|end)\b"),
         "an opening or closing cash line on the cash flow statement is the "
         "roll-forward's own output, not an input to it",
@@ -120,6 +114,162 @@ BLOCKED = (
 #: every rule is tried and the best score per code wins.
 RULES = (
     # --- income statement -------------------------------------------------
+    # --- 12.1.d: operating expenses by disclosed category ------------------
+    _rule(
+        accounts.SGA,
+        r"^(selling,?\s+general\s+and\s+administrative|general\s+and\s+administrative|sg&a)",
+        EXACT,
+        "matched a selling, general and administrative caption",
+    ),
+    _rule(
+        accounts.SGA,
+        r"^(selling|distribution|administrative)\s+(and\s+\w+\s+)?(expenses?|costs?)$",
+        STRONG,
+        "matched a selling or administrative expense caption",
+    ),
+    _rule(
+        accounts.RESEARCH_DEVELOPMENT,
+        r"^research\s+and\s+development|^r&d\b",
+        EXACT,
+        "matched a research and development caption",
+    ),
+    _rule(
+        accounts.OTHER_OPERATING_EXPENSES,
+        r"^(restructuring|impairment\s+of\s+(goodwill|intangibles?|assets))",
+        STRONG,
+        "an operating charge this chart routes to other operating expenses",
+    ),
+    # --- 12.1.f: EBITDA, and only the plain bridge -------------------------
+    _rule(
+        accounts.EBITDA,
+        r"^ebitda$",
+        EXACT,
+        "matched an EBITDA caption. 12.1.f allows this line only when the "
+        "bridge is the plain one -- EBIT plus D&A. An 'adjusted' EBITDA "
+        "carries add-backs the filer chose and does not belong here",
+    ),
+    # --- 12.1.h: interest income, as distinct from interest expense --------
+    _rule(
+        accounts.INTEREST_INCOME,
+        r"^(interest|investment)\s+income$",
+        EXACT,
+        "matched an interest income caption",
+    ),
+    _rule(
+        accounts.INTEREST_INCOME,
+        r"^interest\s+and\s+(other\s+)?(investment\s+)?income",
+        STRONG,
+        "matched a combined interest and investment income caption",
+    ),
+    # --- 12.1.l: attribution ------------------------------------------------
+    _rule(
+        accounts.NET_INCOME_TO_PARENT,
+        r"attributable\s+to\s+.{0,40}\b(parent|company|owners|shareholders|stockholders)\b",
+        STRONG,
+        "matched net income attributed to the parent (12.1.l)",
+    ),
+    _rule(
+        accounts.NET_INCOME_TO_MINORITY,
+        r"attributable\s+to\s+.{0,40}\b(non-?controlling|minority)\b",
+        STRONG,
+        "matched net income attributed to non-controlling interests (12.1.l)",
+    ),
+    # --- 12.2.e: goodwill and intangibles ----------------------------------
+    _rule(
+        accounts.GOODWILL,
+        r"^goodwill$",
+        EXACT,
+        "matched a goodwill caption. Goodwill is not amortized, which is why "
+        "it is its own line rather than part of intangibles",
+    ),
+    _rule(
+        accounts.GOODWILL,
+        r"^goodwill\s+and\s+(other\s+)?intangible",
+        WEAK,
+        "matched a COMBINED goodwill and intangibles caption. Weak on "
+        "purpose: this is one figure covering two lines that behave "
+        "differently, and 11.5 asks that a reviewer decide how to split it "
+        "rather than have a matcher choose",
+    ),
+    _rule(
+        accounts.INTANGIBLES,
+        r"^(other\s+)?intangible\s+assets",
+        EXACT,
+        "matched an intangible assets caption",
+    ),
+    _rule(
+        accounts.INTANGIBLES,
+        r"^(capitali[sz]ed\s+software|developed\s+technology|customer\s+relationships)",
+        STRONG,
+        "matched an identifiable intangible caption",
+    ),
+    # --- 12.2.i: lease liabilities -----------------------------------------
+    _rule(
+        accounts.LEASE_LIABILITIES,
+        r"^(operating\s+|finance\s+)?lease\s+liabilit(y|ies)",
+        EXACT,
+        "matched a lease liability caption",
+    ),
+    _rule(
+        accounts.LEASE_LIABILITIES,
+        r"^(current\s+|non-?current\s+)?(portion\s+of\s+)?(operating\s+|finance\s+)?lease",
+        STRONG,
+        "matched a lease liability caption. Current and non-current portions "
+        "both map here: the chart carries one lease line, and 11.5's "
+        "aggregate mapping is how a filer splitting them is handled",
+    ),
+    # --- 12.2.k: minority interest -----------------------------------------
+    _rule(
+        accounts.MINORITY_INTEREST,
+        r"^(non-?controlling|minority)\s+interests?",
+        EXACT,
+        "matched a non-controlling interest caption. It sits inside total "
+        "equity, so the accounting identity still closes",
+    ),
+    # --- 12.1.e: the D&A split ---------------------------------------------
+    _rule(
+        accounts.DEPRECIATION,
+        r"^depreciation$",
+        EXACT,
+        "matched a depreciation caption reported separately from amortization",
+    ),
+    _rule(
+        accounts.AMORTIZATION,
+        r"^amorti[sz]ation(\s+of\s+(intangibles?|intangible\s+assets))?$",
+        EXACT,
+        "matched an amortization caption reported separately from depreciation",
+    ),
+    # --- 12.3.f and 12.3.i: the other halves --------------------------------
+    _rule(
+        accounts.DISPOSALS,
+        r"^(proceeds\s+from\s+)?(sale|disposal)s?\s+of\s+(business|subsidiar|propert|equipment|assets)",
+        STRONG,
+        "matched proceeds from a disposal (12.3.f)",
+    ),
+    _rule(
+        accounts.SHARE_ISSUANCE,
+        r"^(proceeds\s+from\s+)?(issuance\s+of\s+(common\s+)?(stock|shares)|exercise\s+of\s+(stock\s+)?options)",
+        STRONG,
+        "matched cash received from issuing shares (12.3.i)",
+    ),
+    # --- 12.3.l and 12.3.m --------------------------------------------------
+    _rule(
+        accounts.FX_EFFECT_ON_CASH,
+        r"effect\s+of\s+(foreign\s+)?(exchange|currency)\s+rate",
+        EXACT,
+        "matched the exchange-rate effect on cash (12.3.l). It is not an "
+        "operating, investing or financing flow, which is why 12.4.f states "
+        "the roll-forward as the three subtotals PLUS this",
+    ),
+    _rule(
+        accounts.NET_CHANGE_IN_CASH,
+        r"^(net\s+)?(increase|decrease|change)\s+in\s+cash",
+        EXACT,
+        "matched the period's net change in cash (12.3.m). Mapping it does "
+        "not weaken the check it feeds: 12.4.f compares this reported figure "
+        "against the sum of the subtotals rather than substituting one for "
+        "the other",
+    ),
     _rule(
         accounts.REVENUE,
         r"^(net\s+)?(sales|revenues?)$",

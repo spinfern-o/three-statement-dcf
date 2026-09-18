@@ -327,23 +327,50 @@ Cash flow (`CASHFLOW_ACCOUNTS`, STEP 7): `net_income`,
 `debt_repayment`, `share_repurchases`, `dividends`, `other_financing`,
 `cash_flow_from_financing`.
 
-### Where the engine's vocabulary is short of Section 12
+### Section 12, line by line — RESOLVED (finding F-17)
 
-Specification 12.1–12.3 names lines the engine has no code for. None of these
-is a defect in the engine — 11.1 says explicitly "do not force every company
-to use every canonical line" — but a canonical chart built for the website
-needs them, and the engine's balance check would fail for a company that has
-them, as [`README.md`](../README.md) already warns.
+This section listed what the chart lacked against specification 12.1–12.3 for
+eleven phases. The chart now carries every line those clauses name, and
+`test_every_line_section_12_names_has_a_canonical_code` is the assertion that
+keeps it that way.
 
-| Missing | Specification | Consequence today |
+| Was missing | Specification | Now |
 |---|---|---|
-| `goodwill`, `intangibles` | 12.2.e | No intangibles schedule (13.3) and therefore no check 17.12 |
-| `lease_liabilities` | 12.2.i | Required. 2.4.j: leases **are** debt in the bridge when the filing discloses a liability. Not yet implemented — `EquityBridge` has no lease field |
-| `minority_interest` (balance sheet) | 12.2.k | Exists only as an equity-bridge input in `dcf.py`, not as a balance-sheet account |
-| `ebitda` | 12.1.f | No line. 12.1.f makes EBITDA conditional on a visible bridge, and the 37-step workflow never defines one. Recorded already in [`decision-ledger.md`](decision-ledger.md) F-1 as outstanding against 4.16 |
-| Operating expense **by disclosed category** | 12.1.d | The engine has a single `operating_expenses` line |
-| Statement of equity | 12.2.l, 7.5.d | No `equity` statement type; only a retained-earnings roll-forward |
-| `fx_effect_on_cash` | 12.3.l | No line; the engine's cash roll-forward is `begin + CFO + CFI + CFF` with no FX term |
+| `goodwill`, `intangibles` | 12.2.e | Two lines, not one. Goodwill is **not amortized** under IFRS or US GAAP, so folding it into intangibles would put a balance that never amortizes into a roll-forward driven by amortization |
+| `lease_liabilities` | 12.2.i | Its own line, deliberately outside `debt`: a lease and a borrowing behave differently in a valuation, and once one figure carries both a reader cannot separate them again |
+| `minority_interest` | 12.2.k | A balance-sheet account inside `EQUITY_ACCOUNTS`, where IAS 1.54 and ASC 810-10-45-16 both put it, so A = L + E closes without a fourth section |
+| `ebitda` | 12.1.f | Derived as EBIT + D&A, with **D&A not optional in that derivation**. An absent D&A leaves EBITDA underived rather than equal to EBIT — which is the whole of "only when the precise bridge is visible" |
+| Operating expense by disclosed category | 12.1.d | `selling_general_administrative`, `research_development`, `other_operating_expenses`. A filer disclosing categories and no total derives the total; one reporting the total and no categories supplies it directly |
+| `interest_income` | 12.1.h | Separate from `interest_expense`. A filer reporting one net figure maps it to whichever it is and leaves the other absent — splitting a net figure into two invented halves is what rule 1.3 forbids |
+| D&A split | 12.1.e | `depreciation` and `amortization`, deriving the combined line when a filer splits them. The combined line stays what the cash flow statement is built from, so a filer reporting both is not counted twice |
+| Net income attribution | 12.1.l | `net_income_to_parent`, `net_income_to_minority`. A **check**, not a derivation: net income is already pre-tax less taxes, and an account may be derived only one way |
+| `disposals`, `share_issuance` | 12.3.f, 12.3.i | The other halves of "acquisitions and disposals" and "equity issuance and repurchase" |
+| `fx_effect_on_cash` | 12.3.l | The reason 12.4.f states the roll-forward as the three subtotals **plus FX/other cash effects**. Before it, a foreign-operating filer's cash check could not tie and the difference had nowhere to go |
+| `net_change_in_cash` | 12.3.m | Derived from the three subtotals plus FX, and **mappable**: the reported figure is compared against the derived sum rather than substituted for it, exactly as `total_assets` has always worked |
+
+**Still short:** a statement of equity (12.2.l, 7.5.d). There is no `equity`
+statement type, only a retained-earnings roll-forward, so 12.4.h's "statement
+of equity rolls forward" is answered for retained earnings and not for the
+other equity accounts.
+
+#### What makes "when applicable" safe
+
+12.2.i and 12.2.k say "when applicable", and goodwill, intangibles and several
+others are treated the same way: absent means the company has none, not that
+the figure is unknown. Treating their absence as blocking would make total
+assets underivable for most filings, which is the opposite of what rule 1.3
+protects.
+
+**That is only defensible because the case it could hide does not stay
+hidden.** A filer that DOES report goodwill and whose goodwill was left
+unmapped derives a total assets differing from the reported one by exactly the
+goodwill, and 12.4.i reports that difference with its amount. The optionality
+does not conceal an unmapped line; it stops an inapplicable line from blocking
+a filing that never had it.
+
+`test_every_optional_line_is_a_term_of_some_subtotal` is that argument as an
+assertion: an optional line nothing reconciles over would have nothing
+watching it.
 
 ---
 
