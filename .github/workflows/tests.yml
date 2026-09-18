@@ -189,7 +189,21 @@ jobs:
               # not drift. Everything else is.
               text = re.sub(r"Generated at: `[^`]+`", "", text)
               text = re.sub(r"\| [\d.]+ \|$", "|", text, flags=re.MULTILINE)
-              return [line for line in text.splitlines() if line.startswith("| 22.")]
+              kept = []
+              for line in text.splitlines():
+                  if line.startswith("| 22."):
+                      kept.append(line)
+                  elif line.startswith("| 24."):
+                      # Section 24's Result column is DERIVED from the gates,
+                      # and --fast does not run two of them -- so 24.15 and
+                      # 24.16 legitimately read NOT RUN here and PASS in the
+                      # committed full run. That is the feature, not drift.
+                      # What must not drift is the evidence each criterion
+                      # names, so the result cell is dropped and the rest
+                      # compared.
+                      kept.append(re.sub(r"\*\*(PASS|FAIL|NOT RUN|UNEVIDENCED)\*\*",
+                                         "**-**", line))
+              return kept
 
           committed = rows(Path("docs/release-readiness.md").read_text())
           fresh = rows(Path("/tmp/release-readiness.md").read_text())
@@ -198,5 +212,5 @@ jobs:
               print("Regenerate it: python3 -m apps.api.app.verification.report "
                     "--out docs/release-readiness.md")
               sys.exit(1)
-          print(f"{len(committed)} Section 22 row(s) match the committed report")
+          print(f"{len(committed)} Section 22 and 24 row(s) match the committed report")
           PY
