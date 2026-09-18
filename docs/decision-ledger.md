@@ -1209,6 +1209,78 @@ CI's drift check filtered `| 22.` rows only, so it now covers `| 24.` as well
 gates* and `--fast` legitimately leaves 24.15 and 24.16 as NOT RUN. What must
 not drift is the evidence each criterion names.
 
+### F-39 — RESOLVED. Two period headers that silently lost or misdated a column
+
+Found by building the 22.3.f restatement fixture. Neither defect needed a
+restatement to occur; the fixture only happened to produce the header shapes
+that expose them, which is the argument for building fixtures for clauses
+nobody has covered.
+
+**A merged header cell "2025 2024" resolved to 2024.** `_DATE_LABEL` is
+anchored at the END of the string so that it can read "December 31, 2024" as
+2024. That also made it read a two-year header as the second year — so every
+figure in the 2025 column was labelled with the prior year. Silently: the
+figures were right, the year was wrong, and no reason code said so. A model
+built from it would compare a year against itself and find no growth.
+
+Column headers merge into one cell from ordinary PDF geometry, not from
+anything unusual. This one merged on the first attempt at a new fixture.
+
+**A qualified header "2024 (restated)" was not a period at all.** It matched
+neither a bare year nor a string ending in one, so the column was not a period
+column and every figure beneath it was discarded. "2024 (restated)", "2024
+(unaudited)", "2024*" are ordinary in a filing, and a year of comparatives
+vanishing with no reason code is worse than a wrong one: nothing on the screen
+says anything is missing.
+
+Both now return the header **verbatim** with the ambiguity flag, which raises
+`PERIOD_AMBIGUOUS` — already blocking, already carrying rule 1.7, 10.19, 10.24
+— so the value is preserved, the reviewer sees what the cell actually said,
+and the fact cannot be verified until they resolve it. Only the guess is
+refused.
+
+The two shapes are kept apart deliberately. A header naming two years names
+neither, and is ambiguous in the ordinary sense. A header naming one year and
+a qualifier IS that year — but the qualifier may change what the column means,
+which is 22.3.f's whole subject, so the reviewer confirms rather than the
+parser assuming.
+
+### F-40 — ANSWERED. 22.3.f: what this system does with a restated prior year
+
+The clause's own row read "a fixture nobody has built, and it is the honest gap
+in this row". `restated_prior_year.pdf` is that fixture: Haldane Instruments'
+2024 revenue was originally reported as 1,140,000 and restated to 1,100,000,
+with the restated comparatives on the face of the income statement and the
+original figures in Note 2's three-column table.
+
+What happens is safe, and it is safe for a reason worth recording rather than
+assuming:
+
+- **The face's restated comparatives are extracted.** 2024 revenue is
+  1,100,000, which is the basis a model should use.
+- **The note's original figures never become facts.** A restatement note's
+  columns are headed "As previously reported / Adjustment / As restated",
+  which are not periods, and `_column_periods` requires a period in the header
+  row. So 1,140,000 cannot enter the model at all. The note IS read and its
+  table extracted — the figures are absent by a decision about column headers,
+  not because extraction stopped early, and the test asserts both halves.
+
+So the failure 22.3.f probes — a model carrying both readings of one year, and
+wrong by the whole restatement — is unreachable through extraction.
+
+**The honest limit, asserted rather than left implicit:** nothing in the
+extracted facts records that 2024 was restated. The period label is a plain
+year; "(restated)" is printed on the line beneath the header and "See Note 2"
+under the table, both on the page and neither in the data. No figure is wrong,
+and under 2.3.a the restated basis is the only basis in the model. What a
+reviewer loses is the explanation for why 2024 revenue differs from last
+year's model by 40,000.
+
+F-39's second fix narrows this: a filing that puts the qualifier IN the header
+cell — "2024 (restated)", which is at least as common — now flags the period
+ambiguous and does tell the reviewer. One that puts it on the line below still
+does not.
+
 ### F-34 — RESOLVED in Phase 17. The application was sending no security headers at all
 
 Item 175 asks that TLS and security headers be verified. There was nothing to

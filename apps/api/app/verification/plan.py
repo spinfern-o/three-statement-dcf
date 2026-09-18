@@ -164,14 +164,10 @@ PLAN = (
     Coverage(
         "22.3.f",
         "Restated prior years",
-        (),
-        uncovered_because=(
-            "2.3.a fixes one document per model version, so a restatement "
-            "arrives as a SECOND document rather than as two readings "
-            "inside one. 10.3's duplicate detection and the linked-"
-            "duplicate path are tested; a single PDF carrying both an "
-            "original and a restated prior year is a fixture nobody has "
-            "built, and it is the honest gap in this row."
+        (
+            "test_the_restated_comparatives_are_what_reach_the_model",
+            "test_the_original_figures_in_the_restatement_note_never_become_facts",
+            "test_nothing_in_the_extracted_facts_records_that_2024_was_restated",
         ),
     ),
     # 22.4 Integration tests

@@ -519,6 +519,123 @@ def build_forecastable(path: Path) -> None:
     _finish(doc, path)
 
 
+def build_restated(path: Path) -> None:
+    """22.3.f: one filing carrying a prior year twice, on two bases.
+
+    A real annual report that corrects an earlier error prints the prior year
+    THREE ways in its restatement note -- as previously reported, the
+    adjustment, and as restated -- while the face of the income statement shows
+    only the restated figure. Both readings of 2024 are therefore in the same
+    document, which is exactly the shape 22.3.f asks for and the shape no
+    fixture here had.
+
+    The arithmetic is deliberate: revenue was overstated by 40,000 and cost of
+    goods sold understated by 10,000, so net income falls by 50,000 before tax
+    effects and the note ties.
+
+        revenue            1,140,000 - 40,000 = 1,100,000
+        cost of goods sold   650,000 + 10,000 =   660,000
+
+    A reviewer who maps both readings of revenue to `revenue` 2024 has not
+    aggregated anything: one of the two is wrong, and adding them gives
+    2,240,000 -- which is what makes this fixture worth having.
+    """
+    doc = pymupdf.open()
+
+    # --- page 1: cover ------------------------------------------------------
+    page = doc.new_page(width=PAGE_W, height=PAGE_H)
+    _prepare(page)
+    _text(page, LEFT, 120, "HALDANE INSTRUMENTS PLC", size=18, font=BOLD)
+    _text(page, LEFT, 150, "Annual Report and Consolidated Financial Statements", size=12)
+    _text(page, LEFT, 180, "For the fiscal year ended December 31, 2025", size=11)
+    _text(page, LEFT, 220, "(All amounts in thousands of U.S. dollars)", size=9)
+    _text(page, LEFT, 250, "Prepared in accordance with U.S. GAAP", size=9)
+    _text(page, LEFT, 280, "Report of Independent Registered Public Accounting Firm", size=9)
+
+    # --- page 2: income statement, restated comparatives on the face --------
+    page = doc.new_page(width=PAGE_W, height=PAGE_H)
+    _prepare(page)
+    _text(page, LEFT, 80, "CONSOLIDATED STATEMENTS OF OPERATIONS", size=11, font=BOLD)
+    _text(page, LEFT, 96, "(in thousands of U.S. dollars)", size=8)
+    # Two header lines, as a filing prints them: the qualifier sits under the
+    # year rather than beside it, which is also what keeps the two year
+    # headers in separate table cells.
+    _table_frame(page, 112, 270, [COL_A, COL_B])
+    _row(page, 126, "", [(COL_A, "2025"), (COL_B, "2024")], font=BOLD)
+    _row(page, 138, "", [(COL_B, "(restated)")], font=BOLD)
+    _rule(page, 144)
+    y = 160
+    for label, a, b in [
+        ("Revenue", "1,250,000", "1,100,000"),
+        ("Cost of goods sold", "(750,000)", "(660,000)"),
+        ("Gross profit", "500,000", "440,000"),
+        ("Operating expenses", "(345,500)", "(322,250)"),
+        ("Operating income", "154,500", "117,750"),
+        ("Interest expense", "(18,000)", "(20,000)"),
+        ("Income before income taxes", "136,500", "97,750"),
+        ("Income tax expense", "(34,125)", "(24,438)"),
+    ]:
+        _row(page, y, label, [(COL_A, a), (COL_B, b)])
+        y += 15
+    _row(page, y, "Net income", [(COL_A, "102,375"), (COL_B, "73,312")], font=BOLD)
+    _text(page, LEFT, 295, "See Note 2, Restatement of Prior Year Amounts.", size=7)
+    _text(page, LEFT, 700, "Haldane Instruments plc - Annual Report 2025 - Page 2", size=7)
+
+    # --- page 3: the restatement note, carrying the ORIGINAL figures --------
+    page = doc.new_page(width=PAGE_W, height=PAGE_H)
+    _prepare(page)
+    _text(page, LEFT, 80, "NOTE 2 - RESTATEMENT OF PRIOR YEAR AMOUNTS", size=11, font=BOLD)
+    _text(
+        page,
+        LEFT,
+        100,
+        "During 2025 the Group identified that revenue for the year ended",
+        size=8,
+    )
+    _text(
+        page,
+        LEFT,
+        112,
+        "December 31, 2024 had been overstated and cost of goods sold understated.",
+        size=8,
+    )
+    _text(page, LEFT, 124, "The comparative amounts have been restated as follows:", size=8)
+
+    _table_frame(page, 140, 260, [COL_A, COL_B, PAGE_W - 60])
+    _row(
+        page,
+        154,
+        "Year ended December 31, 2024",
+        [(COL_A, "As previously"), (COL_B, "Adjustment"), (PAGE_W - 60, "As")],
+        font=BOLD,
+    )
+    _row(
+        page,
+        166,
+        "",
+        [(COL_A, "reported"), (COL_B, ""), (PAGE_W - 60, "restated")],
+        font=BOLD,
+    )
+    _rule(page, 172)
+    y = 188
+    for label, original, adjustment, restated in [
+        ("Revenue", "1,140,000", "(40,000)", "1,100,000"),
+        ("Cost of goods sold", "(650,000)", "(10,000)", "(660,000)"),
+        ("Gross profit", "490,000", "(50,000)", "440,000"),
+        ("Net income", "110,812", "(37,500)", "73,312"),
+    ]:
+        _row(
+            page,
+            y,
+            label,
+            [(COL_A, original), (COL_B, adjustment), (PAGE_W - 60, restated)],
+        )
+        y += 15
+    _text(page, LEFT, 700, "Haldane Instruments plc - Annual Report 2025 - Page 3", size=7)
+
+    _finish(doc, path)
+
+
 BUILDERS = {
     "text_native_statements.pdf": build_statements,
     "three_statements.pdf": build_three_statements,
@@ -529,6 +646,7 @@ BUILDERS = {
     "mixed_text_and_image.pdf": build_mixed,
     "encrypted.pdf": build_encrypted,
     "not_actually_a_pdf.pdf": build_non_pdf,
+    "restated_prior_year.pdf": build_restated,
 }
 
 

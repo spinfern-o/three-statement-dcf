@@ -65,12 +65,18 @@ def test_the_uncovered_clauses_are_the_ones_expected():
     number going up by one."""
     assert {row.clause for row in plan.uncovered()} == {
         "22.1.j",  # RBAC: not applicable under 2.2.d, not untested
-        "22.3.f",  # restated prior years: no fixture carries both readings
         "22.8.a",
         "22.8.b",
         "22.8.c",
         "22.8.d",  # no documented hardware
     }
+    # 22.3.f was here until `restated_prior_year.pdf` was built. Removing a
+    # clause from this set is the visible change the test exists to force, and
+    # it cost two extraction defects to make (see the decision ledger): a
+    # merged header cell "2025 2024" silently labelled the 2025 column 2024,
+    # and a qualified header "2024 (restated)" was not a period at all, so its
+    # whole column was discarded.
+    assert "22.3.f" not in {row.clause for row in plan.uncovered()}
 
 
 # --- the report's own claims ------------------------------------------------

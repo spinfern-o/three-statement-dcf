@@ -73,6 +73,15 @@ _OTHER_BASIS = re.compile(
     r"(?i)\b(?:Q[1-4]|quarter|three\s+months|six\s+months|nine\s+months|YTD|TTM|LTM|interim)\b"
 )
 
+#: Every four-digit year anywhere in a header, used only to detect that a
+#: header names more than one. See `normalize_period_label`.
+_ANY_YEAR = re.compile(r"(?:19|20)\d{2}")
+
+#: A year followed by a qualifier: `2024 (restated)`, `2024 (unaudited)`,
+#: `2024*`. The qualifier is what makes it interesting -- see
+#: `normalize_period_label`.
+_QUALIFIED_YEAR = re.compile(r"^(?:FY\s*)?(?:19|20)\d{2}\s*(?:[(\[*\u2020\u2021].*)$")
+
 _SCOPE_WORDS = (
     (re.compile(r"(?i)\bconsolidated\b|\bkonzern"), Scope.CONSOLIDATED),
     (re.compile(r"(?i)\bsegment\b|\bby\s+segment\b"), Scope.SEGMENT),
@@ -91,6 +100,36 @@ def normalize_period_label(text: str) -> tuple[str | None, bool]:
     if not value:
         return None, False
     if _OTHER_BASIS.search(value):
+        return value, True
+    # **A header naming two different years names neither.** `_DATE_LABEL`
+    # below is anchored at the END, so that it can read "December 31, 2024" as
+    # 2024 -- and it read a merged header cell "2025 2024" as 2024 too, which
+    # labelled the 2025 column's values with the prior year. Silently, with no
+    # reason code: the figures were right, the year was wrong, and nothing on
+    # the page said so.
+    #
+    # Column headers merge into one cell from ordinary PDF geometry, so this
+    # is not exotic. It was found by building the 22.3.f restatement fixture,
+    # where "2025" and "2024 (restated)" landed in a single cell.
+    #
+    # The header is kept VERBATIM rather than resolved, so a reviewer sees
+    # what the cell actually said, and `PERIOD_AMBIGUOUS` blocks the fact
+    # until they resolve it (1.7, 10.19, 10.24). The value is preserved; only
+    # the guess is refused.
+    if len(set(_ANY_YEAR.findall(value))) > 1:
+        return value, True
+    # **A qualified year is a period, and the qualifier is the point.**
+    # `2024 (restated)`, `2024 (unaudited)`, `2024*` -- all ordinary in a
+    # filing, and all returned None before, which meant the column was not a
+    # period column and every figure under it was silently dropped. A whole
+    # year of comparatives vanishing without a reason code is worse than a
+    # wrong one: nothing on the screen says anything is missing.
+    #
+    # Kept verbatim and flagged rather than resolved to the bare year, because
+    # the qualifier may change what the column MEANS. "2024 (restated)" and
+    # "2024" are different readings of one period, which is 22.3.f's whole
+    # subject, and a reviewer confirms which is which (1.7, 10.24).
+    if _QUALIFIED_YEAR.match(value):
         return value, True
     match = _YEAR.match(value)
     if match:

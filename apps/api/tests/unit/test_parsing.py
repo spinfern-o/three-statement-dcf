@@ -237,3 +237,82 @@ def test_full_width_digits_are_folded():
 def test_a_value_is_never_a_float():
     parsed = parse_reported_value("1,234.56", locale=US)
     assert isinstance(parsed.value, Decimal)
+
+
+# --- period headers: two defects found by building the 22.3.f fixture -------
+
+
+@pytest.mark.parametrize(
+    "header, expected",
+    [
+        ("2024", ("2024", False)),
+        ("FY2025", ("2025", False)),
+        ("2025A", ("2025", False)),
+        ("December 31, 2024", ("2024", False)),
+        ("Revenue", (None, False)),
+    ],
+)
+def test_an_unambiguous_period_header_resolves_to_its_year(header, expected):
+    """The cases that must keep working, pinned before the two that changed."""
+    from apps.api.app.extraction.text_native import normalize_period_label
+
+    assert normalize_period_label(header) == expected
+
+
+@pytest.mark.parametrize(
+    "header",
+    ["2025 2024", "2024 2025", "2025 2024 2023", "For the years ended December 31, 2025 and 2024"],
+)
+def test_a_header_naming_two_years_names_neither(header):
+    """A header naming two different years is ambiguous, not the last one.
+
+    `_DATE_LABEL` is anchored at the END so it can read "December 31, 2024" as
+    2024. That also made it read a merged header cell "2025 2024" as 2024 --
+    so every figure in the 2025 column was labelled with the prior year.
+    Silently: the figures were right, the year was wrong, and no reason code
+    said so. A model built from it would compare a year against itself.
+
+    Column headers merge into one cell from ordinary PDF geometry; this was
+    found the first time a fixture happened to produce one.
+
+    The header is kept verbatim so a reviewer sees what the cell said, and the
+    ambiguity flag raises PERIOD_AMBIGUOUS, which blocks the fact until they
+    resolve it. The value is preserved; only the guess is refused.
+    """
+    from apps.api.app.extraction.text_native import normalize_period_label
+
+    label, ambiguous = normalize_period_label(header)
+    assert ambiguous is True
+    assert label == header, "the header must be kept verbatim, not resolved"
+
+
+@pytest.mark.parametrize(
+    "header",
+    ["2024 (restated)", "2024 (unaudited)", "2024 (as restated)", "2024*", "FY2024 (pro forma)"],
+)
+def test_a_qualified_year_is_a_period_and_the_qualifier_is_the_point(header):
+    """These returned None, which dropped the whole column.
+
+    `2024 (restated)` and `2024 (unaudited)` are ordinary in a filing. Because
+    neither matched a bare year nor ended in one, both were "not a period
+    column" -- so every figure beneath them was silently discarded. A year of
+    comparatives vanishing with no reason code is worse than a wrong one:
+    nothing on the screen says anything is missing.
+
+    Kept verbatim and flagged rather than resolved to the bare year, because
+    the qualifier may change what the column MEANS. "2024 (restated)" and
+    "2024" are two readings of one period, which is 22.3.f's whole subject.
+    """
+    from apps.api.app.extraction.text_native import normalize_period_label
+
+    label, ambiguous = normalize_period_label(header)
+    assert ambiguous is True
+    assert label == header
+
+
+def test_an_ambiguous_period_blocks_the_facts_under_it():
+    """The flag is only worth having because of what it does downstream."""
+    from apps.api.app.extraction.reasons import ReasonCode
+
+    assert ReasonCode.PERIOD_AMBIGUOUS.blocking
+    assert "1.7" in ReasonCode.PERIOD_AMBIGUOUS.rule

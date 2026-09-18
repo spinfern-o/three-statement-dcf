@@ -235,7 +235,7 @@ baked in by a script somebody has to remember to run. A deployment from a dirty
 tree reports its commit as `-dirty`, because that deployment is not the version
 the suite passed and the value itself should say so.
 
-1454 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+1473 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -313,6 +313,33 @@ this was a *call* — verified by running the rule against the exact shape.
 Enabling it and calling the hole closed would have repeated the original
 mistake one level up. What catches it walks the AST and compares the two sides
 structurally, and a second test feeds it the original defect to prove it fires.
+
+**Building a fixture for an uncovered clause found two extraction defects.**
+Section 22.3.f asks for a restated prior year, and its own coverage row read
+"a fixture nobody has built". Building one produced two header shapes that
+broke the period parser, neither of which needed a restatement to occur:
+
+- A **merged header cell `2025 2024`** resolved to 2024, because the date
+  pattern is anchored at the end of the string so it can read
+  "December 31, 2024". Every figure in the 2025 column was labelled with the
+  prior year — silently, with no reason code. A model built from it would
+  compare a year against itself.
+- A **qualified header `2024 (restated)`** was not a period at all, so the
+  column was discarded whole. `(restated)`, `(unaudited)` and `2024*` are
+  ordinary in a filing, and a year of comparatives vanishing without a reason
+  code is worse than a wrong one.
+
+Both now keep the header verbatim and raise `PERIOD_AMBIGUOUS`, which already
+blocks the fact until a reviewer resolves it. The value is preserved; only the
+guess is refused.
+
+**And the answer to 22.3.f itself is a safe one.** The face's restated
+comparatives are extracted; the note's original figures never become facts,
+because a restatement note's columns are headed "As previously reported /
+Adjustment / As restated" and those are not periods. So a model carrying both
+readings of one year — wrong by the whole restatement — is unreachable through
+extraction. The honest limit is asserted too: nothing in the extracted facts
+records that the year *was* restated.
 
 **What does not exist yet: a deployment.** Every one of the specification's
 180 items that is code is built. What is left is Phase 17's decisions —
@@ -750,7 +777,7 @@ Documentation:
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-38 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-40 |
 
 Specification Phase 2 contract documents. These are **definitions for the
 website, not descriptions of the engine** — each one states plainly where the
