@@ -93,11 +93,19 @@ jobs:
           python -m pip install pip-audit
 
       - name: Audit the dependency tree
-        # pip-audit queries the Python Packaging Advisory Database. It fails
-        # the job on any known vulnerability in anything installed, which is
-        # the whole tree rather than the four lines in requirements.txt --
-        # a transitive dependency is as present as a direct one.
-        run: python -m pip_audit --strict --progress-spinner off
+        # pip-audit queries the Python Packaging Advisory Database, and this
+        # audits THIS PROJECT'S declared requirements and everything they pull
+        # in -- a transitive dependency is as present as a direct one.
+        #
+        # Scoped to the requirements files rather than `--strict` over the
+        # whole environment, which sweeps in whatever the base image ships:
+        # the first run failed on `python-apt`, an Ubuntu system package that
+        # is not on PyPI and cannot be audited. The claim worth making is that
+        # this project's dependencies carry no known vulnerability, not that
+        # the runner's operating system does not.
+        run: |
+          python -m pip_audit --strict --progress-spinner off \
+            -r requirements.txt -r requirements-dev.txt
 
       - name: Check for a source PDF or a secret in the tree
         # Item 166 and 20.4. Written here rather than left to a release
