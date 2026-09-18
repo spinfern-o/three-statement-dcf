@@ -2,7 +2,7 @@
 
 Required by [`website-build-spec.md`](website-build-spec.md) Phase 16 item 168. **Generated, not written** — every row below is the result of running something, and the command is printed beside it so a reader can run it again.
 
-Generated at: `2026-09-18T08:25:47+00:00`
+Generated at: `2026-09-18T08:30:37+00:00`
 
 ## Verdict: READY
 
@@ -16,22 +16,22 @@ This is a statement about the gates, not a recommendation to deploy. Phase 17 it
 |---|---|---|---|---|
 | 154 | Formatting | **PASS** | 208 files already formatted | 0.0 |
 | 154 | Formatting and linting | **PASS** | All checks passed! | 0.0 |
-| 155 | Strict type checks | **PASS** | Success: no issues found in 141 source files | 0.2 |
-| 156 | Unit tests | **PASS** | 595 passed in 0.57s | 0.9 |
-| 157 | Property-based tests | **PASS** | 10 passed in 0.18s | 0.4 |
-| 158 | Golden extraction tests | **PASS** | 46 passed in 13.87s | 14.1 |
-| 159 | Integration tests | **PASS** | 691 passed, 2 warnings in 140.55s (0:02:20) | 141.0 |
-| 160 | End-to-end tests | **PASS** | 24 passed, 2 warnings in 4.85s | 5.3 |
-| 161 | Accessibility tests | **PASS** | 15 passed, 76 deselected in 7.10s | 7.5 |
-| 162 | Visual regression tests | **PASS** | 72 passed, 19 deselected in 16.88s | 17.3 |
+| 155 | Strict type checks | **PASS** | Success: no issues found in 141 source files | 0.1 |
+| 156 | Unit tests | **PASS** | 595 passed in 0.74s | 1.1 |
+| 157 | Property-based tests | **PASS** | 10 passed in 0.17s | 0.5 |
+| 158 | Golden extraction tests | **PASS** | 46 passed in 14.73s | 15.0 |
+| 159 | Integration tests | **PASS** | 691 passed, 2 warnings in 140.72s (0:02:20) | 141.2 |
+| 160 | End-to-end tests | **PASS** | 24 passed, 2 warnings in 4.87s | 5.3 |
+| 161 | Accessibility tests | **PASS** | 15 passed, 76 deselected in 7.03s | 7.4 |
+| 162 | Visual regression tests | **PASS** | 72 passed, 19 deselected in 16.22s | 16.6 |
 | 163 | Production build | **PASS** | 33 routes, health 200, static and tokens served | 0.7 |
-| 164 | Independent arithmetic benchmark | **PASS** | 12 passed, 24 deselected in 0.89s | 1.2 |
-| 165 | Section 4 accuracy contract | **PASS** | 20 of 22 outputs 4.16 names are compared against an implementation sharing no helper with the engine (4.15), on the dataset named below, and every comparison asserts EXACT equality rather than a toler | 1.2 |
+| 164 | Independent arithmetic benchmark | **PASS** | 12 passed, 24 deselected in 1.04s | 1.3 |
+| 165 | Section 4 accuracy contract | **PASS** | 20 of 22 outputs 4.16 names are compared against an implementation sharing no helper with the engine (4.15), on the dataset named below, and every comparison asserts EXACT equality rather than a toler | 1.3 |
 | 166 | No source PDF or secret in Git | **PASS** | No source PDF and no secret value in the tree (259 tracked file(s) checked). 20.4 holds. | 0.1 |
 | 167 | 21.1's sixteen export tabs are all built | **PASS** | 16 tabs | 0.0 |
 | 167 | Every Section 22 clause is either covered or says why not | **PASS** | 55 clauses, 49 covered, 6 with a stated reason | 0.0 |
 | 167 | Every test the Section 22 plan names exists | **PASS** | every named test resolves | 0.0 |
-| 167 | README's phase range is stated | **PASS** | README says phases 2-16 of 17 | 0.0 |
+| 167 | README's phase range matches what is built | **PASS** | README says phases 2-17 of 17 | 0.0 |
 | 167 | README's test count matches the suite | **PASS** | README says 1454, pytest collects 1454 | 0.0 |
 | 167 | Section 17's thirty checks are all in the registry | **PASS** | 30 checks registered | 0.0 |
 | 167 | The forced/proposed severity split agrees across the documents | **PASS** | registry: 5 forced, 25 proposed; validation-policy.md and decision-ledger.md agree | 0.0 |

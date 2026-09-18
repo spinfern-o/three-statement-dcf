@@ -8,7 +8,7 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–16 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–17 of 17** |
 
 ## Status, stated plainly
 
