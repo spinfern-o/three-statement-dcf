@@ -314,3 +314,144 @@ def test_a_tolerance_wide_enough_to_pass_still_reports_the_difference():
     assert "0 period(s) tie exactly" in lenient.detail
     assert "within" in lenient.detail and "not exact" in lenient.detail
     assert "unexplained -0.001" in lenient.detail
+
+
+# --- item 71 / 13.3: the intangibles roll-forward, buildable at last --------
+
+
+YEARS = ("2024A", "2025A")
+
+
+def test_the_intangibles_roll_forward_runs_on_a_filing_that_discloses_both_sides():
+    """13.3, on the shape it was written for (F-17).
+
+    Opening 400, amortization 60, closing 340: the roll-forward ties exactly
+    and there is nothing unexplained, because this filer added and impaired
+    nothing in the period.
+    """
+    from apps.api.app.schedules.rollforward import intangibles_schedule
+
+    books = ledgers(
+        YEARS,
+        balance={accounts.INTANGIBLES: {"2024A": "400", "2025A": "340"}},
+        cashflow={accounts.AMORTIZATION: {"2025A": "60"}},
+    )
+    schedule = intangibles_schedule(books, YEARS)
+
+    assert schedule.availability is Availability.AVAILABLE, schedule.reason
+    row = schedule.years[0]
+    assert row.year == "2025A"
+    assert row.beginning.value == D("400")
+    assert row.computed_ending == D("340")
+    assert row.reported_ending == D("340")
+    assert schedule.reconciliations[0].difference == D("0")
+
+
+def test_an_addition_the_filing_does_not_quantify_lands_in_the_difference():
+    """Not plugged, and not solved for.
+
+    This filer's intangibles went UP by 90 while amortizing 60, so it added
+    150 of something. The cash flow statement does not say so on its face, and
+    the schedule reports a difference of 150 rather than inventing an
+    additions line to absorb it. That difference is the finding.
+    """
+    from apps.api.app.schedules.rollforward import intangibles_schedule
+
+    books = ledgers(
+        YEARS,
+        balance={accounts.INTANGIBLES: {"2024A": "400", "2025A": "490"}},
+        cashflow={accounts.AMORTIZATION: {"2025A": "60"}},
+    )
+    schedule = intangibles_schedule(books, YEARS)
+
+    row = schedule.years[0]
+    assert row.computed_ending == D("340")
+    assert row.reported_ending == D("490")
+    # `difference` is computed minus reported, so an unquantified ADDITION
+    # reads negative: the schedule explains 150 less than the balance sheet
+    # carries.
+    assert schedule.reconciliations[0].difference == D("-150")
+
+
+def test_combined_d_and_a_is_not_charged_against_intangibles():
+    """The mistake the schedule refuses to make.
+
+    A filing reporting one combined `depreciation_amortization` figure has no
+    separable amortization charge. Using the combined line here would be wrong
+    by the whole of depreciation -- and the PP&E schedule is already charging
+    that same figure, so the two would double count it.
+    """
+    from apps.api.app.schedules.rollforward import intangibles_schedule
+
+    books = ledgers(
+        YEARS,
+        balance={accounts.INTANGIBLES: {"2024A": "400", "2025A": "340"}},
+        cashflow={accounts.DEPRECIATION_AMORTIZATION: {"2025A": "260"}},
+    )
+    schedule = intangibles_schedule(books, YEARS)
+
+    row = schedule.years[0]
+    # The amortization movement is absent, not 260.
+    assert row.movements[0].value is None
+    assert row.computed_ending == D("400")
+    assert schedule.availability is Availability.PARTIAL
+    assert any("combined" in c.text for c in schedule.caveats)
+
+
+def test_goodwill_is_named_and_deliberately_not_rolled_forward():
+    """It is not amortized, so it has no charge to roll against."""
+    from apps.api.app.schedules.rollforward import intangibles_schedule
+
+    books = ledgers(
+        YEARS,
+        balance={
+            accounts.INTANGIBLES: {"2024A": "400", "2025A": "340"},
+            accounts.GOODWILL: {"2024A": "900", "2025A": "900"},
+        },
+        cashflow={accounts.AMORTIZATION: {"2025A": "60"}},
+    )
+    schedule = intangibles_schedule(books, YEARS)
+
+    assert any("not amortized" in c.text for c in schedule.caveats)
+    # And the balance it rolls is the intangibles one, untouched by goodwill.
+    assert schedule.years[0].beginning.value == D("400")
+
+
+def test_the_ppe_schedule_prefers_a_disclosed_depreciation_line():
+    """12.1.e. Charging combined D&A against PP&E is right only if the company
+    amortizes nothing, and a filer that discloses the split has said otherwise."""
+    books = ledgers(
+        YEARS,
+        balance={accounts.PPE_NET: {"2024A": "1000", "2025A": "1100"}},
+        cashflow={
+            accounts.CAPEX: {"2025A": "-300"},
+            accounts.DEPRECIATION: {"2025A": "200"},
+            accounts.AMORTIZATION: {"2025A": "60"},
+        },
+    )
+    schedule = ppe_schedule(books, YEARS)
+
+    labels = [line.label for line in schedule.years[0].movements]
+    assert "Depreciation" in labels
+    assert "Depreciation and amortization" not in labels
+    # 1000 + 300 - 200 = 1100, and the amortization is not charged here.
+    assert schedule.years[0].computed_ending == D("1100")
+    assert not any("combined" in c.text for c in schedule.caveats)
+
+
+def test_the_ppe_schedule_says_so_when_it_must_use_the_combined_line():
+    """And the caveat is what tells a reader which of the two they have."""
+    books = ledgers(
+        YEARS,
+        balance={accounts.PPE_NET: {"2024A": "1000", "2025A": "1040"}},
+        cashflow={
+            accounts.CAPEX: {"2025A": "-300"},
+            accounts.DEPRECIATION_AMORTIZATION: {"2025A": "260"},
+        },
+    )
+    schedule = ppe_schedule(books, YEARS)
+
+    labels = [line.label for line in schedule.years[0].movements]
+    assert "Depreciation and amortization" in labels
+    assert schedule.years[0].computed_ending == D("1040")
+    assert any("combined" in c.text for c in schedule.caveats)

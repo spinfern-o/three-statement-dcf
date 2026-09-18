@@ -762,24 +762,49 @@ amortization against PP&E. That is right only if the company amortizes
 nothing, and the schedule says so rather than quietly being wrong for any
 filing with intangibles.
 
-#### What the chart change does not by itself close
+#### What the chart change closed, and what it did not
 
-The chart was the blocker for all four, and it is gone. Building on it is
-separate work, still outstanding:
+- **13.3 intangibles is built.** Both sides now exist, and the roll-forward
+  runs like 13.2 and 13.4. Amortization is the only movement the face
+  statements quantify; additions, impairments and FX land in the unexplained
+  difference, which is where a movement a filing does not quantify belongs.
+  Solving for them would make the 13.8 reconciliation tie unconditionally and
+  be worth nothing.
 
-- **13.3 intangibles** now has both sides -- `intangibles` and `amortization`
-  -- so the roll-forward can be built. It has not been.
-- **13.5 leases** now has a liability line, so a filer with leases is
-  distinguishable from one whose leases sit inside other non-current
-  liabilities. The payment schedule the roll-forward needs does not exist.
-- **13.7 share counts** is unchanged and is NOT a chart problem. The chart
-  holds currency amounts; a share count is neither. It remains a valuation
-  input supplied with its own source (STEP 35), and `BLOCKED` still refuses to
-  map a weighted-average share line into a statement.
-- The **PP&E caveat** above is now avoidable for a filer that discloses the
-  split: `depreciation` exists. The schedule does not yet prefer it.
+  **Goodwill is deliberately not rolled forward.** It is not amortized under
+  either standard, so it has no charge to roll against -- it moves only on an
+  acquisition, a disposal or an impairment, none of which the face statements
+  quantify. A goodwill roll-forward from this data would be one number
+  repeated, asserting that nothing happened. A caveat says so on any filing
+  that reports goodwill.
 
-Check 17.12 still reports SKIP citing F-17, and will until 13.3 is built.
+- **Check 17.12 runs.** It reported SKIP for eleven phases with a reason about
+  *this system*. It now reads like 17.11 and 17.13, and on a filing with no
+  intangibles it skips because THAT FILING has no opening balance. The
+  difference matters to a reader: the first sends them looking for a missing
+  feature, the second sends them to the balance sheet, where the answer is.
+
+- **The PP&E schedule prefers a disclosed `depreciation` line** and carries
+  the combined-D&A caveat only for a filing that does not disclose one.
+  Preferring it *silently* would have been worse than either: the caveat is
+  what tells a reader which of the two figures they are looking at.
+
+- **13.5 leases is still unavailable, and for a different reason now.** The
+  ending balance exists, so a filer with leases is distinguishable from one
+  whose leases sit inside other non-current liabilities -- that half is
+  closed. Every movement is still missing, and not because the chart is short:
+  additions, payments and the interest component are in the lease footnote's
+  maturity table rather than on the face of the statements. **Building it
+  needs footnote extraction, not more canonical lines.** A roll-forward with a
+  balance and no movements explains nothing, so it is reported as unavailable
+  rather than rendered as a table whose every row reads "unexplained".
+
+- **13.7 share counts is unchanged and was never a chart-length problem.** The
+  chart holds currency amounts; a share count is neither an amount nor a line
+  the sign conventions apply to. It remains a valuation input supplied with
+  its own source (STEP 35), and `BLOCKED` still refuses to map a
+  weighted-average share line into a statement. It survived the extension
+  because lengthening the chart does not fix it.
 
 
 ### F-18 — RESOLVED in Phase 6. The extractor was truncating long row labels

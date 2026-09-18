@@ -246,43 +246,71 @@ PPE_FORMULA = (
     "- Disposals +/- FX and Other Adjustments"
 )
 
-PPE_MOVEMENTS = (
-    Movement(
-        account=accounts.CAPEX,
-        statement=Statement.CASHFLOW,
-        multiplier=-1,
-        label="Capital expenditure",
-        basis=(
-            "cash flow statement `capex`, which model/accounts.py stores as a "
-            "negative outflow; negated here because buying PP&E increases it"
-        ),
-    ),
-    Movement(
-        account=accounts.DEPRECIATION_AMORTIZATION,
-        statement=Statement.CASHFLOW,
-        multiplier=-1,
-        label="Depreciation and amortization",
-        basis=(
-            "cash flow statement `depreciation_amortization`, a positive add-back "
-            "in operating cash flow; subtracted here because it reduces the "
-            "carrying amount"
-        ),
+_CAPEX_MOVEMENT = Movement(
+    account=accounts.CAPEX,
+    statement=Statement.CASHFLOW,
+    multiplier=-1,
+    label="Capital expenditure",
+    basis=(
+        "cash flow statement `capex`, which model/accounts.py stores as a "
+        "negative outflow; negated here because buying PP&E increases it"
     ),
 )
+
+#: Used when the filing discloses depreciation separately (12.1.e).
+_DEPRECIATION_MOVEMENT = Movement(
+    account=accounts.DEPRECIATION,
+    statement=Statement.CASHFLOW,
+    multiplier=-1,
+    label="Depreciation",
+    basis=(
+        "cash flow statement `depreciation`, disclosed separately from "
+        "amortization; subtracted here because it reduces the carrying amount"
+    ),
+)
+
+#: Used when it does not, which is most filings.
+_COMBINED_DA_MOVEMENT = Movement(
+    account=accounts.DEPRECIATION_AMORTIZATION,
+    statement=Statement.CASHFLOW,
+    multiplier=-1,
+    label="Depreciation and amortization",
+    basis=(
+        "cash flow statement `depreciation_amortization`, a positive add-back "
+        "in operating cash flow; subtracted here because it reduces the "
+        "carrying amount"
+    ),
+)
+
+PPE_MOVEMENTS = (_CAPEX_MOVEMENT, _COMBINED_DA_MOVEMENT)
 
 
 def ppe_schedule(ledgers: dict, years: tuple[str, ...]) -> RollForwardSchedule:
     """13.2. Built from CapEx and D&A, with three honest gaps named."""
-    caveats = [
-        Caveat(
-            "13.2 / 13.3",
-            "The canonical chart has one combined `depreciation_amortization` "
-            "line, and this schedule charges all of it against PP&E. That is "
-            "right only if the company amortizes nothing. Splitting it needs the "
-            "PP&E note, which this system does not yet extract into canonical "
-            "lines -- so read the PP&E movement as depreciation *and* "
-            "amortization until it does.",
-        ),
+    cashflow_ledger: Ledger = ledgers[Statement.CASHFLOW]
+    splits = any(cashflow_ledger.has(accounts.DEPRECIATION, year) for year in years)
+
+    # 12.1.e. A filing that discloses depreciation separately gets the right
+    # figure charged against PP&E; one that does not gets the combined line and
+    # the caveat saying so. Preferring the split silently would be worse than
+    # either: the caveat is what tells a reader which of the two they are
+    # looking at.
+    movements = (_CAPEX_MOVEMENT, _DEPRECIATION_MOVEMENT if splits else _COMBINED_DA_MOVEMENT)
+
+    caveats = []
+    if not splits:
+        caveats.append(
+            Caveat(
+                "13.2 / 13.3",
+                "This filing reports one combined `depreciation_amortization` "
+                "figure, and this schedule charges all of it against PP&E. That "
+                "is right only if the company amortizes nothing. The chart now "
+                "carries a separate `depreciation` line (12.1.e) and this "
+                "schedule uses it wherever a filing discloses it -- this one "
+                "does not.",
+            )
+        )
+    caveats += [
         Caveat(
             "13.2",
             "Disposals and FX have no canonical line. A disposal in the period "
@@ -291,8 +319,7 @@ def ppe_schedule(ledgers: dict, years: tuple[str, ...]) -> RollForwardSchedule:
             "quantify.",
         ),
     ]
-    cashflow: Ledger = ledgers[Statement.CASHFLOW]
-    if any(cashflow.has(accounts.ACQUISITIONS, year) for year in years):
+    if any(cashflow_ledger.has(accounts.ACQUISITIONS, year) for year in years):
         caveats.append(
             Caveat(
                 "13.2",
@@ -309,7 +336,102 @@ def ppe_schedule(ledgers: dict, years: tuple[str, ...]) -> RollForwardSchedule:
         rule="13.2",
         formula=PPE_FORMULA,
         balance_account=accounts.PPE_NET,
-        movements=PPE_MOVEMENTS,
+        movements=movements,
+        ledgers=ledgers,
+        years=years,
+        caveats=tuple(caveats),
+    )
+
+
+# --- item 71: intangibles (13.3) --------------------------------------------
+
+INTANGIBLES_FORMULA = (
+    "Ending Intangibles = Beginning Intangibles + Additions - Amortization "
+    "- Impairment +/- FX and Other Adjustments"
+)
+
+INTANGIBLES_MOVEMENTS = (
+    Movement(
+        account=accounts.AMORTIZATION,
+        statement=Statement.CASHFLOW,
+        multiplier=-1,
+        label="Amortization",
+        basis=(
+            "cash flow statement `amortization`, a positive add-back in "
+            "operating cash flow; subtracted here because it reduces the "
+            "carrying amount"
+        ),
+    ),
+)
+
+
+def intangibles_schedule(ledgers: dict, years: tuple[str, ...]) -> RollForwardSchedule:
+    """13.3, buildable since the chart grew both of its sides (F-17).
+
+    This schedule reported itself unavailable for eleven phases, because
+    neither side existed: goodwill and intangibles both mapped to
+    `other_noncurrent_assets`, and `depreciation_amortization` was one combined
+    figure. Both are now canonical lines.
+
+    **Amortization is the only movement the face statements quantify.**
+    Additions, impairments and FX are real and are disclosed in the intangibles
+    note rather than on the face, so they land in the unexplained difference --
+    which is where a movement this filing does not quantify belongs. Solving
+    for them would make the 13.8 reconciliation tie unconditionally and be
+    worth nothing.
+
+    **Goodwill is not rolled forward here.** It is not amortized under IFRS or
+    US GAAP, so it has no charge to roll against: it moves only on an
+    acquisition, a disposal or an impairment, none of which the face statements
+    quantify either. A goodwill roll-forward built from this data would be a
+    table of one number repeated, asserting that nothing happened.
+    """
+    balance: Ledger = ledgers[Statement.BALANCE]
+    cashflow: Ledger = ledgers[Statement.CASHFLOW]
+
+    caveats = [
+        Caveat(
+            "13.3",
+            "Additions, impairments and FX have no canonical line: a filing "
+            "discloses them in the intangibles note rather than on the face of "
+            "the statements. Any such movement therefore shows up in the "
+            "unexplained difference, which is where a movement this filing "
+            "does not quantify belongs.",
+        ),
+    ]
+    if any(balance.has(accounts.GOODWILL, year) for year in years):
+        caveats.append(
+            Caveat(
+                "13.3",
+                "This filing reports goodwill, and it is deliberately NOT "
+                "rolled forward here. Goodwill is not amortized under either "
+                "IFRS or US GAAP, so it has no charge to roll against -- it "
+                "moves only on an acquisition, a disposal or an impairment, "
+                "none of which the face statements quantify. A goodwill "
+                "roll-forward from this data would be one number repeated, "
+                "asserting that nothing happened.",
+            )
+        )
+    if not any(cashflow.has(accounts.AMORTIZATION, year) for year in years):
+        caveats.append(
+            Caveat(
+                "13.3 / 12.1.e",
+                "This filing reports one combined "
+                "`depreciation_amortization` figure rather than the split, so "
+                "the amortization charge against these intangibles is not "
+                "separable. The combined line is NOT used here: charging "
+                "depreciation against intangibles would be wrong by the whole "
+                "of it, and the PP&E schedule already carries the combined "
+                "figure.",
+            )
+        )
+    return build_rollforward(
+        key="intangibles",
+        title="Intangibles and amortization",
+        rule="13.3",
+        formula=INTANGIBLES_FORMULA,
+        balance_account=accounts.INTANGIBLES,
+        movements=INTANGIBLES_MOVEMENTS,
         ledgers=ledgers,
         years=years,
         caveats=tuple(caveats),

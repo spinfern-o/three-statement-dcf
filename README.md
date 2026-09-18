@@ -235,7 +235,7 @@ baked in by a script somebody has to remember to run. A deployment from a dirty
 tree reports its commit as `-dirty`, because that deployment is not the version
 the suite passed and the value itself should say so.
 
-1435 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+1443 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -276,6 +276,22 @@ high by the whole of operating expenses for a filer reporting no expense
 categories; and the forecast's balance-sheet totals were summed by hand, so
 adding goodwill to the chart broke A = L + E by exactly the goodwill until the
 totals were made to read their own membership.
+
+**13.3's intangibles roll-forward is built, and 13.5's leases still is not —
+for a different reason than before.** Closing F-17 gave 13.3 both of its sides,
+so it runs like the PP&E and debt schedules, with amortization as the only
+movement the face statements quantify and everything else landing in the
+unexplained difference. Goodwill is deliberately *not* rolled forward: it is
+not amortized under either standard, so a roll-forward from this data would be
+one number repeated, asserting that nothing happened.
+
+13.5 now has its ending balance — a filer with leases is distinguishable from
+one whose leases sit inside other non-current liabilities. What is missing is
+every movement, and **that needs footnote extraction rather than more
+canonical lines**: additions, payments and the interest component live in the
+lease maturity table, not on the face of the statements. 13.7's share counts
+were never a chart-length problem at all — the chart holds currency amounts
+and a share count is neither.
 
 **What does not exist yet: a deployment.** Every one of the specification's
 180 items that is code is built. What is left is Phase 17's decisions —
@@ -579,10 +595,10 @@ Supporting schedules (specification Phase 7, items 69–77):
 |---|---|---|
 | `apps/api/app/schedules/base.py` | — | The shared vocabulary: a line, a caveat, a reconciliation, and availability with a reason |
 | `apps/api/app/schedules/working_capital.py` | 69 | 13.1, with DSO, inventory days and DPO, and the day-count convention stated |
-| `apps/api/app/schedules/rollforward.py` | 70, 72, 75 | PP&E, debt and equity, built from disclosed movements only |
+| `apps/api/app/schedules/rollforward.py` | 70, 71, 72, 75 | PP&E, intangibles, debt and equity, built from disclosed movements only |
 | `apps/api/app/schedules/interest.py` | 72 | 13.4's stated basis: beginning debt, because that is what the forecast charges |
 | `apps/api/app/schedules/tax.py` | 74 | 13.6's effective rate, and the four components only a tax footnote carries |
-| `apps/api/app/schedules/unavailable.py` | 71, 73 | The three that cannot be built, each with its reason (F-17) |
+| `apps/api/app/schedules/unavailable.py` | 73 | The two that cannot be built, each with its reason — and why a longer chart does not fix either |
 | `apps/api/app/schedules/checks.py` | 76 | 13.8: every schedule against its statement line, every period |
 | `apps/api/app/api/templates/schedules.html` | 77 | The 7.6 screen |
 
