@@ -630,3 +630,48 @@ def test_that_guard_would_have_caught_the_defect_it_exists_for():
         and ast.dump(node.left) == ast.dump(node.comparators[0])
     ]
     assert len(found) == 1, found
+
+
+def test_every_finding_records_its_status():
+    """Item 167, applied to the document that records findings.
+
+    Six of the thirty-eight headings carried no status, so a reader counting
+    open findings by scanning would have counted ten where there are four.
+    Two of the six actively misled: F-7's summary line still read "None was
+    fixed" above three bullets each marked RESOLVED.
+
+    The status is in the heading rather than the body because scanning is how
+    this document is read once it passes about twenty entries.
+    """
+    import re
+    from pathlib import Path
+
+    ledger = (Path(__file__).resolve().parents[4] / "docs" / "decision-ledger.md").read_text()
+    headings = re.findall(r"^### (F-\d+) — (.*)$", ledger, re.MULTILINE)
+    assert len(headings) >= 38, len(headings)
+
+    known = ("RESOLVED", "MITIGATED", "ANSWERED", "OPEN")
+    unmarked = [f"{name} — {rest}" for name, rest in headings if not rest.startswith(known)]
+    assert unmarked == [], unmarked
+
+
+def test_the_open_findings_are_the_ones_the_ledger_says_they_are():
+    """And there are four, each named in the index at the top of the section.
+
+    A count that drifts from the list beside it is the same failure one level
+    up: the index would read as a summary of something it no longer summarises.
+    """
+    import re
+    from pathlib import Path
+
+    ledger = (Path(__file__).resolve().parents[4] / "docs" / "decision-ledger.md").read_text()
+    open_findings = {
+        name
+        for name, rest in re.findall(r"^### (F-\d+) — (.*)$", ledger, re.MULTILINE)
+        if rest.startswith("OPEN")
+    }
+    assert open_findings == {"F-2", "F-3", "F-4", "F-11"}, open_findings
+
+    index = ledger.split("The four that are open are the owner's")[1].split("## ")[0]
+    for name in sorted(open_findings):
+        assert f"**{name}**" in index, f"{name} is OPEN and not in the index"

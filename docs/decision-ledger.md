@@ -157,6 +157,33 @@ None of these are derivable from a filing. All require an external, dated source
 
 Recorded here because they change what can truthfully be claimed.
 
+**Every heading carries a status**, so the open ones can be found by scanning
+rather than by reading thirty-eight entries. Six headings did not, and a reader
+counting open findings would have counted ten where there are four — which is
+the drift item 167 exists to catch, in the document that records drift.
+`test_every_finding_records_its_status` keeps it that way.
+
+| Status | Meaning |
+|---|---|
+| `RESOLVED` | Fixed, with the fix and usually a regression test named in the entry |
+| `MITIGATED` | Not fixed as originally proposed; the risk is controlled and the control is tested, with the residual named |
+| `ANSWERED` | The requirement is satisfied by something other than what it appeared to ask for, and the entry says how |
+| `OPEN` | Outstanding |
+
+**The four that are open are the owner's, not the implementing agent's:**
+
+- **F-2** — Section 26's design observations could not be independently
+  verified, because decisions 2.3.d and 2.3.e close outbound network access.
+  Not closable from inside this repository at all.
+- **F-3** — `main` has no branch protection. Repository administration.
+- **F-4** — Section 17 assigns a severity to none of its thirty checks. Five
+  are forced by rules stating a consequence; the other twenty-five are
+  proposals awaiting ratification. Until then the gate blocks on every
+  outstanding check, which is strictly stricter than item 137 under any
+  assignment the owner might make.
+- **F-11** — whether one scanned page should refuse a whole filing, and if not,
+  which of two amendments.
+
 ### F-1 — RESOLVED (2026-09-16). The engine now uses exact decimal arithmetic
 
 **Was: blocks any claim of Section 4 compliance. Now: closed.**
@@ -234,21 +261,21 @@ CFO/CFI/CFF and change-in-NWC but the model has no EBITDA line, because the
 37-step workflow never defines one (12.1.f makes it conditional on a visible
 bridge).
 
-### F-2 — Section 26's design observations could not be independently verified
+### F-2 — OPEN, and not closable here. Section 26's design observations could not be independently verified
 
 findash.ai renders its content with JavaScript; fetching the page yields only
 the document title. The colors and typefaces in Section 6.1–6.2 are recorded as
 the owner's stated observations. Section 6.4 requires token values to pass
 contrast testing regardless, which governs what is actually adopted.
 
-### F-3 — `main` has no branch protection
+### F-3 — OPEN. `main` has no branch protection
 
 CI (`.github/workflows/tests.yml`) runs on pull requests but is not a required
 check, so it cannot block a merge. PR #1 merged into `main` with no CI in the
 repository at all. Enabling a required status check is a repository-settings
 action the implementing agent cannot perform.
 
-### F-4 — Section 17 does not assign a severity to any of its thirty checks
+### F-4 — OPEN. Section 17 does not assign a severity to any of its thirty checks
 
 **Blocks Phase 13 item 137 (prevent release when CRITICAL/ERROR checks remain).**
 
@@ -355,9 +382,14 @@ string — which is what 4.2 asks for anyway). It was **not applied**: the
 session that found it was scoped to documentation only, and `run_model.py` was
 explicitly out of scope.
 
-### F-7 — Three narrower defects found while reading the engine
+### F-7 — RESOLVED in #7. Three narrower defects found while reading the engine
 
-None was fixed, for the same scope reason. All are verified, not suspected.
+All three were found by reading the engine rather than by a failing test, and
+all three are verified rather than suspected. The sentence here read "None was
+fixed, for the same scope reason" for as long as that was true; it stopped
+being true in #7, and the three bullets below have said RESOLVED since. A
+summary contradicting the detail directly beneath it is the drift item 167
+exists to catch, so it now says what the bullets say.
 
 **F-7a. RESOLVED in #7.** `_shift_wacc` now raises rather than returning an
 unshifted cost of capital labelled with a WACC it did not reach. Regression test
@@ -414,7 +446,7 @@ findings. Re-verified by grep rather than by reading:
   error. `test_units_multiplier_values_are_pinned` holds the values. This
   becomes a real gap the moment 2.3.a permits more than one PDF per company.
 
-### F-38 — Check 17.29 was a tautology, and passed for four phases
+### F-38 — RESOLVED. Check 17.29 was a tautology, and passed for four phases
 
 17.29 asks that every displayed rounded value tie to its full-precision stored
 value (4.18, 4.19). The check read:
@@ -1107,7 +1139,7 @@ what the stylesheet claims.
 
 ---
 
-### F-37 — The release report said READY without addressing Section 24
+### F-37 — RESOLVED. The release report said READY without addressing Section 24
 
 Section 24 lists twenty-two release acceptance criteria and opens with "the
 application is not complete until all applicable items pass". 24.22 then asks
@@ -1177,7 +1209,7 @@ CI's drift check filtered `| 22.` rows only, so it now covers `| 24.` as well
 gates* and `--fast` legitimately leaves 24.15 and 24.16 as NOT RUN. What must
 not drift is the evidence each criterion names.
 
-### F-34 — Phase 17. The application was sending no security headers at all
+### F-34 — RESOLVED in Phase 17. The application was sending no security headers at all
 
 Item 175 asks that TLS and security headers be verified. There was nothing to
 verify: every response left the application with FastAPI's defaults and
@@ -1218,7 +1250,7 @@ The middleware is installed **after** the guard, so it wraps the guard's own
 refusals. A 303 to `/login` is a response too, and it was the one response an
 unauthenticated reader was guaranteed to receive.
 
-### F-35 — Phase 17. A smoke test that authenticates cannot run against production
+### F-35 — RESOLVED in Phase 17. A smoke test that authenticates cannot run against production
 
 Item 179 asks for production smoke tests *without exposing private data*, and
 those two halves pull against each other. A smoke test that logs in proves
@@ -1246,7 +1278,7 @@ reading it goes and changes the deployment. HTTP header names are
 case-insensitive and servers disagree about case; `_Headers` now lowercases on
 both sides.
 
-### F-36 — Phase 17. There are no migrations, and item 173 is answered anyway
+### F-36 — ANSWERED in Phase 17. There are no migrations, and item 173 is answered anyway
 
 Item 173 asks that database migrations and a rollback plan be verified. This
 application stores JSON files on a filesystem
