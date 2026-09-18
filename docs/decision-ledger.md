@@ -476,7 +476,38 @@ evidence names a property it never examined is exactly how 17.29 spent four
 phases passing on nothing — and its evidence states plainly which half of the
 clause it did not verify.
 
-### F-9 — The engine's error messages conflict with 20.16 under hosted deployment
+### F-9 — MITIGATED and now tested. Engine error messages and 20.16
+
+The website inherited this, and the mitigation turned out to be already in
+place for a reason nobody had written down or pinned. Measured rather than
+reasoned about:
+
+- **An unhandled engine exception does not reach the response.** `create_app`
+  leaves `debug` off, so Starlette's default handler returns a bare "Internal
+  Server Error" with no message and no traceback. Verified by raising a
+  `ProvenanceError` carrying a figure from a route and reading the body.
+- **Nothing logs exception text.** `security/logging.py` records identifiers,
+  never values, and no call site passes `str(exc)` into it.
+- **A handled error IS rendered with its figures**, and that is not 20.16's
+  concern: `authorization.require_access` runs before the build, so the only
+  reader who reaches such a page is the document's owner, looking at figures
+  from the filing they are already reviewing.
+
+**The mitigation is a setting, and a setting can be changed** by somebody
+debugging a problem who then forgets. Three tests in `test_security.py` now
+assert it, one of them on `app.debug` directly, so that change fails in CI
+rather than in production. The unauthenticated refusal is asserted
+byte-identical for a real document and an invented one, so it cannot be used
+to probe which identifiers exist (20.7).
+
+**Residual, unchanged:** the resolution the original finding proposed -- a
+structured error code plus a redacted message at the boundary, with the full
+diagnostic retained server-side -- is still the right shape and still not
+built. It matters the moment 2.2.b stops meaning one user, because then a
+handled error could render a figure to somebody who is not the filing's owner.
+Phase 2 item 23 is where it belongs.
+
+#### The original finding
 
 Not a defect today, and worth recording before the website inherits it.
 
