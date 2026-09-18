@@ -8,7 +8,7 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–15 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–16 of 17** |
 
 ## Status, stated plainly
 
@@ -173,7 +173,30 @@ the tar is well-formed, not that the bytes inside it are the bytes that went in.
 That verification runs in CI on every commit rather than quarterly on a
 calendar.
 
-1297 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**The release-readiness report is generated, not written.** Item 168 asks for
+PASS/FAIL evidence, and a file somebody typed is a claim about the code rather
+than evidence about it. Every row in
+[`docs/release-readiness.md`](docs/release-readiness.md) is the result of
+running something, with the command printed beside it, and the generator exits
+non-zero unless every gate passed — a skipped gate blocks the verdict, because
+a check that did not run has not passed.
+
+It found three real things on its first run, including a stale test count in
+this file. CI regenerates it and fails when the committed copy has drifted.
+
+**This is the one place the 0.0001% claim can be made.** 4.20 permits it only
+once the benchmark suite passes *and* the report names the exact dataset and
+formulas. A web process cannot observe the test suite, so the in-app panel
+reports coverage and says the result is not observed; a report generator runs
+the suite, so it names the dataset, lists all twenty-two of 4.16's outputs, and
+reports the contract **UNPROVEN** when the benchmark did not pass rather than
+carrying the claim forward.
+
+**A READY verdict is not permission to deploy**, and the report says so: Phase
+17 item 169 requires the target, the access level and the data policy to be
+confirmed first.
+
+1353 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -593,6 +616,15 @@ Security and operations (specification Phase 15, items 145–153):
 | `apps/api/app/security/retention.py` | 151 | 2.6.c's deletion, behind 20.18, leaving a tombstone |
 | `apps/api/app/security/repository_scan.py` | 152 | No source PDF and no secret in Git, checked in CI |
 | [`docs/incident-response.md`](docs/incident-response.md) | 153 | What to do, and what this system does not defend against |
+
+Final verification (specification Phase 16, items 154–168):
+
+| Path | Item | What it does |
+|---|---|---|
+| `pyproject.toml` | 154, 155 | Ruff and mypy, with a reason beside every rule and every exclusion |
+| `apps/api/app/verification/plan.py` | 156–162 | Section 22's fifty-five clauses, mapped onto the tests that cover them |
+| `apps/api/app/verification/report.py` | 168 | The release-readiness report: every row the result of running something |
+| [`docs/release-readiness.md`](docs/release-readiness.md) | 168 | Its output, regenerated in CI so it cannot go stale |
 
 Documentation:
 

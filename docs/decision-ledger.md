@@ -1184,6 +1184,78 @@ Buildable now, because it depends on no OPEN decision:
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
 
+**Phase 16 (items 154-168) is built**, in
+[`apps/api/app/verification/`](../apps/api/app/verification), with
+[`release-readiness.md`](release-readiness.md) as its output and
+[`pyproject.toml`](../pyproject.toml) carrying the two tool configurations.
+
+**Item 168's report is generated, and that is the whole design.** "Produce a
+release-readiness report with PASS/FAIL evidence" could be satisfied by a
+markdown file somebody wrote, and a file somebody wrote is a claim about the
+code rather than evidence about it -- read six months later by whoever has to
+decide whether to trust a number. So every row comes from running something,
+the command is printed beside the result, and the exit code is non-zero unless
+every gate passed.
+
+**It caught three things on its first run**, which is the argument for building
+it rather than writing it: two files I had just added were unformatted, and
+**the test count in `README.md` was stale** -- the exact drift item 167 exists
+to find. It went stale twice more in the same hour as tests were added, and was
+caught both times.
+
+**4.20's claim is made here and nowhere else.** The clause permits "less than
+0.0001% error" only once the benchmark suite passes *and* the report identifies
+the exact dataset and formulas. The in-app panel cannot satisfy the first half
+-- a web process does not observe the test suite -- so it reports coverage and
+says the result is not observed. A report generator *runs* the suite, so it can
+satisfy both halves: it names the fixtures, the extreme-input cases and the
+randomized sweep, and lists all twenty-two of 4.16's outputs with where each
+comparison lives. When the benchmark does not pass, or was skipped, the contract
+is reported **UNPROVEN** rather than carried forward from the last green run.
+Three tests assert that, because it is the one claim in this repository that
+would be most tempting to make anyway.
+
+**A skipped gate blocks the verdict.** Rule 1.14 applied to the report itself: a
+check that did not run has not passed, and a release report whose worst row
+reads NOT RUN is one somebody will read as green.
+
+**A READY verdict says it is not permission to deploy.** Phase 17 item 169 is
+explicit -- do not deploy until the target, the access level and the data policy
+are confirmed -- and a report saying READY is precisely the artefact most likely
+to be quoted as though it were that permission. A test asserts the sentence is
+there.
+
+**Section 22's plan is a map with its gaps written in.** Fifty-five clauses;
+forty-nine covered by named tests, six with a stated reason. `Coverage` refuses
+construction with neither a test nor a reason, because a row with neither reads
+as covered -- which is the failure mode of every test plan. The six: 22.1.j
+(RBAC is not applicable under 2.2.d, not untested), 22.3.f (no fixture carries
+both an original and a restated prior year) and all four of 22.8's performance
+targets, which 22.8 itself scopes "to be measured on documented hardware/data"
+that no deployment has yet.
+
+**Writing that map found its own defect.** Twenty-seven of the test names in the
+first draft did not exist -- guessed from what a test *should* be called rather
+than read from the tree. `missing_tests()` is what found them, and it now runs
+in the suite, so a renamed test is a failure rather than a silently weakened
+claim.
+
+**The production-build gate was checking nothing, and admitting that made it a
+gate.** `assert app.routes` passes for any application: this FastAPI version
+wraps an included router as a *single* entry, so `len(app.routes)` is 4 whether
+the router declares thirty routes or none. It now counts the router's own
+declared paths (33), serves a request, and resolves both static mounts.
+
+Items 154 and 155 found **F-31** (a mypy configuration that read as "strict for
+`model/`" and was strict for everything, reporting 397 errors across a package
+the decision did not cover) and **F-32** (sixteen `Decimal | None` guards
+written in forms no checker can verify, three genuine latent crashes, five loop
+variables reused across loops of different types, and six fields typed `object`
+with a comment naming the real type). Items 156 to 162 found **F-33**
+(`margin: 0 auto` on a flex item opts it out of `stretch`, so the item sizes to
+its content's min-content -- F-25's failure through a door `min-width: 0` does
+not close).
+
 **Phase 15 (items 145-153) is built**, in
 [`apps/api/app/security/`](../apps/api/app/security) with
 [`incident-response.md`](incident-response.md) beside it. **F-15 is closed.**
