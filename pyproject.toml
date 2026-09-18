@@ -19,7 +19,17 @@ extend-exclude = ["var", "inputs"]
 # report built once per request, a manifest built once per snapshot -- and
 # rewriting a readable loop into a comprehension to save microseconds nobody
 # measures is the kind of change that introduces a bug for no gain.
-select = ["F", "E", "W", "I", "B", "C4", "SIM", "UP", "RUF", "PIE"]
+# PLR0124 is here alone out of the whole pylint family. It catches `x != x`.
+#
+# **It would NOT have caught finding F-38**, and that is worth stating rather
+# than leaving a reader to assume the rule closes the hole it was added for:
+# check 17.29 read `quantize_for_display(v, 1) != quantize_for_display(v, 1)`,
+# a CALL compared with itself, and PLR0124 only looks at names -- verified by
+# running it against that exact shape. It is enabled because the cheaper
+# variant is worth catching and costs nothing here, not because it is the
+# guard. The guard is
+# `test_no_check_compares_an_expression_with_itself`, which walks the AST.
+select = ["F", "E", "W", "I", "B", "C4", "SIM", "UP", "RUF", "PIE", "PLR0124"]
 
 ignore = [
     # A decimal written as Decimal("0.055") rather than Decimal(0.055) is the

@@ -576,3 +576,57 @@ def test_only_the_result_column_of_the_section_24_table_depends_on_the_run():
     # And the masking is doing work rather than passing trivially.
     assert "**NOT RUN**" in fast.markdown()
     assert "**NOT RUN**" not in full.markdown()
+
+
+def test_no_check_compares_an_expression_with_itself():
+    """F-38's guard, and the reason it is a test rather than a lint rule.
+
+    Check 17.29 read `quantize_for_display(v, 1) != quantize_for_display(v, 1)`
+    for four phases: a pure function compared with itself, which can never
+    differ. It reported PASS with a count of values it had not examined -- a
+    vacuous check inside the panel that enforces rule 1.14.
+
+    Ruff's PLR0124 is enabled and would **not** have caught it: that rule
+    compares names, and this was a call. Verified by running it against the
+    exact shape. So the guard walks the AST and compares the two sides
+    structurally, which catches a call, an attribute chain or a subscript as
+    readily as a name.
+    """
+    import ast
+    from pathlib import Path
+
+    roots = [Path(__file__).resolve().parents[4] / part for part in ("model", "apps/api/app")]
+    offenders = []
+    for root in roots:
+        for path in root.rglob("*.py"):
+            if "__pycache__" in str(path):
+                continue
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+                    continue
+                if not isinstance(node.ops[0], (ast.Eq, ast.NotEq, ast.Is, ast.IsNot)):
+                    continue
+                if ast.dump(node.left) == ast.dump(node.comparators[0]):
+                    offenders.append(f"{path.name}:{node.lineno}: {ast.unparse(node)}")
+    assert offenders == [], offenders
+
+
+def test_that_guard_would_have_caught_the_defect_it_exists_for():
+    """A guard nobody has seen fail is a guard nobody should trust."""
+    import ast
+
+    source = (
+        "def check(value):\n"
+        "    if quantize_for_display(value, 1) != quantize_for_display(value, 1):\n"
+        "        return 'FAIL'\n"
+        "    return 'PASS'\n"
+    )
+    found = [
+        ast.unparse(node)
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Compare)
+        and len(node.ops) == 1
+        and ast.dump(node.left) == ast.dump(node.comparators[0])
+    ]
+    assert len(found) == 1, found
