@@ -18,6 +18,9 @@ STATEMENTS = FIXTURES / "text_native_statements.pdf"
 THREE_STATEMENTS = FIXTURES / "three_statements.pdf"
 #: A complete balance sheet, so the forecast has everything it anchors on.
 FORECASTABLE = FIXTURES / "forecastable.pdf"
+#: 22.3.f: one filing carrying a prior year on two bases -- the restated
+#: comparatives on the face, and the original figures in the restatement note.
+RESTATED = FIXTURES / "restated_prior_year.pdf"
 EU_LOCALE = FIXTURES / "eu_locale_statements.pdf"
 IMAGE_ONLY = FIXTURES / "image_only_scan.pdf"
 PARTLY_SCANNED = FIXTURES / "partly_scanned.pdf"

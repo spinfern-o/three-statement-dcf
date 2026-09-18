@@ -2,7 +2,7 @@
 
 Required by [`website-build-spec.md`](website-build-spec.md) Phase 16 item 168. **Generated, not written** — every row below is the result of running something, and the command is printed beside it so a reader can run it again.
 
-Generated at: `2026-09-18T08:30:37+00:00`
+Generated at: `2026-09-18T14:26:02+00:00`
 
 ## Verdict: READY
 
@@ -16,23 +16,23 @@ This is a statement about the gates, not a recommendation to deploy. Phase 17 it
 |---|---|---|---|---|
 | 154 | Formatting | **PASS** | 208 files already formatted | 0.0 |
 | 154 | Formatting and linting | **PASS** | All checks passed! | 0.0 |
-| 155 | Strict type checks | **PASS** | Success: no issues found in 141 source files | 0.1 |
-| 156 | Unit tests | **PASS** | 595 passed in 0.74s | 1.1 |
-| 157 | Property-based tests | **PASS** | 10 passed in 0.17s | 0.5 |
-| 158 | Golden extraction tests | **PASS** | 46 passed in 14.73s | 15.0 |
-| 159 | Integration tests | **PASS** | 691 passed, 2 warnings in 140.72s (0:02:20) | 141.2 |
-| 160 | End-to-end tests | **PASS** | 24 passed, 2 warnings in 4.87s | 5.3 |
-| 161 | Accessibility tests | **PASS** | 15 passed, 76 deselected in 7.03s | 7.4 |
-| 162 | Visual regression tests | **PASS** | 72 passed, 19 deselected in 16.22s | 16.6 |
-| 163 | Production build | **PASS** | 33 routes, health 200, static and tokens served | 0.7 |
-| 164 | Independent arithmetic benchmark | **PASS** | 12 passed, 24 deselected in 1.04s | 1.3 |
-| 165 | Section 4 accuracy contract | **PASS** | 20 of 22 outputs 4.16 names are compared against an implementation sharing no helper with the engine (4.15), on the dataset named below, and every comparison asserts EXACT equality rather than a toler | 1.3 |
-| 166 | No source PDF or secret in Git | **PASS** | No source PDF and no secret value in the tree (259 tracked file(s) checked). 20.4 holds. | 0.1 |
+| 155 | Strict type checks | **PASS** | Success: no issues found in 141 source files | 0.2 |
+| 156 | Unit tests | **PASS** | 610 passed in 0.78s | 1.2 |
+| 157 | Property-based tests | **PASS** | 10 passed in 0.26s | 0.5 |
+| 158 | Golden extraction tests | **PASS** | 50 passed in 21.89s | 22.2 |
+| 159 | Integration tests | **PASS** | 695 passed, 2 warnings in 191.08s (0:03:11) | 191.8 |
+| 160 | End-to-end tests | **PASS** | 24 passed, 2 warnings in 6.01s | 6.6 |
+| 161 | Accessibility tests | **PASS** | 15 passed, 76 deselected in 8.75s | 9.2 |
+| 162 | Visual regression tests | **PASS** | 72 passed, 19 deselected in 20.41s | 21.0 |
+| 163 | Production build | **PASS** | 33 routes, health 200, static and tokens served | 1.0 |
+| 164 | Independent arithmetic benchmark | **PASS** | 12 passed, 24 deselected in 1.31s | 1.6 |
+| 165 | Section 4 accuracy contract | **PASS** | 20 of 22 outputs 4.16 names are compared against an implementation sharing no helper with the engine (4.15), on the dataset named below, and every comparison asserts EXACT equality rather than a toler | 1.6 |
+| 166 | No source PDF or secret in Git | **PASS** | No source PDF and no secret value in the tree (259 tracked file(s) checked). 20.4 holds. | 0.2 |
 | 167 | 21.1's sixteen export tabs are all built | **PASS** | 16 tabs | 0.0 |
-| 167 | Every Section 22 clause is either covered or says why not | **PASS** | 55 clauses, 49 covered, 6 with a stated reason | 0.0 |
+| 167 | Every Section 22 clause is either covered or says why not | **PASS** | 55 clauses, 50 covered, 5 with a stated reason | 0.0 |
 | 167 | Every test the Section 22 plan names exists | **PASS** | every named test resolves | 0.0 |
 | 167 | README's phase range matches what is built | **PASS** | README says phases 2-17 of 17 | 0.0 |
-| 167 | README's test count matches the suite | **PASS** | README says 1454, pytest collects 1454 | 0.0 |
+| 167 | README's test count matches the suite | **PASS** | README says 1473, pytest collects 1473 | 0.0 |
 | 167 | Section 17's thirty checks are all in the registry | **PASS** | 30 checks registered | 0.0 |
 | 167 | The forced/proposed severity split agrees across the documents | **PASS** | registry: 5 forced, 25 proposed; validation-policy.md and decision-ledger.md agree | 0.0 |
 | 24.22 | Every Section 24 criterion has recorded evidence | **PASS** | 22 criteria, 22 evidenced | 0.0 |
@@ -40,7 +40,7 @@ This is a statement about the gates, not a recommendation to deploy. Phase 17 it
 
 ## Section 22, clause by clause
 
-49 of 55 clauses are covered by a named test. The rest are listed below with the reason, because a plan where an uncovered clause looks like a covered one tells a reader that everything is covered.
+50 of 55 clauses are covered by a named test. The rest are listed below with the reason, because a plan where an uncovered clause looks like a covered one tells a reader that everything is covered.
 
 | Clause | What | Covered by |
 |---|---|---|
@@ -64,7 +64,7 @@ This is a statement about the gates, not a recommendation to deploy. Phase 17 it
 | 22.3.c | Multi-column PDF | `test_fixture_is_unchanged` |
 | 22.3.d | Parenthetical negatives | `test_a_confirmed_locale_resolves_it` |
 | 22.3.e | Values in thousands and millions | `test_a_randomized_sweep_across_nine_orders_of_magnitude` |
-| 22.3.f | Restated prior years | — |
+| 22.3.f | Restated prior years | `test_the_restated_comparatives_are_what_reach_the_model`, `test_the_original_figures_in_the_restatement_note_never_become_facts`, `test_nothing_in_the_extracted_facts_records_that_2024_was_restated` |
 | 22.4.a | Ingestion to verified facts | `test_step_d_review_every_fact` |
 | 22.4.b | Mapping to statements | `test_step_e_propose_and_approve_the_mappings`, `test_step_f_the_historical_checks_are_shown_and_pass` |
 | 22.4.c | Assumptions to forecast | `test_step_g_enter_and_approve_every_required_assumption`, `test_step_h_the_forecast_builds_and_labels_its_estimates` |
@@ -105,10 +105,6 @@ This is a statement about the gates, not a recommendation to deploy. Phase 17 it
 **22.1.j — Permission checks**
 
 2.2.d: one user, one role, so 20.6's RBAC is not applicable rather than untested. What IS tested is 20.7's authorization on every read -- see test_security.py -- which is the requirement that survives a single-user deployment.
-
-**22.3.f — Restated prior years**
-
-2.3.a fixes one document per model version, so a restatement arrives as a SECOND document rather than as two readings inside one. 10.3's duplicate detection and the linked-duplicate path are tested; a single PDF carrying both an original and a restated prior year is a fixture nobody has built, and it is the honest gap in this row.
 
 **22.8.a — Dashboard load <= 2.5s at p75**
 

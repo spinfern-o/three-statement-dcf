@@ -321,3 +321,93 @@ def test_a_float_is_refused_by_the_serializer():
 
     with pytest.raises(SerializationError):
         _jsonable({"value": 1.5})
+
+
+# --- 22.3.f: a restated prior year ------------------------------------------
+
+
+def _restated(tmp_path):
+    from apps.api.app.core.config import IngestionConfig
+    from apps.api.app.extraction.pipeline import ingest
+    from apps.api.app.extraction.storage import SourceStore
+    from apps.api.tests.conftest import RESTATED
+
+    outcome = ingest(
+        RESTATED.read_bytes(),
+        original_filename=RESTATED.name,
+        company_id="co-restated",
+        config=IngestionConfig(storage_root=str(tmp_path)),
+        store=SourceStore(tmp_path),
+    )
+    assert outcome.accepted, outcome.describe()
+    return outcome.result
+
+
+def test_the_restated_comparatives_are_what_reach_the_model(tmp_path):
+    """22.3.f. The face of the statement carries the RESTATED prior year.
+
+    Haldane's 2024 revenue was originally reported as 1,140,000 and restated to
+    1,100,000. The income statement prints the restated figure, headed
+    "2024 (restated)", and that is the one extraction produces.
+    """
+    result = _restated(tmp_path)
+    by_key = {(f.raw_label, f.period_label): f.raw_value for f in result.facts}
+
+    assert by_key[("Revenue", "2024")] == "1,100,000"
+    assert by_key[("Revenue", "2025")] == "1,250,000"
+    assert by_key[("Cost of goods sold", "2024")] == "(660,000)"
+
+
+def test_the_original_figures_in_the_restatement_note_never_become_facts(tmp_path):
+    """The answer to 22.3.f, and the reason it is a safe one.
+
+    A restatement note prints the prior year three ways -- as previously
+    reported, the adjustment, as restated -- under column headers that are not
+    periods. `_column_periods` requires a period in the header row, so the note
+    yields no facts at all, and 1,140,000 cannot enter the model.
+
+    That is checked here rather than assumed, because the failure it rules out
+    is severe: a model carrying both readings of one year would be wrong by the
+    whole restatement, and nothing downstream distinguishes 1,140,000 from a
+    legitimate figure.
+    """
+    result = _restated(tmp_path)
+    raw_values = {f.raw_value for f in result.facts}
+
+    assert "1,140,000" not in raw_values
+    assert "(650,000)" not in raw_values
+    assert "110,812" not in raw_values
+
+    # And the note was SEEN rather than missed -- the page was read and its
+    # table extracted. The figures are absent by a decision about column
+    # headers, not because extraction stopped early.
+    note_tables = [t for t in result.tables if t.page_number == 3]
+    assert note_tables, "the restatement note produced no table at all"
+    assert not any(
+        (location := result.location(f.source_location_id)) and location.page_number == 3
+        for f in result.facts
+    )
+
+
+def test_nothing_in_the_extracted_facts_records_that_2024_was_restated(tmp_path):
+    """The honest limit of what this filing's extraction conveys.
+
+    The face header is "2024" with "(restated)" printed beneath it, so the
+    period label is a plain year and no fact carries the qualifier. The
+    information is on the page -- the header line, and "See Note 2" under the
+    table -- and it is not in the data.
+
+    No figure is wrong: under 2.3.a the restated basis is the only basis in the
+    model, and it is the right one. What a reviewer loses is the explanation
+    for why 2024 revenue differs from last year's model by 40,000.
+
+    Asserted rather than left implicit, because the fix is real but partial:
+    `normalize_period_label` now keeps a header like "2024 (restated)" verbatim
+    and flags it PERIOD_AMBIGUOUS, so a filing that puts the qualifier IN the
+    header cell does tell the reviewer. One that puts it on the line below,
+    as this fixture does, still does not.
+    """
+    result = _restated(tmp_path)
+    periods = {f.period_label for f in result.facts}
+    assert periods == {"2024", "2025"}, periods
+    assert not any("restat" in (f.period_label or "").lower() for f in result.facts)
