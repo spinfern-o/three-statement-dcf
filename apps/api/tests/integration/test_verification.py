@@ -222,3 +222,183 @@ def test_the_last_meaningful_line_skips_a_dependency_warning():
         "  from starlette.testclient import TestClient as TestClient  # noqa"
     )
     assert report._last_meaningful_line(output).startswith("33 routes")
+
+
+# --- Phase 17: the deployment preconditions ---------------------------------
+
+
+def test_every_security_header_is_on_every_response(client):
+    """Item 175, and 20.12's XSS half. This application was sending none."""
+    from apps.api.app.security.headers import HEADERS
+
+    for path in ("/health", "/", f"/documents/{client.document_id}/statements"):
+        response = client.get(path)
+        for name in HEADERS:
+            assert name in response.headers, f"{path} is missing {name}"
+
+
+def test_the_headers_reach_the_guards_own_refusals(client):
+    """A route-level hook would miss these, which is why it is middleware.
+
+    A 403 from the CSRF check is a response like any other, and it is one an
+    attacker's page provoked -- so it is exactly the response that needs the
+    frame and referrer policies on it.
+    """
+    refused = client.post(
+        f"/documents/{client.document_id}/metadata",
+        data={"page": "1", "reason": "x", "csrf_token": "wrong"},
+    )
+    assert refused.status_code == 403
+    assert "Content-Security-Policy" in refused.headers
+    assert refused.headers["X-Frame-Options"] == "DENY"
+
+
+def test_the_policy_forbids_script_because_there_is_none():
+    """`script-src 'none'` is not a compromise here -- it is simply true.
+
+    This application ships no JavaScript, so the strongest possible value is
+    also the correct one, and a policy that merely restricted script SOURCES
+    would be throwing that away.
+    """
+    from apps.api.app.security.headers import CSP_DIRECTIVES
+
+    directives = dict(CSP_DIRECTIVES)
+    assert directives["script-src"] == "'none'"
+    assert directives["default-src"] == "'none'"
+    assert directives["connect-src"] == "'none'"
+    assert directives["frame-ancestors"] == "'none'"
+    assert directives["base-uri"] == "'none'"
+
+
+def test_no_template_contains_a_script_tag():
+    """The claim `script-src 'none'` rests on, asserted rather than assumed.
+
+    If a template ever gains a `<script>`, the policy above silently stops it
+    working -- and the symptom is a broken page rather than a policy error, so
+    this fails first and says why.
+    """
+    from pathlib import Path
+
+    templates = Path(__file__).resolve().parents[2] / "app" / "api" / "templates"
+    for path in sorted(templates.glob("*.html")):
+        body = path.read_text().lower()
+        assert "<script" not in body, (
+            f"{path.name} has a <script> tag, which `script-src 'none'` blocks. "
+            f"Either remove it or change the policy deliberately."
+        )
+
+
+def test_inline_style_attributes_are_the_only_exception_taken():
+    """`style-src-attr 'unsafe-inline'` and not `style-src 'unsafe-inline'`.
+
+    The narrower form permits `style=` attributes and nothing else -- no inline
+    `<style>` blocks. That is the difference between "inline styles are
+    allowed" and "these three are".
+    """
+    from apps.api.app.security.headers import CSP_DIRECTIVES
+
+    directives = dict(CSP_DIRECTIVES)
+    assert directives["style-src"] == "'self'"
+    assert directives["style-src-attr"] == "'unsafe-inline'"
+
+
+def test_the_stylesheet_may_be_cached_and_a_filing_may_not(client):
+    """20.1: no shared cache holds a filing. A stylesheet is not one."""
+    assert client.get("/static/app.css").headers["Cache-Control"] == "public, max-age=3600"
+    assert client.get("/").headers["Cache-Control"] == "no-store"
+
+
+def test_a_route_that_set_its_own_cache_control_keeps_it(client):
+    """The page-image route sets `private, max-age=3600` deliberately: an
+    image is expensive to render and belongs to one reader."""
+    response = client.get(f"/documents/{client.document_id}/pages/2/image.png")
+    assert response.headers["Cache-Control"] == "private, max-age=3600"
+
+
+def test_hsts_is_sent_only_over_https():
+    """Off HTTPS a browser ignores it, so sending it would be a header that
+    looks like a control and is not."""
+    from apps.api.app.security.headers import for_request
+
+    assert "Strict-Transport-Security" in for_request("/", is_https=True)
+    assert "Strict-Transport-Security" not in for_request("/", is_https=False)
+
+
+# --- item 180: the build identity -------------------------------------------
+
+
+def test_health_records_the_three_versions_item_180_requires(client):
+    body = client.get("/health").json()
+    assert body["status"] == "ok"
+    assert body["commit"] and body["schema_version"] and body["formula_version"]
+
+
+def test_health_carries_no_filing_detail(client):
+    """It is public, so a company name or a document id here would be a filing
+    detail served without a credential."""
+    body = client.get("/health").json()
+    assert set(body) == {
+        "status",
+        "commit",
+        "commit_source",
+        "schema_version",
+        "formula_version",
+        "started_at",
+        "identified",
+    }
+
+
+def test_an_unidentifiable_commit_says_so_rather_than_guessing():
+    """Item 180 says RECORD the commit. A recorded value that is wrong is
+    worse than one that is absent, because the point is to trust it."""
+    from apps.api.app.verification.build_info import UNKNOWN, BuildInfo
+
+    unknown = BuildInfo(
+        commit=UNKNOWN,
+        commit_source="no .git directory",
+        schema_version="1.0.0",
+        formula_version="abc",
+        started_at="now",
+    )
+    assert not unknown.is_identified
+    assert "cannot identify its own commit" in unknown.describe()
+
+
+def test_a_dirty_tree_is_marked_because_it_is_not_the_tested_version():
+    """Item 178: deploy the exact tested version. A dirty tree is not it."""
+    from apps.api.app.verification.build_info import collect
+
+    info = collect()
+    # Whatever the state here, the marker's meaning is what is asserted.
+    assert info.commit.endswith("-dirty") == ("uncommitted" in info.commit_source)
+
+
+# --- items 172, 179: the smoke tests ----------------------------------------
+
+
+def test_the_smoke_test_checks_every_deployment_property_that_matters():
+    """It never authenticates, which is what makes it safe against production
+    -- and "does an unauthenticated request get refused" is the most important
+    thing to check after a deployment."""
+    import inspect
+
+    from apps.api.app.verification import smoke
+
+    source = inspect.getsource(smoke)
+    for expected in ("2.2.c", "175", "180", "20.1", "20.2", "178"):
+        assert expected in source, f"the smoke test checks nothing for {expected}"
+    # Nothing in it signs in.
+    assert "/login" in source
+    assert "password" not in source.lower().replace("never sends a credential", "")
+
+
+def test_the_smoke_headers_are_case_insensitive():
+    """The bug this found on its first run: uvicorn sends header names
+    lowercase, and looking them up in title case reported every header absent
+    on a deployment that was sending all of them -- which is the worst kind of
+    wrong for a smoke test, because somebody then "fixes" the deployment."""
+    from apps.api.app.verification.smoke import _Headers
+
+    headers = _Headers([("content-security-policy", "default-src 'none'")])
+    assert "Content-Security-Policy" in headers
+    assert headers.get("CONTENT-SECURITY-POLICY") == "default-src 'none'"

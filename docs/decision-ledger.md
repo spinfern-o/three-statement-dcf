@@ -852,6 +852,94 @@ what the stylesheet claims.
 
 ---
 
+### F-34 — Phase 17. The application was sending no security headers at all
+
+Item 175 asks that TLS and security headers be verified. There was nothing to
+verify: every response left the application with FastAPI's defaults and
+nothing else — no CSP, no `nosniff`, no `Referrer-Policy`, and no
+`Cache-Control: no-store` on a page showing a filing.
+
+Twelve phases of authorization work had been sitting behind a browser that was
+free to cache a filing in a shared proxy, sniff a page image into something
+executable, or hand a document id to whatever a reader clicked through to.
+None of that is an authorization bug, which is exactly why none of the
+authorization tests found it.
+
+`app/security/headers.py` now sends them, from the application rather than
+from the proxy, so a proxy misconfiguration cannot silently drop them. Two
+choices in it are worth recording:
+
+**`script-src 'none'` is not aspirational.** Deviation F-14 decided this
+application ships no JavaScript, which makes the strictest possible CSP
+simply true rather than ambitious. `default-src 'none'` with `connect-src
+'none'` follows for the same reason. The claim rests on a test —
+`test_no_template_contains_a_script_tag` — because a CSP that a later template
+quietly violates is worse than none: the browser breaks the page rather than
+the author noticing.
+
+`style-src-attr 'unsafe-inline'` is the one concession, and it is a real one.
+The chart bars and the grid set widths and column spans through the `style`
+attribute, which is the only way to express a data-driven length without
+JavaScript. It is scoped to attributes, so `<style>` blocks and sheets remain
+`'self'`.
+
+**HSTS is sent only on an HTTPS request.** Sending `Strict-Transport-Security`
+over plaintext is meaningless — a browser ignores it — and it makes a
+`curl -I` against a plaintext deployment look compliant. The middleware reads
+the ASGI scope's scheme and omits it otherwise, so the header's presence
+is evidence and not decoration.
+
+The middleware is installed **after** the guard, so it wraps the guard's own
+refusals. A 303 to `/login` is a response too, and it was the one response an
+unauthenticated reader was guaranteed to receive.
+
+### F-35 — Phase 17. A smoke test that authenticates cannot run against production
+
+Item 179 asks for production smoke tests *without exposing private data*, and
+those two halves pull against each other. A smoke test that logs in proves
+more; it also holds a credential, and anything it prints about what it found
+is a filing detail printed by a monitoring job.
+
+`app/verification/smoke.py` resolves it by **never authenticating**. It cannot
+reach a filing, so it cannot expose one, and the credential problem does not
+arise. What it checks instead is the shape of a correct deployment, which is
+most of what a smoke test is actually for: that the process answers, that it
+names its own commit, that the commit is not `-dirty` (item 178), that an
+unauthenticated request for `/` is refused, that the refusal carries no filing
+content, and that all six security headers are on it.
+
+Sixteen checks. Against a guarded loopback server it reports fifteen passes
+and one failure — `deploys a clean tree (178)` — which is correct: the tree it
+ran from had uncommitted changes. A check that passed there would be useless.
+
+One bug in it is worth recording because of its shape rather than its size.
+The first version looked up `"Content-Security-Policy"` in a plain dict.
+uvicorn sends header names lowercased, so it reported **every header absent on
+a deployment that was sending all of them**. That is the worst failure mode
+available to a smoke test: it fails on a correct deployment, so the person
+reading it goes and changes the deployment. HTTP header names are
+case-insensitive and servers disagree about case; `_Headers` now lowercases on
+both sides.
+
+### F-36 — Phase 17. There are no migrations, and item 173 is answered anyway
+
+Item 173 asks that database migrations and a rollback plan be verified. This
+application stores JSON files on a filesystem
+(`app/persistence/json_store.py`); PostgreSQL is specification 3.2.d and is
+still open. There is no migration tool to verify.
+
+The honest answer is not "N/A". What 173 wants is that a deployment can be
+undone without losing data, and that is answerable here: the stored PDF is
+never rewritten (rule 1.12), so every derived artefact can be rebuilt from it;
+records carry their own version and a reader refuses one it does not
+understand rather than guessing; and `security/backup.py` takes a verified
+snapshot before the deploy. [`docs/deployment.md`](deployment.md) §4 is that
+plan, and it says plainly that this section is the part that has to be
+rewritten when the JSON store is replaced.
+
+Recorded as a finding rather than a decision because it is a gap being
+reported, not a choice being made.
+
 ### F-33 — RESOLVED in Phase 16. `margin: 0 auto` on a flex item opts out of stretch
 
 22.6.e asks for a visual test with long company names. Substituting one — a

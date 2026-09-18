@@ -196,7 +196,34 @@ carrying the claim forward.
 17 item 169 requires the target, the access level and the data policy to be
 confirmed first.
 
-1353 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**Every response now carries its security headers, and the strictest CSP
+available is simply true here.** Item 175 had nothing to verify: the
+application was sending none. `script-src 'none'` and `default-src 'none'` are
+not aspirations but consequences of shipping no JavaScript (deviation F-14),
+and `test_no_template_contains_a_script_tag` is the test the claim rests on.
+They are sent from the application rather than the proxy, so a proxy
+misconfiguration cannot drop them, and the middleware sits *after* the guard so
+the guard's own refusals carry them too. `Strict-Transport-Security` is sent
+only on an HTTPS request, because over plaintext it is ignored by the browser
+and merely makes a `curl -I` look compliant.
+
+**The smoke test never authenticates.** Item 179 wants production smoke tests
+that do not expose private data, and the two halves pull against each other: a
+test that logs in proves more, but holds a credential and prints filing
+details from a monitoring job. `python3 -m apps.api.app.verification.smoke
+https://host` cannot reach a filing, so it cannot expose one. Its sixteen
+checks are about the shape of a correct deployment — that the process answers,
+names its own commit, is not running from a modified tree (item 178), refuses
+an unauthenticated request, leaks nothing in the refusal, and carries all six
+headers on it.
+
+**`/health` names the code that produced a figure** (item 180): the commit, the
+export schema version and the formula fingerprint, read at startup rather than
+baked in by a script somebody has to remember to run. A deployment from a dirty
+tree reports its commit as `-dirty`, because that deployment is not the version
+the suite passed and the value itself should say so.
+
+1367 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -211,10 +238,15 @@ there was no mapping stage; Phase 5 built one. The application still evaluates
 all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
 
-**What does not exist yet:** the rest of the website. No database, no
-diagnostics or lineage screens, no exports. Phases 13 to 17 of the
-specification, in other words — all of them presentations of, or projections from, numbers this
-stage now certifies.
+**What does not exist yet: a deployment.** Every one of the specification's
+180 items that is code is built. What is left is Phase 17's decisions —
+item 169's target, access level and data policy, and item 177's release
+approval — and they are the owner's, not the implementing agent's.
+[`docs/deployment.md`](docs/deployment.md) is the runbook, and §6 is the list
+of questions it cannot answer for itself. The one piece of infrastructure that
+is still missing is PostgreSQL: specification 3.2.d asks for it and storage is
+JSON files on a filesystem, which is recorded as finding F-36 rather than
+glossed.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
 1.15 and 4.4 prohibit binary floating point here, so the engine runs on
@@ -626,13 +658,22 @@ Final verification (specification Phase 16, items 154–168):
 | `apps/api/app/verification/report.py` | 168 | The release-readiness report: every row the result of running something |
 | [`docs/release-readiness.md`](docs/release-readiness.md) | 168 | Its output, regenerated in CI so it cannot go stale |
 
+Deployment (specification Phase 17, items 169–180):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/security/headers.py` | 175 | Every security header, from the application so a proxy cannot drop them |
+| `apps/api/app/verification/build_info.py` | 178, 180 | The commit, the schema version and the formula fingerprint, on `/health` |
+| `apps/api/app/verification/smoke.py` | 172, 179 | Sixteen checks that never authenticate, so they cannot expose a filing |
+| [`docs/deployment.md`](docs/deployment.md) | 169–180 | The runbook, and §6: the four items only the owner can answer |
+
 Documentation:
 
 | Path | What it is |
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-25 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-36 |
 
 Specification Phase 2 contract documents. These are **definitions for the
 website, not descriptions of the engine** — each one states plainly where the

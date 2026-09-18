@@ -236,9 +236,22 @@ def _back(document_id: str, page: int, **flash) -> RedirectResponse:
 
 
 @router.get("/health")
-def health() -> dict:
-    """Phase 1 item 14. Liveness only -- it asserts nothing about the data."""
-    return {"status": "ok"}
+def health(request: Request) -> dict:
+    """Phase 1 item 14, and Phase 17 item 180.
+
+    Liveness, plus the three versions 180 requires a deployment record: the
+    commit, the export schema version and the formula fingerprint. It asserts
+    nothing about the data, and deliberately carries none: this endpoint is
+    public (see `guard.PUBLIC`), so a company name or a document id here would
+    be a filing detail served without a credential.
+
+    A commit is not a secret. It is a revision of a private repository, and
+    knowing it tells an unauthenticated reader nothing they could not learn by
+    being given access -- while not knowing it makes item 180 unanswerable for
+    whoever is holding two exports that disagree.
+    """
+    info = request.app.state.build_info
+    return {"status": "ok", **info.as_dict()}
 
 
 @dataclass(frozen=True)

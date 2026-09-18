@@ -25,7 +25,9 @@ from ..extraction.storage import SourceStore
 from ..persistence.json_store import JsonDocumentRepository
 from ..security.credentials import Credential, signing_key
 from ..security.guard import install as install_guard
+from ..security.headers import install as install_headers
 from ..security.ratelimit import Limiters
+from ..verification.build_info import collect as collect_build_info
 from .routes import router
 
 HERE = Path(__file__).resolve().parent
@@ -92,10 +94,18 @@ def create_app(
     app.state.credential = credential if credential is not None else Credential.load(environ)
     app.state.signing_key = key or signing_key(environ)
     app.state.limiters = Limiters.build()
+    # Item 180, read once at startup rather than per request: a
+    # subprocess call on a liveness probe is a liveness probe that
+    # can fail for a reason unrelated to liveness.
+    app.state.build_info = collect_build_info()
     templates.env.globals.update(
         local_review=app.state.credential is None,
     )
     install_guard(app)
+    # Added after the guard, so it wraps it: the guard's own 401s,
+    # 403s and redirects are responses too, and a header a route
+    # sets cannot cover them.
+    install_headers(app)
 
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
     app.mount("/tokens", StaticFiles(directory=str(PACKAGES / "design-tokens")), name="tokens")

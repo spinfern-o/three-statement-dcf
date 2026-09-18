@@ -19,8 +19,17 @@ def _room(client, page: int = 2, **params):
 
 
 def test_health(client):
-    """Phase 1 item 14."""
-    assert client.get("/health").json() == {"status": "ok"}
+    """Phase 1 item 14, and Phase 17 item 180.
+
+    The endpoint was `{"status": "ok"}` alone until 180 asked for a build
+    record. It still answers liveness first -- a deployment probe reads
+    `status` and nothing else -- and now also carries the three versions that
+    let somebody holding two disagreeing exports say which build made each.
+    """
+    body = client.get("/health").json()
+    assert body["status"] == "ok"
+    for field in ("commit", "commit_source", "schema_version", "formula_version"):
+        assert body[field], field
 
 
 def test_the_portfolio_lists_the_document(client, stored):
