@@ -436,7 +436,7 @@ def parse_reported_value(
                 ),
             )
         chosen, decimals = candidates[locale]
-        used = locale
+        used: NumberLocale = locale
     else:
         readings = {value for value, _ in candidates.values()}
         if len(readings) > 1:
@@ -456,7 +456,9 @@ def parse_reported_value(
                     f"rather than picking one."
                 ),
             )
-        used = next(iter(candidates)) if len(candidates) == 1 else NumberLocale.UNKNOWN
+        used = (
+            next(iter(candidates)) if len(candidates) == 1 else NumberLocale.UNKNOWN
+        )
         chosen, decimals = next(iter(candidates.values()))
 
     value = D(("-" if negative else "") + chosen, what=f"the cell {raw!r}")

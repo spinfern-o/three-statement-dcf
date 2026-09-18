@@ -87,15 +87,15 @@ EXTREMES = (
 
 @dataclass(frozen=True)
 class Report:
-    coverage: "tuple[Coverage, ...]" = COVERAGE
-    extremes: "tuple[tuple[str, str], ...]" = EXTREMES
+    coverage: tuple[Coverage, ...] = COVERAGE
+    extremes: tuple[tuple[str, str], ...] = EXTREMES
 
     @property
-    def compared(self) -> "tuple[Coverage, ...]":
+    def compared(self) -> tuple[Coverage, ...]:
         return tuple(c for c in self.coverage if c.compared)
 
     @property
-    def not_compared(self) -> "tuple[Coverage, ...]":
+    def not_compared(self) -> tuple[Coverage, ...]:
         return tuple(c for c in self.coverage if not c.compared)
 
     @property

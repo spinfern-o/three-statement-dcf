@@ -15,63 +15,21 @@ is *supposed* to fail -- so it is presented as an answer, not as a crash.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+from model.accounts import Statement
 from model.numeric import D, PrecisionError
 
-from ..extraction.records import confirm_metadata
-from ..mapping.actions import (
-    approve_all,
-    approve_fact_mapping,
-    combine_facts,
-    map_fact,
-    propose_all,
-    proposals_for,
-    reject_mapping,
-    split_fact,
-    why_no_proposal,
-)
-from ..mapping.chart import CHART
-from model.accounts import Statement
-from ..mapping.checks import all_findings, apply_findings
-from ..mapping.normalized import normalize, periods as ledger_periods, statement_of_fact
-from ..mapping.sets import MappingError
 from ..assumptions.gate import evaluate as evaluate_gate
-from ..dashboard.cards import STATUS_LEGEND, portfolio_cards
-from ..diagnostics.audit import Filters, choices as audit_choices, filter_events
-from ..diagnostics.benchmark import Report as BenchmarkReport
-from ..diagnostics.lineage import trace, traceable_lines
-from ..diagnostics.release import checklist, readiness
-from ..diagnostics.run import evaluate as run_diagnostics
-from ..dashboard.charts import line_chart
-from ..security.authorization import NOT_FOUND, require_access, visible
-from ..security.retention import RETENTION, DeletionRefused, delete_permanently
-from ..security.scanning import scan_state
-from ..security.guard import safe_next
-from ..security.logging import security_event
-from ..security.ratelimit import RateLimited
-from ..security.sessions import (
-    clear_cookie as clear_session_cookie,
-    is_secure_request,
-    issue as issue_session,
-    set_cookie as set_session_cookie,
-)
-from ..exports.csv_export import DICTIONARY, neutralized_cells, table_to_csv
-from ..exports.gather import gather
-from ..exports.json_export import schema_json, to_json
-from ..exports.pdf_export import to_bytes as pdf_bytes
-from ..exports.schema import SCHEMA_VERSION
-from ..exports.xlsx_export import to_bytes as xlsx_bytes
-from ..dashboard.navigation import nav_items
-from ..dashboard.standing import standing_for
 from ..assumptions.impact import preview as preview_change
 from ..assumptions.proposals import propose_from_schedules, unproposable
+from ..assumptions.scenarios import BASE, ScenarioError, ScenarioSet
 from ..assumptions.schema import AssumptionError, Status
-from ..assumptions.scenarios import BASE, ScenarioError
 from ..assumptions.store import ScenarioStore
 from ..assumptions.views import (
     optional_rows,
@@ -80,31 +38,91 @@ from ..assumptions.views import (
     status_choices,
 )
 from ..assumptions.workflow import WorkflowError, transition
-from ..forecast.build import ForecastError, build_scenario_forecast
+from ..dashboard.cards import STATUS_LEGEND, portfolio_cards
+from ..dashboard.charts import line_chart
+from ..dashboard.navigation import nav_items
+from ..dashboard.standing import standing_for
+from ..dashboard.status import Standing
+from ..diagnostics.audit import Filters, filter_events
+from ..diagnostics.audit import choices as audit_choices
+from ..diagnostics.benchmark import Report as BenchmarkReport
+from ..diagnostics.lineage import trace, traceable_lines
+from ..diagnostics.release import checklist, readiness
+from ..diagnostics.run import evaluate as run_diagnostics
+from ..exports.csv_export import DICTIONARY, neutralized_cells, table_to_csv
+from ..exports.gather import gather
+from ..exports.json_export import schema_json, to_json
+from ..exports.pdf_export import to_bytes as pdf_bytes
+from ..exports.schema import SCHEMA_VERSION
+from ..exports.xlsx_export import to_bytes as xlsx_bytes
+from ..extraction.records import ExtractionResult, SourceDocument, confirm_metadata
+from ..forecast.build import ForecastError, build_scenario_forecast, forecast_ledger
 from ..forecast.checks import check_every_scenario
 from ..forecast.views import columns as forecast_columns
-from ..forecast.views import comparison, driver_rows as forecast_driver_rows
-from ..forecast.build import forecast_ledger
+from ..forecast.views import comparison
+from ..forecast.views import driver_rows as forecast_driver_rows
 from ..forecast.views import statement_rows as forecast_statement_rows
 from ..formula.catalog import derivation_formulas, ledger_environment
 from ..formula.graph import DependencyGraph
-from ..valuation.build import ValuationError, build_scenario_valuation
-from ..valuation.checks import EXIT_MULTIPLE_STATUS, headroom, terminal_share
-from ..valuation.inputs import LEASE_LIABILITIES_NOTE
-from ..valuation.sensitivity import build_grid
-from ..valuation.views import flow_rows
 from ..formula.views import formula_report
+from ..mapping.actions import (
+    approve_all,
+    approve_fact_mapping,
+    combine_facts,
+    map_fact,
+    proposals_for,
+    propose_all,
+    reject_mapping,
+    split_fact,
+    why_no_proposal,
+)
+from ..mapping.chart import CHART
+from ..mapping.checks import all_findings, apply_findings
+from ..mapping.normalized import normalize, statement_of_fact
+from ..mapping.normalized import periods as ledger_periods
+from ..mapping.sets import MappingError
+from ..review.actions import (
+    ACCEPT,
+    CORRECT,
+    REJECT,
+    ReviewError,
+    accept_fact,
+    correct_fact,
+    reject_fact,
+)
+from ..review.progress import review_progress, verification_gates
 from ..schedules.build import build_schedules
 from ..schedules.checks import run_schedule_checks
 from ..schedules.checks import summarize as summarize_schedule_checks
 from ..schedules.views import driver_rows, working_capital_rows
-from ..review.actions import ACCEPT, CORRECT, REJECT, ReviewError, accept_fact, correct_fact, reject_fact
+from ..security.authorization import NOT_FOUND, require_access, visible
+from ..security.guard import safe_next
+from ..security.logging import security_event
+from ..security.ratelimit import RateLimited
+from ..security.retention import RETENTION, DeletionRefused, delete_permanently
+from ..security.scanning import scan_state
+from ..security.sessions import (
+    clear_cookie as clear_session_cookie,
+)
+from ..security.sessions import (
+    is_secure_request,
+)
+from ..security.sessions import (
+    issue as issue_session,
+)
+from ..security.sessions import (
+    set_cookie as set_session_cookie,
+)
 from ..statements.build import BuildError, build_statements
 from ..statements.checks import run_historical_checks, summarize
 from ..statements.export import ExportError, build_engine_inputs
 from ..statements.reported import citations, reported_strings
 from ..statements.views import equity_statement_status, statement_view
-from ..review.progress import review_progress, verification_gates
+from ..valuation.build import ValuationError, build_scenario_valuation
+from ..valuation.checks import EXIT_MULTIPLE_STATUS, headroom, terminal_share
+from ..valuation.inputs import LEASE_LIABILITIES_NOTE
+from ..valuation.sensitivity import build_grid
+from ..valuation.views import flow_rows
 from .bookmarks import bookmarks, unmapped_statements
 from .rendering import render_page
 
@@ -138,8 +156,8 @@ class _Shell:
         # that has to be passed it is a template somebody will forget. The
         # guard put it on the request before any route ran.
         context.setdefault(
-            "csrf_token", getattr(request.state, "guard", None)
-            and request.state.guard.csrf_token or ""
+            "csrf_token", (getattr(request.state, "guard", None)
+            and request.state.guard.csrf_token) or ""
         )
         return self.templates.TemplateResponse(
             request=request, name=name, context=context, **kwargs
@@ -227,10 +245,10 @@ def health() -> dict:
 class _Model:
     """One row of the 7.1 portfolio."""
 
-    document: object
-    standing: object
-    result: object
-    scenarios: object = None
+    document: SourceDocument
+    standing: Standing
+    result: ExtractionResult
+    scenarios: ScenarioSet | None = None
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -309,10 +327,13 @@ def _revenue_series(result, scenarios=None):
         return None
 
     income = built.ledgers[Statement.INCOME]
-    points = [
-        (year, income.get("revenue", year))
-        for year in built.years
-        if income.get("revenue", year) is not None
+    # Annotated, because the comprehension's own type is
+    # list[tuple[str, Decimal | None]] -- the `is not None` filter narrows the
+    # values but not the inferred element type.
+    points: list[tuple[str, Decimal]] = [
+        (year, value)
+        for year, value in ((y, income.get("revenue", y)) for y in built.years)
+        if value is not None
     ]
     if len(points) < 2:
         return None
@@ -325,9 +346,12 @@ def _revenue_series(result, scenarios=None):
         if forecast is not None:
             projected = forecast_ledger(forecast, Statement.INCOME)
             points += [
-                (year, projected.get("revenue", year))
-                for year in forecast.periods.forecast
-                if projected.get("revenue", year) is not None
+                (year, value)
+                for year, value in (
+                    (y, projected.get("revenue", y))
+                    for y in forecast.periods.forecast
+                )
+                if value is not None
             ]
 
     return line_chart("Revenue", tuple(points), _units_for(result))
@@ -461,7 +485,10 @@ def confirm(
                 result, {field: replacement}, actor=_actor(request), reason=reason
             )
         else:
-            detected = {
+            # Annotated: every value here is None -- "accept what was
+            # detected" -- and an inferred dict[str, None] is not the
+            # dict[str, str | None] `confirm_metadata` takes.
+            detected: dict[str, str | None] = {
                 name: None
                 for name, f in result.document.metadata.fields.items()
                 if f.value is not None and not f.confirmed
@@ -622,7 +649,7 @@ def decide_mapping(
     return _mapping_back(document_id, ok=f"Recorded: {action}.")
 
 
-def _parse_allocation(text: str) -> "list[tuple[str, str]]":
+def _parse_allocation(text: str) -> list[tuple[str, str]]:
     """`code = amount` per line. Refuses anything it cannot read."""
     allocations = []
     for number, line in enumerate(text.splitlines(), start=1):
@@ -646,7 +673,7 @@ def combine(
     document_id: str,
     canonical_code: str = Form(...),
     note: str = Form(""),
-    fact_ids: "list[str]" = Form(default=[]),
+    fact_ids: list[str] = Form(default=[]),
 ):
     """Item 53, 11.5. Several raw lines onto one canonical line."""
     result = _load(request, document_id)
@@ -850,7 +877,7 @@ def formulas(request: Request, document_id: str, error: str = ""):
 #: The forecast periods this system plans for. `export.py` already fixes five
 #: (FORECAST_YEARS), and the gate has to ask about each one separately: a
 #: driver scoped to 2026E alone is missing from the other four.
-def _forecast_periods(built) -> "tuple[str, ...]":
+def _forecast_periods(built) -> tuple[str, ...]:
     from ..statements.export import FORECAST_YEARS
 
     last = int(built.years[-1][:4]) if built.years else 0
@@ -955,7 +982,7 @@ def accept_proposal(
     code: str = Form(...),
 ):
     """7.7.a: take a measured historical driver into the scenario, as a Draft."""
-    result, built, blocked = _assumptions_context(request, document_id, scenario_id)
+    _result, built, blocked = _assumptions_context(request, document_id, scenario_id)
     if blocked:
         return _assumptions_back(document_id, scenario_id, error=blocked)
 
@@ -1032,7 +1059,7 @@ def preview_assumption(
     The impact is held for exactly one render and then dropped. Storing it
     would make it a saved thing, which is the opposite of what 14.8 asks for.
     """
-    result, built, blocked = _assumptions_context(request, document_id, scenario_id)
+    _result, built, blocked = _assumptions_context(request, document_id, scenario_id)
     if blocked:
         return _assumptions_back(document_id, scenario_id, error=blocked)
 
@@ -1275,7 +1302,7 @@ def diagnostics(
     )
 
 
-def _trace_target(raw: str, traceable) -> "tuple[str, str]":
+def _trace_target(raw: str, traceable) -> tuple[str, str]:
     """Which line the lineage panel is showing.
 
     Defaults to the first traceable line rather than to nothing: a panel that
@@ -1391,7 +1418,9 @@ def export_table_csv(
     try:
         table = model.table(table_name)
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"no table {table_name!r}")
+        raise HTTPException(
+            status_code=404, detail=f"no table {table_name!r}"
+        ) from None
     return Response(
         content=table_to_csv(model, table),
         media_type="text/csv; charset=utf-8",

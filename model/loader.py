@@ -14,11 +14,11 @@ from typing import Any
 
 from . import accounts as A
 from .accounts import Statement
-from .assumptions import Assumptions, Assumption, Basis, Conflict
+from .assumptions import Assumption, Assumptions, Basis, Conflict
 from .dcf import CostOfCapital, EquityBridge
+from .numeric import D, PrecisionError
 from .profile import REQUIRED_SOURCE_MAP_KEYS, CompanyProfile, Periods, SourceMap, Units
 from .provenance import Figure, ProvenanceError, Source
-from .numeric import D, PrecisionError
 from .schedules import TaxSchedule
 from .statements import Ledger
 from .yaml_exact import load_exact
@@ -44,14 +44,16 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
-def _req(data: dict, key: str, where: str, step: str) -> Any:
+def _req(data: dict[str, Any], key: str, where: str, step: str) -> Any:
     """Fetch a required key, treating an unfilled template blank as missing."""
     if key not in data or data[key] is None or (isinstance(data[key], str) and not data[key].strip()):
         raise InputError(f"{where}.{key} is required by {step} and is blank. Fill it in -- do not leave it to a default.")
     return data[key]
 
 
-def _section(data: dict, key: str, where: str, step: str) -> dict:
+def _section(
+    data: dict[str, Any], key: str, where: str, step: str
+) -> dict[str, Any]:
     value = _req(data, key, where, step)
     if not isinstance(value, dict):
         raise InputError(f"{where}.{key} must be a mapping ({step})")

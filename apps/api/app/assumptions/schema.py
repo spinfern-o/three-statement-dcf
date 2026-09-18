@@ -115,7 +115,7 @@ class Evidence:
     #: Publication or observation date, ISO 8601. 14.4.g.
     date: str = ""
     #: For a historical driver: the periods it was measured over.
-    measured_over: "tuple[str, ...]" = ()
+    measured_over: tuple[str, ...] = ()
 
     def describe(self) -> str:
         parts = []
@@ -148,7 +148,7 @@ class Assumption:
     value: Decimal
     unit: str
     # c. Applicable period(s). Empty means every forecast period.
-    periods: "tuple[str, ...]" = ()
+    periods: tuple[str, ...] = ()
     # d. Applicable scenario.
     scenario_id: str = "base"
     # e. Source type.
@@ -258,7 +258,7 @@ class Assumption:
 
     # --- reading ------------------------------------------------------------
     @property
-    def key(self) -> "tuple[str, str, tuple[str, ...]]":
+    def key(self) -> tuple[str, str, tuple[str, ...]]:
         return (self.scenario_id, self.code, self.periods)
 
     @property
@@ -289,7 +289,7 @@ class Assumption:
             f"[{self.status.value}]"
         )
 
-    def with_status(self, status: Status, reviewer: str = "") -> "Assumption":
+    def with_status(self, status: Status, reviewer: str = "") -> Assumption:
         return replace(
             self,
             status=status,
@@ -297,7 +297,7 @@ class Assumption:
             updated_at=_now(),
         )
 
-    def with_value(self, value) -> "Assumption":
+    def with_value(self, value) -> Assumption:
         return replace(self, value=value, updated_at=_now())
 
 

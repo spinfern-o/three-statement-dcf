@@ -22,7 +22,7 @@ from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from .accounts import DERIVED, OPTIONAL_IN_DERIVATION, Statement, validate_account
-from .numeric import D, ZERO, relative_error
+from .numeric import ZERO, D, relative_error
 from .provenance import Figure, ProvenanceError, Source
 
 
@@ -218,7 +218,7 @@ class Ledger:
             if y in years and c.origin == "reported"
         )
 
-    def extended_to(self, years: tuple[str, ...]) -> "Ledger":
+    def extended_to(self, years: tuple[str, ...]) -> Ledger:
         """Copy this ledger onto a wider year axis (historical -> full model)."""
         out = Ledger(self.statement, years)
         for (account, year), cell in self._cells.items():

@@ -74,7 +74,7 @@ class Manifest:
     created_at: str
     source_root: str
     #: `relative path -> sha256`, sorted, so two snapshots of one state match.
-    files: "dict[str, str]" = field(default_factory=dict)
+    files: dict[str, str] = field(default_factory=dict)
     note: str = ""
 
     @property
@@ -94,7 +94,7 @@ class Manifest:
         )
 
     @classmethod
-    def parse(cls, text: str) -> "Manifest":
+    def parse(cls, text: str) -> Manifest:
         body = json.loads(text)
         return cls(
             version=body["version"],
@@ -116,7 +116,7 @@ NOTE = (
 )
 
 
-def _files_under(root: Path) -> "list[Path]":
+def _files_under(root: Path) -> list[Path]:
     return sorted(
         path
         for path in root.rglob("*")
@@ -125,7 +125,7 @@ def _files_under(root: Path) -> "list[Path]":
     )
 
 
-def snapshot(storage_root: "str | Path", destination: "str | Path") -> Manifest:
+def snapshot(storage_root: str | Path, destination: str | Path) -> Manifest:
     """Write one archive, with its manifest inside it."""
     root = Path(storage_root)
     if not root.exists():
@@ -152,7 +152,7 @@ def snapshot(storage_root: "str | Path", destination: "str | Path") -> Manifest:
     return manifest
 
 
-def restore(archive: "str | Path", destination: "str | Path") -> Manifest:
+def restore(archive: str | Path, destination: str | Path) -> Manifest:
     """Extract one archive and return the manifest it carried."""
     target = Path(destination)
     target.mkdir(parents=True, exist_ok=True)
@@ -188,7 +188,7 @@ def _extract(tar: tarfile.TarFile, target: Path) -> None:
         tar.extractall(target)
 
 
-def verify(archive: "str | Path", *, scratch: "str | Path | None" = None) -> Manifest:
+def verify(archive: str | Path, *, scratch: str | Path | None = None) -> Manifest:
     """Restore into a scratch directory and re-hash everything. 2.6.d.
 
     This is the quarterly restore test, written as a function so it runs in
@@ -225,7 +225,7 @@ def verify(archive: "str | Path", *, scratch: "str | Path | None" = None) -> Man
         return manifest
 
 
-def _main(argv: "list[str] | None" = None) -> int:
+def _main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(

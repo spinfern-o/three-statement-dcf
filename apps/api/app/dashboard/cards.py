@@ -54,7 +54,7 @@ STATUS_LEGEND = (
 )
 
 
-def portfolio_cards(models: "tuple[tuple[object, Standing], ...]") -> "tuple[Card, ...]":
+def portfolio_cards(models: tuple[tuple[object, Standing], ...]) -> tuple[Card, ...]:
     """The four figures worth putting at the top of a portfolio."""
     total = len(models)
     ready = sum(

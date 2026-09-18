@@ -28,7 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from model.numeric import D, ZERO, quantize_for_display
+from model.numeric import ZERO, D, quantize_for_display
 
 #: SVG user-space geometry. A viewBox, so the page scales it.
 WIDTH = D(720)
@@ -56,10 +56,10 @@ class LineChart:
 
     title: str
     unit: str
-    points: "tuple[Point, ...]"
+    points: tuple[Point, ...]
     actual_path: str
     estimate_path: str
-    y_ticks: "tuple[tuple[Decimal, str], ...]"
+    y_ticks: tuple[tuple[Decimal, str], ...]
     #: 6.6.h. Required, not optional.
     summary: str
     #: 6.5.f. Required, not optional.
@@ -90,7 +90,7 @@ def _format(value: Decimal) -> str:
     return f"{value:,.0f}"
 
 
-def _summary(title: str, points: "tuple[Point, ...]", unit: str) -> str:
+def _summary(title: str, points: tuple[Point, ...], unit: str) -> str:
     """6.6.h: the trend, in words, with the numbers a reader would want."""
     first, last = points[0], points[-1]
     actuals = [p for p in points if not p.is_estimate]
@@ -128,7 +128,7 @@ def _summary(title: str, points: "tuple[Point, ...]", unit: str) -> str:
     return " ".join(parts)
 
 
-def _csv(title: str, points: "tuple[Point, ...]", unit: str) -> str:
+def _csv(title: str, points: tuple[Point, ...], unit: str) -> str:
     """6.5.f's downloadable data, at full stored precision.
 
     Not the displayed values. A downloaded series a reader recomputes from
@@ -144,7 +144,7 @@ def _csv(title: str, points: "tuple[Point, ...]", unit: str) -> str:
 
 def line_chart(
     title: str,
-    series: "tuple[tuple[str, Decimal], ...]",
+    series: tuple[tuple[str, Decimal], ...],
     unit: str = "reporting units",
 ) -> LineChart:
     """Build a chart from `(period label, value)` pairs, actuals then estimates.

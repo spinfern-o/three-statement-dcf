@@ -38,7 +38,7 @@ class MarketInput:
     why_sourced: str
     #: The source types that make sense for it. A beta is market data; a
     #: terminal growth rate is usually a stated analyst judgement.
-    expected: "tuple[SourceType, ...]"
+    expected: tuple[SourceType, ...]
     required: bool = True
     note: str = ""
 
@@ -160,5 +160,5 @@ LEASE_LIABILITIES_NOTE = (
 )
 
 
-def required_codes() -> "frozenset[str]":
+def required_codes() -> frozenset[str]:
     return frozenset(item.code for item in MARKET_INPUTS if item.required)

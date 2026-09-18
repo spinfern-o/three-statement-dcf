@@ -852,6 +852,87 @@ what the stylesheet claims.
 
 ---
 
+### F-31 — RESOLVED in Phase 16. A "strict for model/" config was strict for everything
+
+Item 155 asks for strict type checks. The decision recorded in
+[`pyproject.toml`](../pyproject.toml) is that **`model/` is checked strictly
+and `apps/api/app/` is checked but not strictly**, and the reasoning is stated
+there: `model/` is the arithmetic, where a type error is a wrong number, and it
+imports nothing but the standard library; `apps/api/app/` sits on FastAPI,
+PyMuPDF and openpyxl, whose own type information is incomplete, and making it
+strict would produce a lot of `Any` with a strict flag on top — which reads as
+checked and is not.
+
+The first configuration expressed that with
+
+    [[tool.mypy.overrides]]
+    module = "model.*"
+    strict = true
+
+and reported **397 errors across 73 files**, most of them in the package it was
+not supposed to be checking strictly. `strict` is a global flag; in a
+per-module override it is applied more broadly than it reads. Listing the seven
+flags it implies, explicitly, gave 108 — the number the decision actually
+described.
+
+The lesson is the one worth keeping: **a configuration that reads correctly and
+behaves differently produces a number nobody can interpret.** 397 looks like a
+codebase in trouble and was a config bug; 108 was the real figure, and every
+one of them was worth reading.
+
+### F-32 — RESOLVED in Phase 16. Sixteen guards the checker could not verify
+
+Working the 108 down to zero found one class of defect over and over, and it is
+the one this codebase is most exposed to.
+
+The sparse ledger returns `Decimal | None` — absent is not zero (rule 1.3) —
+and the arithmetic that consumes it was guarded in forms a type checker cannot
+narrow:
+
+    if None in (begin, end, cfo, cfi, cff):       # model/checks.py
+        continue
+    delta = (begin + cfo + cfi + cff) - end
+
+    if all(v is not None for v in expected.values()):   # STEP 37's rebuild
+        rebuilt = expected["ebit"] * (D(1) - expected["tax_rate"]) + ...
+
+Both guard correctly **today**. Neither states the guarantee in a form anything
+can check — so the next edit that adds a sixth term, or moves a check, produces
+a `TypeError` in a subtraction, on the first filing that omits a cash-flow
+subtotal. That is not a hypothetical failure mode here; it is the *central* one,
+and it would surface as a crashed check run rather than as a wrong number, which
+is the better of the two but not by much.
+
+Sixteen sites were rewritten into narrowing forms — naming each operand,
+binding narrowed locals, or taking the value as a parameter so the guarantee
+crosses the function boundary. Three were genuine latent crashes rather than
+unverifiable guards:
+
+- **a table with no detected header row** indexed `table.cell(None, column)`
+  in two places, which would raise on the first filing whose header could not
+  be found;
+- **`callable[[str], str | None]`** as an annotation — the builtin predicate,
+  not `Callable`, which never evaluated because of
+  `from __future__ import annotations`;
+- **`_tree: Node = field(default=None)`**, a non-optional field whose own
+  default was `None`.
+
+And five loop variables were reused across loops of different types in the same
+function — `row` for an `InterestYear` and then a `RollForwardYear`, `year` for
+a label and then a period object. Each read as one kind of thing throughout and
+was two.
+
+**Six fields typed `object`** were the other recurring shape:
+`ExtractionResult.mappings`, `ScenarioForecast.result`,
+`ScenarioValuation.valuation` and three on the portfolio row. Each had a comment
+naming the real type. A comment naming a type is not a type: five modules were
+reaching through `result` for `.income`, `.balance` and `.taxes` on nothing but
+faith, and the loose annotations existed to avoid an import cycle that
+`TYPE_CHECKING` handles in two lines.
+
+`model/` and `apps/api/app/` both pass now — 134 files, no issues — and both
+are gated in CI.
+
 ### F-30 — RESOLVED in Phase 15. A CSRF middleware ate every request body
 
 Written the obvious way — Starlette's `@app.middleware("http")` decorator — the

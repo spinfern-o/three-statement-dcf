@@ -57,7 +57,7 @@ def is_dangerous(text: str) -> bool:
     return bool(text) and text[0] in DANGEROUS
 
 
-def neutralize(cell: Cell) -> "tuple[str, bool]":
+def neutralize(cell: Cell) -> tuple[str, bool]:
     """The string to write, and whether it had to be defused.
 
     A cell holding a value is written from that value and is never defused: a
@@ -72,7 +72,7 @@ def neutralize(cell: Cell) -> "tuple[str, bool]":
     return text, False
 
 
-def header_lines(model: ExportModel, table: Table) -> "list[str]":
+def header_lines(model: ExportModel, table: Table) -> list[str]:
     """21.4 and 21.7, as comment lines above the data.
 
     Comments rather than columns: a reader opening this in a spreadsheet wants
@@ -110,7 +110,7 @@ def table_to_csv(model: ExportModel, table: Table) -> str:
     return out.getvalue()
 
 
-def neutralized_cells(model: ExportModel) -> "tuple[tuple[str, str], ...]":
+def neutralized_cells(model: ExportModel) -> tuple[tuple[str, str], ...]:
     """Every cell the defence touched, as `(table, original text)`.
 
     Reported rather than silent: a reader who finds an apostrophe in their data
@@ -126,7 +126,7 @@ def neutralized_cells(model: ExportModel) -> "tuple[tuple[str, str], ...]":
     return tuple(found)
 
 
-def export_csv(result, scenarios=None, scenario_id: str = "base", *, now=None) -> "dict[str, str]":
+def export_csv(result, scenarios=None, scenario_id: str = "base", *, now=None) -> dict[str, str]:
     """Every 21.1 table as its own CSV, keyed by filename."""
     model = gather(result, scenarios, scenario_id, now=now)
     return {f"{table.name}.csv": table_to_csv(model, table) for table in model.tables}

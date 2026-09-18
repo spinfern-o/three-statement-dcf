@@ -70,9 +70,9 @@ DEFINITIONS = {
 #: Which statement each derived subtotal is printed on, so an environment can
 #: be built from the right ledger.
 STATEMENT_OF = {
-    **{a: Statement.INCOME for a in accounts.INCOME_ACCOUNTS},
-    **{a: Statement.BALANCE for a in accounts.BALANCE_ACCOUNTS},
-    **{a: Statement.CASHFLOW for a in accounts.CASHFLOW_ACCOUNTS},
+    **dict.fromkeys(accounts.INCOME_ACCOUNTS, Statement.INCOME),
+    **dict.fromkeys(accounts.BALANCE_ACCOUNTS, Statement.BALANCE),
+    **dict.fromkeys(accounts.CASHFLOW_ACCOUNTS, Statement.CASHFLOW),
 }
 
 
@@ -119,11 +119,11 @@ def derivation_formulas() -> FormulaSet:
 
 
 def ledger_environment(
-    ledgers: "dict[Statement, Ledger]",
+    ledgers: dict[Statement, Ledger],
     year: str,
     *,
     reported_only: bool = True,
-) -> "tuple[Environment, dict[str, str]]":
+) -> tuple[Environment, dict[str, str]]:
     """Build a formula environment from one year of the built statements.
 
     Returns the environment and a record of every residual line supplied as
@@ -136,7 +136,7 @@ def ledger_environment(
     already derived and calling that agreement.
     """
     environment = Environment()
-    assumed_nil: "dict[str, str]" = {}
+    assumed_nil: dict[str, str] = {}
 
     for account, statement in STATEMENT_OF.items():
         if account in accounts.DERIVED:
@@ -179,7 +179,7 @@ def computable_subset(formulas: FormulaSet, environment: Environment) -> Formula
     with nothing to run on, not a formula that ran and came up short.
     """
     available = set(environment.paths)
-    keep: "set[str]" = set()
+    keep: set[str] = set()
     changed = True
     while changed:
         changed = False

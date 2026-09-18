@@ -110,7 +110,7 @@ def test_net_income_is_on_both_statements_and_they_are_separate_cells(built):
 
 def test_every_cell_carries_a_page_and_the_companys_own_wording(built):
     """STEP 4 and acceptance criterion 24.3."""
-    for statement, ledger in built.ledgers.items():
+    for _statement, ledger in built.ledgers.items():
         for year in YEARS:
             for code in ledger.accounts_present(year):
                 cell = ledger._cells[(code, year)]

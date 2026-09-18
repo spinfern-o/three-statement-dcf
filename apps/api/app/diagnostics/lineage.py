@@ -46,7 +46,7 @@ class Trace:
     code: str
     period: str
     statement: str
-    steps: "tuple[Step, ...]" = field(default_factory=tuple)
+    steps: tuple[Step, ...] = field(default_factory=tuple)
     #: Set when the chain cannot be completed, with the reason.
     incomplete: str = ""
 
@@ -158,7 +158,7 @@ def _contributors(result, code: str, period: str, statement: Statement):
     return tuple(by_id[fid] for fid in value.contributors if fid in by_id)
 
 
-def traceable_lines(built) -> "tuple[tuple[str, str, str], ...]":
+def traceable_lines(built) -> tuple[tuple[str, str, str], ...]:
     """Every `(statement, code, period)` this model can trace."""
     if built is None:
         return ()

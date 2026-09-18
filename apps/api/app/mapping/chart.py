@@ -414,10 +414,9 @@ def ancestors(code: str) -> frozenset[str]:
     while frontier:
         current = frontier.pop()
         for subtotal, (plus, minus) in accounts.DERIVED.items():
-            if current in plus or current in minus:
-                if subtotal not in found:
-                    found.add(subtotal)
-                    frontier.append(subtotal)
+            if (current in plus or current in minus) and subtotal not in found:
+                found.add(subtotal)
+                frontier.append(subtotal)
     return frozenset(found)
 
 

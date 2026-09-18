@@ -40,10 +40,10 @@ should show the failed conditions rather than the number alone.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import Iterable, Mapping
 
 from model.numeric import D
 
@@ -51,7 +51,14 @@ from model.numeric import D
 class ReasonCode(Enum):
     """Why a fact needs attention. `blocking` codes force review on their own."""
 
-    def __new__(cls, code: str, blocking: bool, rule: str, summary: str) -> "ReasonCode":
+    # Declared as class annotations as well as assigned in `__new__`. Without
+    # these, the attributes exist at runtime and nothing -- no checker, no
+    # editor, no reader of the class -- can see that they do.
+    blocking: bool
+    rule: str
+    summary: str
+
+    def __new__(cls, code: str, blocking: bool, rule: str, summary: str) -> ReasonCode:
         obj = object.__new__(cls)
         obj._value_ = code
         obj.blocking = blocking

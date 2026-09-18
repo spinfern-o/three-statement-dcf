@@ -68,7 +68,7 @@ class RateLimit:
     allowed: int
     window: int
     name: str = "request"
-    _events: "dict[str, deque]" = field(default_factory=dict)
+    _events: dict[str, deque] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def check(self, key: str, *, now: float | None = None) -> None:
@@ -115,7 +115,7 @@ class Concurrency:
         with self._lock:
             return self._running
 
-    def __enter__(self) -> "Concurrency":
+    def __enter__(self) -> Concurrency:
         with self._lock:
             if self._running >= self.limit:
                 raise RateLimited(1, f"concurrent {self.name}")
@@ -138,7 +138,7 @@ class Limiters:
     jobs: Concurrency
 
     @classmethod
-    def build(cls) -> "Limiters":
+    def build(cls) -> Limiters:
         return cls(
             **{
                 name: RateLimit(allowed, window, name)

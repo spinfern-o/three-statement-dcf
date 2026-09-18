@@ -32,8 +32,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from . import accounts as A
-from .numeric import D, ONE, ZERO
 from .assumptions import Assumptions
+from .numeric import ONE, ZERO, D
 from .profile import Periods
 from .provenance import ProvenanceError
 from .schedules import (
@@ -47,7 +47,6 @@ from .schedules import (
     retained_earnings_schedule,
 )
 from .statements import Ledger
-
 
 #: STEP 17 / specification 13.1.e: the day-count convention, stated once
 #: rather than buried as a literal 365 inside three separate formulas.

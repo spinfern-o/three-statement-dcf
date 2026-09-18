@@ -20,6 +20,7 @@ filing uploaded twice to one company is.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..core.errors import DUPLICATE_DOCUMENT, IngestionRefusal
@@ -65,7 +66,7 @@ class DuplicateCheck:
 def check_duplicate(
     data: bytes,
     *,
-    existing_id_for_hash: "callable[[str], str | None]",
+    existing_id_for_hash: Callable[[str], str | None],
     allow_linked_duplicate: bool = False,
     link_reason: str | None = None,
 ) -> DuplicateCheck:

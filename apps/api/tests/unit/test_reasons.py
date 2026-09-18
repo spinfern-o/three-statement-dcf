@@ -19,7 +19,7 @@ from apps.api.app.extraction.reasons import (
 
 
 def test_every_code_is_either_blocking_or_advisory():
-    assert BLOCKING_CODES | ADVISORY_CODES == set(ReasonCode)
+    assert set(ReasonCode) == BLOCKING_CODES | ADVISORY_CODES
     assert not BLOCKING_CODES & ADVISORY_CODES
 
 
@@ -49,13 +49,13 @@ def test_source_policy_blocking_codes_block(code):
 
 def test_10_30_is_not_negotiable():
     """A reconciliation failure forces review whatever the score says."""
-    perfect = score_confidence({c: True for c in ALL_EVIDENCE})
+    perfect = score_confidence(dict.fromkeys(ALL_EVIDENCE, True))
     assert perfect.score == Decimal("1.0000")
     assert has_blocking([ReasonCode.SUBTOTAL_MISMATCH])
 
 
 def test_confidence_is_the_fraction_of_evidence_conditions_met():
-    evidence = {c: True for c in ALL_EVIDENCE}
+    evidence = dict.fromkeys(ALL_EVIDENCE, True)
     evidence[EvidenceCheck.COLUMN_PERIOD] = False
     evidence[EvidenceCheck.CLEAN_NUMERIC] = False
     result = score_confidence(evidence)
@@ -64,7 +64,7 @@ def test_confidence_is_the_fraction_of_evidence_conditions_met():
 
 
 def test_confidence_explains_itself():
-    evidence = {c: True for c in ALL_EVIDENCE}
+    evidence = dict.fromkeys(ALL_EVIDENCE, True)
     evidence[EvidenceCheck.PARSED] = False
     text = score_confidence(evidence).explain()
     assert EvidenceCheck.PARSED.value in text
@@ -78,7 +78,7 @@ def test_an_unstated_condition_is_an_error_not_a_default():
 
 
 def test_the_threshold_is_compared_strictly():
-    evidence = {c: True for c in ALL_EVIDENCE}
+    evidence = dict.fromkeys(ALL_EVIDENCE, True)
     evidence[EvidenceCheck.CLEAN_NUMERIC] = False
     result = score_confidence(evidence)
     assert result.score == Decimal("0.8750")

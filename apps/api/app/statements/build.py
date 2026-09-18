@@ -28,6 +28,7 @@ up as they work; the export does not.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 from model.accounts import Statement
 from model.provenance import Figure, Source
@@ -95,12 +96,22 @@ def engine_year(period_label: str) -> str:
 
 
 def _figure_for(
-    value: NormalizedValue, fact: ReportedFact, result: ExtractionResult, document_label: str
+    value: NormalizedValue,
+    figure: Decimal,
+    fact: ReportedFact,
+    result: ExtractionResult,
+    document_label: str,
 ) -> Figure:
-    """Build the engine's provenance from the extraction's."""
+    """Build the engine's provenance from the extraction's.
+
+    `figure` is passed in rather than read off `value`, which holds it as
+    `Decimal | None`. The caller has already established it is present --
+    taking it as an argument carries that across the boundary rather than
+    restating it here as something nothing can check.
+    """
     location = result.location(fact.source_location_id)
     return Figure(
-        value=value.value,
+        value=figure,
         year=engine_year(value.period_label),
         source=Source(
             document=document_label,
@@ -186,7 +197,8 @@ def build_statements(
     ):
         year = engine_year(period)
 
-        if value.value is None:
+        figure_value = value.value
+        if figure_value is None:
             omitted.append((code, year, value.absent_because or "no parsed value"))
             continue
         if not value.approved:
@@ -223,7 +235,7 @@ def build_statements(
         # chart. `net_income` appears on two statements and a filing prints it
         # twice; writing one reading to both ledgers would make the linkage
         # check compare a figure with itself.
-        figure = _figure_for(value, contributors[0], result, label)
+        figure = _figure_for(value, figure_value, contributors[0], result, label)
         ledgers[ENGINE_STATEMENT[statement_type]].set_reported(code, year, figure)
 
     return BuiltStatements(

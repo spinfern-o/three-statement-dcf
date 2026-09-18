@@ -69,7 +69,7 @@ class Node:
     def text(self) -> str:  # pragma: no cover - overridden everywhere
         raise NotImplementedError
 
-    def references(self) -> "frozenset[str]":
+    def references(self) -> frozenset[str]:
         return frozenset()
 
 
@@ -90,7 +90,7 @@ class Reference(Node):
     def text(self) -> str:
         return self.path
 
-    def references(self) -> "frozenset[str]":
+    def references(self) -> frozenset[str]:
         return frozenset({self.path})
 
 
@@ -102,7 +102,7 @@ class Unary(Node):
     def text(self) -> str:
         return f"-{self.operand.text()}" if self.op == "-" else self.operand.text()
 
-    def references(self) -> "frozenset[str]":
+    def references(self) -> frozenset[str]:
         return self.operand.references()
 
 
@@ -115,7 +115,7 @@ class Binary(Node):
     def text(self) -> str:
         return f"({self.left.text()} {self.op} {self.right.text()})"
 
-    def references(self) -> "frozenset[str]":
+    def references(self) -> frozenset[str]:
         return self.left.references() | self.right.references()
 
 
@@ -127,7 +127,7 @@ class Call(Node):
     def text(self) -> str:
         return f"{self.function}({', '.join(a.text() for a in self.arguments)})"
 
-    def references(self) -> "frozenset[str]":
+    def references(self) -> frozenset[str]:
         out: frozenset[str] = frozenset()
         for argument in self.arguments:
             out |= argument.references()
@@ -143,7 +143,7 @@ class Token:
     position: int
 
 
-def tokenize(formula: str) -> "tuple[Token, ...]":
+def tokenize(formula: str) -> tuple[Token, ...]:
     """Characters to tokens, refusing anything outside the approved set."""
     tokens: list[Token] = []
     index = 0

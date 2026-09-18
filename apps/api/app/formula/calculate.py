@@ -69,18 +69,18 @@ class CalculatedModel:
     """The result of running a formula set, and the one it replaced (18.9)."""
 
     formulas: FormulaSet
-    cells: "dict[str, CalculatedCell]"
+    cells: dict[str, CalculatedCell]
     #: target -> why it could not be computed. Never a zero.
-    unavailable: "dict[str, str]"
+    unavailable: dict[str, str]
     #: The leaf inputs this calculation actually rested on.
-    inputs: "dict[str, Decimal]"
+    inputs: dict[str, Decimal]
     #: 18.7.
     fingerprint: str
     version: int = 1
     #: 18.9. The model this one replaced, or None for the first calculation.
-    previous: "CalculatedModel | None" = field(default=None, repr=False)
+    previous: CalculatedModel | None = field(default=None, repr=False)
     #: 18.8. Which targets this round actually recomputed.
-    recalculated: "tuple[str, ...]" = ()
+    recalculated: tuple[str, ...] = ()
 
     def value(self, target: str) -> Decimal | None:
         cell = self.cells.get(target)
@@ -93,11 +93,11 @@ class CalculatedModel:
         return self.cells[target].value
 
     @property
-    def carried_over(self) -> "tuple[str, ...]":
+    def carried_over(self) -> tuple[str, ...]:
         """Cells this round reused rather than recomputed (18.8)."""
         return tuple(sorted(set(self.cells) - set(self.recalculated)))
 
-    def changed_from_previous(self) -> "tuple[str, ...]":
+    def changed_from_previous(self) -> tuple[str, ...]:
         """Targets whose value differs from the model this one replaced."""
         if self.previous is None:
             return tuple(sorted(self.cells))
@@ -135,7 +135,7 @@ def _compute(
     definition: FormulaDefinition,
     environment: Environment,
     strict: bool,
-) -> "tuple[CalculatedCell | None, str]":
+) -> tuple[CalculatedCell | None, str]:
     """Evaluate one definition, or say why it could not be.
 
     Two kinds of failure, and the difference matters.
@@ -184,8 +184,8 @@ def calculate(
     by_target = {d.target: d for d in formulas}
 
     working = Environment(dict(environment.values))
-    cells: "dict[str, CalculatedCell]" = {}
-    unavailable: "dict[str, str]" = {}
+    cells: dict[str, CalculatedCell] = {}
+    unavailable: dict[str, str] = {}
 
     for target in order:
         definition = by_target[target]
@@ -215,7 +215,7 @@ def calculate(
 def recalculate(
     model: CalculatedModel,
     environment: Environment,
-    changed: "tuple[str, ...]",
+    changed: tuple[str, ...],
     *,
     strict: bool = True,
 ) -> CalculatedModel:
@@ -248,12 +248,15 @@ def recalculate(
 
     for target in order:
         definition = by_target[target]
-        cell, reason = _compute(definition, working, strict)
-        if cell is None:
+        # `computed`, not `cell`: the loop above binds `cell` to a stored
+        # CalculatedCell, and reusing the name here made the optional result
+        # of `_compute` look non-optional to anything reading the function.
+        computed, reason = _compute(definition, working, strict)
+        if computed is None:
             unavailable[target] = reason
             continue
-        cells[target] = cell
-        working.put(target, cell.value, definition.unit, origin=definition.code)
+        cells[target] = computed
+        working.put(target, computed.value, definition.unit, origin=definition.code)
 
     inputs, fingerprint = _fingerprint(model.formulas, environment, graph)
     return CalculatedModel(
@@ -268,7 +271,7 @@ def recalculate(
     )
 
 
-def environment_from(values: "dict[str, tuple]") -> Environment:
+def environment_from(values: dict[str, tuple]) -> Environment:
     """`{"revenue": (Decimal("100"), CURRENCY)}` -> an `Environment`."""
     environment = Environment()
     for path, (amount, unit) in values.items():

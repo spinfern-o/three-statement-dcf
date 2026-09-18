@@ -11,7 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .numeric import D, PrecisionError as _PrecisionError
+from .numeric import D
+from .numeric import PrecisionError as _PrecisionError
 
 
 class ProvenanceError(ValueError):

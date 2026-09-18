@@ -7,6 +7,7 @@ status that becomes colour-only -- rather than how anything looks.
 
 from __future__ import annotations
 
+import itertools
 import re
 
 
@@ -214,13 +215,13 @@ def test_a_decision_persists_across_requests(client, stored, repository):
         follow_redirects=True,
     )
     reloaded = repository.load_result(client.document_id)
-    decided = [f for f in reloaded.facts if f.id == fact_id][0]
+    decided = next(f for f in reloaded.facts if f.id == fact_id)
     assert decided.decision.reason == "matches page 2 line 1"
 
 
 def test_a_refusal_is_presented_as_an_answer_not_a_crash(client, stored):
     """Accepting a fact whose cell held an em dash is SUPPOSED to fail."""
-    dash = [f for f in stored.facts if f.raw_value == "—"][0]
+    dash = next(f for f in stored.facts if f.raw_value == "—")
     response = client.post(
         f"/documents/{client.document_id}/facts/{dash.id}",
         data={"action": "accept", "reason": "it is zero", "page": "2"},
@@ -280,7 +281,7 @@ def test_heading_order_does_not_skip_a_level(client):
     levels = [int(m) for m in re.findall(r"<h([1-6])[ >]", _room(client).text)]
     assert levels, "no headings"
     assert levels[0] == 1
-    for previous, current in zip(levels, levels[1:]):
+    for previous, current in itertools.pairwise(levels):
         assert current <= previous + 1, f"h{previous} followed by h{current}"
 
 
@@ -439,7 +440,7 @@ def test_the_mapping_page_keeps_the_accessibility_contract(client):
     body = client.get(_mapping_url(client)).text
     assert body.count("<h1>") == 1
     levels = [int(m) for m in re.findall(r"<h([1-6])[ >]", body)]
-    for previous, current in zip(levels, levels[1:]):
+    for previous, current in itertools.pairwise(levels):
         assert current <= previous + 1
     controls = re.findall(r'<(?:input|select|textarea)\b[^>]*id="([^"]+)"[^>]*>', body)
     labelled = set(re.findall(r'<label[^>]*for="([^"]+)"', body))

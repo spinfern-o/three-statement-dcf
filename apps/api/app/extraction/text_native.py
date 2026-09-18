@@ -51,15 +51,15 @@ from dataclasses import replace
 
 import pymupdf
 
+from model.numeric import D
+
+from ..core.config import DEFAULT_REVIEW_THRESHOLD
 from .geometry import BoundingBox
 from .metadata import DetectedMetadata
 from .pages import PageKind, PageProfile
-from ..core.config import DEFAULT_REVIEW_THRESHOLD
 from .parsing import NumberLocale, SignSource, parse_reported_value
 from .reasons import EvidenceCheck, ReasonCode, score_confidence
 from .records import RawCell, RawTable, ReportedFact, Scope, SourceLocation
-
-from model.numeric import D
 
 #: How far above a table to look for its caption.
 CAPTION_REACH = 70
@@ -99,7 +99,7 @@ def normalize_period_label(text: str) -> tuple[str | None, bool]:
     return None, False
 
 
-def _caption_for(page: "pymupdf.Page", box: BoundingBox) -> str:
+def _caption_for(page: pymupdf.Page, box: BoundingBox) -> str:
     """The nearest text above a table, used for 10.23's scope detection."""
     lines: list[tuple[float, str]] = []
     for block in page.get_text("dict")["blocks"]:
@@ -122,8 +122,8 @@ def _scope_from(caption: str) -> Scope:
 
 
 def extract_tables(
-    doc: "pymupdf.Document",
-    profiles: "tuple[PageProfile, ...]",
+    doc: pymupdf.Document,
+    profiles: tuple[PageProfile, ...],
     *,
     document_id: str,
 ) -> tuple[RawTable, ...]:
@@ -266,8 +266,8 @@ def _mark_splits(tables: list[RawTable]) -> list[RawTable]:
 
 
 def build_facts(
-    tables: "tuple[RawTable, ...]",
-    profiles: "tuple[PageProfile, ...]",
+    tables: tuple[RawTable, ...],
+    profiles: tuple[PageProfile, ...],
     metadata: DetectedMetadata,
     *,
     document_id: str,
@@ -322,7 +322,7 @@ def build_facts(
     return tuple(locations), tuple(facts)
 
 
-def _row_label(table: RawTable, row: int, headers: dict) -> "tuple[str, BoundingBox | None]":
+def _row_label(table: RawTable, row: int, headers: dict) -> tuple[str, BoundingBox | None]:
     """The label read from the page, and the box the label columns occupy."""
     first_value_column = min(headers) if headers else 1
     label = table.row_labels[row] if row < len(table.row_labels) else ""
@@ -342,8 +342,14 @@ def _row_label(table: RawTable, row: int, headers: dict) -> "tuple[str, Bounding
 
 def _column_periods(table: RawTable) -> dict[int, tuple[str, bool]]:
     headers: dict[int, tuple[str, bool]] = {}
+    header_row = table.header_row
+    if header_row is None:
+        # No detected header row means no period columns to read. Returning
+        # empty says that; indexing with None would have raised on the first
+        # table whose header could not be found.
+        return headers
     for column in range(1, table.column_count):
-        cell = table.cell(table.header_row, column)
+        cell = table.cell(header_row, column)
         if cell is None:
             continue
         period, mixes = normalize_period_label(cell.text)
@@ -379,7 +385,10 @@ def _fact_from_cell(
     locale: NumberLocale,
     review_threshold,
 ) -> tuple[SourceLocation, ReportedFact]:
-    header_cell = table.cell(table.header_row, cell.column)
+    header_cell = (
+        None if table.header_row is None
+        else table.cell(table.header_row, cell.column)
+    )
     location = SourceLocation.create(
         document_id=document_id,
         page_number=table.page_number,

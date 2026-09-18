@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from .numeric import D, ZERO
+from .numeric import ZERO, D
 from .provenance import ProvenanceError
 
 

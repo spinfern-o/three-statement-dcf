@@ -47,7 +47,7 @@ class ScanResult:
         return not self.findings
 
 
-def scan_document(doc: "pymupdf.Document") -> ScanResult:
+def scan_document(doc: pymupdf.Document) -> ScanResult:
     """Inspect a parsed document. Raises `IngestionRefusal` on anything blocking."""
     if doc.needs_pass or doc.is_encrypted:
         raise IngestionRefusal(
@@ -108,7 +108,7 @@ def scan_document(doc: "pymupdf.Document") -> ScanResult:
     return ScanResult(findings=(), notes=tuple(notes))
 
 
-def _names_keys(doc: "pymupdf.Document", value: str) -> list[str]:
+def _names_keys(doc: pymupdf.Document, value: str) -> list[str]:
     """Read the key names under the catalog's /Names dictionary, if reachable."""
     try:
         xref = int(value.split()[0]) if value and value.split()[0].isdigit() else None

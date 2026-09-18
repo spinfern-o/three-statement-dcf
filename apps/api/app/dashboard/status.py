@@ -73,11 +73,11 @@ class Standing:
     valuation_date: str
     owner: str
     #: 7.1.c: unresolved errors, counted and named.
-    unresolved: "tuple[str, ...]"
+    unresolved: tuple[str, ...]
     #: What the next status needs, in a sentence a reader can act on.
     blocked_by: str
     #: How each gate answered, for the drill-down.
-    gates: "tuple[tuple[str, bool, str], ...]"
+    gates: tuple[tuple[str, bool, str], ...]
 
     @property
     def unresolved_count(self) -> int:

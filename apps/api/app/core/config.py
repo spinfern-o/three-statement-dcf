@@ -59,7 +59,7 @@ class IngestionConfig:
             raise ValueError("review_threshold must lie in [0, 1]")
 
     @classmethod
-    def from_env(cls, storage_root: str | None = None) -> "IngestionConfig":
+    def from_env(cls, storage_root: str | None = None) -> IngestionConfig:
         """Build from environment variables. Names are listed in .env.example."""
         root = storage_root or os.environ.get("INGEST_STORAGE_ROOT")
         if not root:

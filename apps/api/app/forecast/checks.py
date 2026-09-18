@@ -71,14 +71,14 @@ class ScenarioChecks:
     """One scenario's results, with the scenario attached (9.13)."""
 
     scenario_id: str
-    results: "tuple[CheckResult, ...]"
+    results: tuple[CheckResult, ...]
 
     @property
-    def failed(self) -> "tuple[CheckResult, ...]":
+    def failed(self) -> tuple[CheckResult, ...]:
         return tuple(r for r in self.results if r.status is Status.FAIL)
 
     @property
-    def skipped(self) -> "tuple[CheckResult, ...]":
+    def skipped(self) -> tuple[CheckResult, ...]:
         """Forecast checks that could not run. Rule 1.14: reported, not passed."""
         return tuple(
             r for r in self.results
@@ -86,7 +86,7 @@ class ScenarioChecks:
         )
 
     @property
-    def deferred(self) -> "tuple[CheckResult, ...]":
+    def deferred(self) -> tuple[CheckResult, ...]:
         """Valuation checks, which have nothing to run on until Phase 11.
 
         Separated from `skipped` rather than hidden. A forecast is not
@@ -100,7 +100,7 @@ class ScenarioChecks:
         )
 
     @property
-    def passed(self) -> "tuple[CheckResult, ...]":
+    def passed(self) -> tuple[CheckResult, ...]:
         return tuple(r for r in self.results if r.status is Status.PASS)
 
     @property
@@ -132,9 +132,9 @@ class ScenarioChecks:
 class ForecastReadiness:
     """15.20 and 15.21 across every scenario the model carries."""
 
-    by_scenario: "tuple[ScenarioChecks, ...]"
+    by_scenario: tuple[ScenarioChecks, ...]
     #: Scenarios that could not be forecast at all, with the reason.
-    not_built: "dict[str, str]"
+    not_built: dict[str, str]
 
     @property
     def is_forecast_ready(self) -> bool:
@@ -198,8 +198,8 @@ def check_scenario(
 
 
 def check_every_scenario(
-    forecasts: "tuple[ScenarioForecast, ...]",
-    not_built: "dict[str, str]" | None = None,
+    forecasts: tuple[ScenarioForecast, ...],
+    not_built: dict[str, str] | None = None,
     tolerance: Tolerance | None = None,
 ) -> ForecastReadiness:
     """15.20, across the set."""

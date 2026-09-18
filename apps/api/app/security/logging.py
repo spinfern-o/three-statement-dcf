@@ -85,7 +85,7 @@ class SecurityEvent:
     outcome: str
     detail: str = ""
     document_id: str = ""
-    extra: "dict[str, str]" = field(default_factory=dict)
+    extra: dict[str, str] = field(default_factory=dict)
 
     def as_json(self) -> str:
         """One line of JSON. Structured, so a search is a query not a grep."""
@@ -110,7 +110,7 @@ def security_event(
     outcome: str = "",
     detail: str = "",
     document_id: str = "",
-    logger: "logging.Logger | None" = None,
+    logger: logging.Logger | None = None,
     **extra: str,
 ) -> SecurityEvent:
     """Record one event, redacted.

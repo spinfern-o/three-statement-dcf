@@ -31,14 +31,21 @@ from decimal import Decimal
 
 from model import accounts
 from model.accounts import Statement
-from model.dcf import CostOfCapital, EquityBridge, FCFFYear, build_fcff, run_dcf
+from model.dcf import (
+    CostOfCapital,
+    EquityBridge,
+    FCFFYear,
+    Valuation,
+    build_fcff,
+    run_dcf,
+)
 from model.numeric import ZERO
 from model.provenance import ProvenanceError
 from model.timing import Schedule, Timing, build_schedule
 
 from ..assumptions.scenarios import ScenarioSet
 from ..forecast.build import ScenarioForecast, forecast_ledger
-from .inputs import BY_CODE, BRIDGE_INPUTS, MARKET_INPUTS, required_codes
+from .inputs import BRIDGE_INPUTS, BY_CODE, MARKET_INPUTS, required_codes
 
 
 class ValuationError(Exception):
@@ -67,14 +74,16 @@ class ScenarioValuation:
     """One scenario's valuation, and everything it rested on."""
 
     scenario_id: str
-    valuation: object          # model.dcf.Valuation
-    fcff_years: "tuple[FCFFYear, ...]"
+    #: The engine's own `Valuation`. Typed, for the same reason as
+    #: `ScenarioForecast.result`: a comment naming the type is not the type.
+    valuation: Valuation
+    fcff_years: tuple[FCFFYear, ...]
     cost_of_capital: CostOfCapital
     bridge: EquityBridge
     schedule: Schedule
-    inputs: "tuple[InputRecord, ...]"
+    inputs: tuple[InputRecord, ...]
     #: 16.19 lines taken as nil because nobody entered them.
-    assumed_nil: "tuple[str, ...]"
+    assumed_nil: tuple[str, ...]
     #: 16.20: why there is no per-share value, when there is none.
     per_share_status: str
     #: The calendar date this valuation counts from, when one was supplied.
@@ -82,7 +91,7 @@ class ScenarioValuation:
     #: last actual period rather than to a calendar -- and 21.6 asks the report
     #: for a valuation date, so the absence has to be reportable rather than
     #: guessed at from today.
-    valuation_date: "date | None" = None
+    valuation_date: date | None = None
 
     @property
     def has_per_share(self) -> bool:
@@ -156,7 +165,7 @@ def build_scenario_valuation(
 ) -> ScenarioValuation:
     """Items 109-118 for one scenario, by running the engine that implements them."""
     scenario_id = forecast.scenario_id
-    resolved, records, missing, unresolved, wrong_unit = _gather(scenarios, scenario_id)
+    _resolved, records, missing, unresolved, wrong_unit = _gather(scenarios, scenario_id)
 
     problems = []
     if missing:
@@ -271,7 +280,7 @@ def build_scenario_valuation(
     )
 
 
-def missing_inputs(scenarios: ScenarioSet, scenario_id: str) -> "tuple[str, ...]":
+def missing_inputs(scenarios: ScenarioSet, scenario_id: str) -> tuple[str, ...]:
     """The required market inputs this scenario does not yet carry."""
     resolved = _resolved(scenarios, scenario_id)
     return tuple(sorted(required_codes() - set(resolved)))

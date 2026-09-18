@@ -76,9 +76,9 @@ class Row:
     label: str
     definition: str
     is_subtotal: bool
-    cells: "tuple[Cell, ...]"
+    cells: tuple[Cell, ...]
     #: Year-on-year growth per column, and why it is undefined where it is.
-    growth: "tuple[tuple[Decimal | None, str], ...]"
+    growth: tuple[tuple[Decimal | None, str], ...]
 
     @property
     def any_present(self) -> bool:
@@ -95,8 +95,10 @@ _ACCOUNTS = {
 _SUBTOTALS = frozenset(accounts.DERIVED)
 
 
-def _growth(values: "tuple[Cell, ...]") -> "tuple[tuple[Decimal | None, str], ...]":
-    out = [(None, "no prior period in this model")]
+def _growth(values: tuple[Cell, ...]) -> tuple[tuple[Decimal | None, str], ...]:
+    out: list[tuple[Decimal | None, str]] = [
+        (None, "no prior period in this model")
+    ]
     for index in range(1, len(values)):
         prior, current = values[index - 1].value, values[index].value
         if prior is None or current is None:
@@ -118,7 +120,7 @@ def _growth(values: "tuple[Cell, ...]") -> "tuple[tuple[Decimal | None, str], ..
 
 def statement_rows(
     forecast: ScenarioForecast, statement: Statement
-) -> "tuple[Row, ...]":
+) -> tuple[Row, ...]:
     """7.8.a-c for one statement, across every period actual and estimate."""
     ledger = forecast_ledger(forecast, statement)
     years = forecast.periods.all_years
@@ -149,7 +151,7 @@ def statement_rows(
     return tuple(rows)
 
 
-def columns(forecast: ScenarioForecast) -> "tuple[Column, ...]":
+def columns(forecast: ScenarioForecast) -> tuple[Column, ...]:
     """7.8.d: every period labelled actual or estimate, never by inference."""
     return tuple(Column(year) for year in forecast.periods.all_years)
 
@@ -160,18 +162,18 @@ class ComparisonRow:
 
     scenario_id: str
     #: The driver values that differ from the base scenario's.
-    differences: "tuple[tuple[str, Decimal | None, Decimal], ...]"
-    values: "tuple[Decimal | None, ...]"
+    differences: tuple[tuple[str, Decimal | None, Decimal], ...]
+    values: tuple[Decimal | None, ...]
     forecast_ready: bool
 
 
 def comparison(
-    forecasts: "tuple[ScenarioForecast, ...]",
+    forecasts: tuple[ScenarioForecast, ...],
     statement: Statement,
     code: str,
     readiness=None,
     scenarios=None,
-) -> "tuple[ComparisonRow, ...]":
+) -> tuple[ComparisonRow, ...]:
     """7.8.e: one line, every scenario, with the driver differences beside it.
 
     The differences are the point. Two revenue lines that diverge tell a reader
@@ -208,7 +210,7 @@ class DriverRow:
     step: str
 
 
-def driver_rows(forecast: ScenarioForecast) -> "tuple[DriverRow, ...]":
+def driver_rows(forecast: ScenarioForecast) -> tuple[DriverRow, ...]:
     """15.4 -- "show each revenue driver and formula by period"."""
     from ..assumptions.drivers import BY_CODE
 

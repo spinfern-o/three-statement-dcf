@@ -16,13 +16,16 @@ from pathlib import Path
 
 from model import report
 from model.accounts import (
-    BALANCE_ACCOUNTS, CASHFLOW_ACCOUNTS, INCOME_ACCOUNTS, Statement,
+    BALANCE_ACCOUNTS,
+    CASHFLOW_ACCOUNTS,
+    INCOME_ACCOUNTS,
+    Statement,
 )
 from model.checks import DEFAULT_ABS_TOL, DEFAULT_REL_TOL, Status, Tolerance, run_all_checks
 from model.dcf import build_fcff, run_dcf
+from model.disclaimer import block as disclaimer_block
 from model.forecast import build_forecast
 from model.loader import load_assumptions, load_historical, load_profile, load_valuation
-from model.disclaimer import block as disclaimer_block
 from model.numeric import PrecisionError
 from model.provenance import ProvenanceError
 from model.sensitivity import sensitivity_grid

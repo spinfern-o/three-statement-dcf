@@ -16,10 +16,10 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from .forecast import ForecastResult
-from .numeric import D, ONE, ZERO
+from .numeric import ONE, ZERO, D
 from .profile import Periods
-from .timing import Schedule, Timing, build_schedule, discount_factor
 from .provenance import ProvenanceError
+from .timing import Schedule, Timing, build_schedule, discount_factor
 
 
 @dataclass(frozen=True)
@@ -250,7 +250,7 @@ def run_dcf(
     periods: Periods,
     diluted_shares: Decimal | None = None,
     shares_source: str | None = None,
-    schedule: "Schedule | None" = None,
+    schedule: Schedule | None = None,
 ) -> Valuation:
     """STEP 29-35.
 

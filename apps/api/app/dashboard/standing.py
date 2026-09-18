@@ -30,8 +30,8 @@ def standing_for(
 ) -> Standing:
     """7.1.b and 7.1.c for one model."""
     progress = review_progress(result)
-    gates: "list[tuple[str, bool, str]]" = []
-    unresolved: "list[str]" = []
+    gates: list[tuple[str, bool, str]] = []
+    unresolved: list[str] = []
 
     # --- Extracting: the pipeline produced facts -----------------------------
     extracted = bool(result.facts)
@@ -86,7 +86,9 @@ def standing_for(
     # --- Forecast Ready and Valuation Ready ---------------------------------
     forecast_ready = False
     valuation_ready = False
-    if validated and scenarios is not None:
+    # `statements is not None` is implied by `validated` and is stated anyway:
+    # nothing in the name says so, and the two would come apart silently.
+    if validated and statements is not None and scenarios is not None:
         periods = forecast_periods(statements)
         gate = evaluate_gate(scenarios, BASE, periods.forecast)
         gates.append((

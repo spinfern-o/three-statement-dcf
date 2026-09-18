@@ -45,7 +45,6 @@ def main(argv: list[str] | None = None) -> int:
     import uvicorn
 
     from apps.api.app.api.main import create_app
-
     from apps.api.app.security.credentials import Credential, CredentialError
     from apps.api.app.security.logging import configure as configure_security_log
 

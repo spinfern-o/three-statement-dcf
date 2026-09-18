@@ -113,11 +113,11 @@ def unit_for(name: str) -> Unit:
     return UNITS[name]
 
 
-def _combine(left: Unit, right: Unit, sign: int) -> "tuple[int, ...]":
+def _combine(left: Unit, right: Unit, sign: int) -> tuple[int, ...]:
     return tuple(a + sign * b for a, b in zip(left.exponents, right.exponents))
 
 
-def _named(exponents: "tuple[int, ...]") -> Unit:
+def _named(exponents: tuple[int, ...]) -> Unit:
     """The declared unit with these exponents, or an anonymous one.
 
     An anonymous unit is not an error by itself -- an intermediate result in a

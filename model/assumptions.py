@@ -13,7 +13,8 @@ and an unresolved conflict is a hard error, not a warning.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Iterator
+from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 
@@ -166,5 +167,5 @@ class Assumptions:
     def __len__(self) -> int:
         return len(self._items)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Assumption]:
         return iter(sorted(self._items.values(), key=lambda a: (a.name, a.year or "")))

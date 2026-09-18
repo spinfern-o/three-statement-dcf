@@ -37,7 +37,7 @@ class CsrfError(ValueError):
 
 def token_for(key: bytes, nonce: str) -> str:
     """The token this session's forms must carry."""
-    return hmac.new(key, f"csrf|{nonce}".encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(key, f"csrf|{nonce}".encode(), hashlib.sha256).hexdigest()
 
 
 def check(key: bytes, nonce: str, supplied: str) -> None:

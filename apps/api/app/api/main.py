@@ -21,11 +21,11 @@ from model.disclaimer import DISCLAIMER
 
 from ..core.config import IngestionConfig
 from ..display import FILTERS as DISPLAY_FILTERS
+from ..extraction.storage import SourceStore
+from ..persistence.json_store import JsonDocumentRepository
 from ..security.credentials import Credential, signing_key
 from ..security.guard import install as install_guard
 from ..security.ratelimit import Limiters
-from ..extraction.storage import SourceStore
-from ..persistence.json_store import JsonDocumentRepository
 from .routes import router
 
 HERE = Path(__file__).resolve().parent
@@ -40,7 +40,7 @@ def create_app(
     storage_root: str | Path,
     *,
     actor: str = "owner",
-    credential: "Credential | None" = None,
+    credential: Credential | None = None,
     key: bytes | None = None,
     environ=None,
 ) -> FastAPI:

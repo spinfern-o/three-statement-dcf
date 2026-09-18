@@ -87,7 +87,7 @@ def statement_view(
     built: BuiltStatements,
     statement: accounts.Statement,
     *,
-    raw_values: "dict[tuple[str, str], str] | None" = None,
+    raw_values: dict[tuple[str, str], str] | None = None,
 ) -> tuple[StatementRow, ...]:
     """Every canonical line of one statement, in chart order, with all views.
 
@@ -147,7 +147,7 @@ def _chart_statement(statement: accounts.Statement) -> StatementType:
 
 def _common_size(
     value: Decimal | None, base: Decimal | None, base_code: str
-) -> "tuple[Decimal | None, str]":
+) -> tuple[Decimal | None, str]:
     """Item 64. `value / base`, as a percentage, or a reason it is undefined."""
     if value is None:
         return None, ""
@@ -160,7 +160,7 @@ def _common_size(
 
 def _growth(
     value: Decimal | None, prior: Decimal | None, index: int
-) -> "tuple[Decimal | None, str]":
+) -> tuple[Decimal | None, str]:
     """Item 64. Period-on-period change, or a reason it is undefined."""
     if index == 0:
         return None, "no prior year in this filing"
@@ -194,7 +194,7 @@ def equity_statement_status() -> str:
     )
 
 
-def summarize_views(rows: "tuple[StatementRow, ...]") -> str:
+def summarize_views(rows: tuple[StatementRow, ...]) -> str:
     lines = []
     for row in rows:
         parts = []

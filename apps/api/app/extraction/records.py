@@ -27,6 +27,9 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
+from typing import TYPE_CHECKING
+
+from model.numeric import D
 
 from ..core.config import DEFAULT_REVIEW_THRESHOLD
 from .geometry import BoundingBox
@@ -36,7 +39,10 @@ from .pages import PageProfile
 from .parsing import NumberLocale, ParsedValue, SignSource, parse_reported_value
 from .reasons import Confidence, EvidenceCheck, ReasonCode, score_confidence
 
-from model.numeric import D
+if TYPE_CHECKING:  # pragma: no cover - imported for typing only
+    # `mapping` imports `extraction`; this is the same edge in the other
+    # direction, which would be a cycle at runtime and is not one here.
+    from ..mapping.sets import MappingSet
 
 
 def _new_id(prefix: str) -> str:
@@ -66,7 +72,7 @@ class SourceLocation:
     column_label: str | None = None
 
     @classmethod
-    def create(cls, **kwargs) -> "SourceLocation":
+    def create(cls, **kwargs) -> SourceLocation:
         return cls(id=_new_id("loc"), **kwargs)
 
     def cite(self) -> str:
@@ -117,7 +123,7 @@ class RawTable:
     row_labels: tuple[str, ...] = ()
 
     @classmethod
-    def create(cls, **kwargs) -> "RawTable":
+    def create(cls, **kwargs) -> RawTable:
         return cls(id=_new_id("tbl"), **kwargs)
 
     def cell(self, row: int, column: int) -> RawCell | None:
@@ -207,7 +213,7 @@ class ReportedFact:
     reviewer_id: str | None = None
 
     @classmethod
-    def create(cls, **kwargs) -> "ReportedFact":
+    def create(cls, **kwargs) -> ReportedFact:
         return cls(id=_new_id("fact"), **kwargs)
 
     @property
@@ -253,7 +259,7 @@ class ReportedFact:
         codes = " ".join(c.value for c in self.reason_codes)
         return (
             f"{self.raw_label[:40]:40} {self.period_label:>8} "
-            f"{str(shown):>14}  raw={self.raw_value!r:14} "
+            f"{shown!s:>14}  raw={self.raw_value!r:14} "
             f"conf={self.confidence.score} {codes}"
         )
 
@@ -271,7 +277,7 @@ class AuditEvent:
     detail: str
 
     @classmethod
-    def create(cls, *, actor: str, action: str, entity_type: str, entity_id: str, detail: str) -> "AuditEvent":
+    def create(cls, *, actor: str, action: str, entity_type: str, entity_id: str, detail: str) -> AuditEvent:
         if not detail.strip():
             raise ValueError("an audit entry without a reason is not an audit entry (10.33)")
         return cls(
@@ -312,7 +318,7 @@ class SourceDocument:
     scan_notes: tuple[str, ...] = ()
 
     @classmethod
-    def create(cls, **kwargs) -> "SourceDocument":
+    def create(cls, **kwargs) -> SourceDocument:
         return cls(id=_new_id("doc"), **kwargs)
 
 
@@ -336,10 +342,15 @@ class ExtractionResult:
     facts: tuple[ReportedFact, ...]
     audit: tuple[AuditEvent, ...]
     job_history: tuple[str, ...]
-    #: Phase 5. A `mapping.sets.MappingSet`, typed loosely here so that
-    #: `extraction` does not import `mapping` -- the dependency runs the other
-    #: way, and a cycle between them would be the wrong shape.
-    mappings: "object | None" = None
+    #: Phase 5. A `mapping.sets.MappingSet`, imported under `TYPE_CHECKING` so
+    #: that `extraction` does not import `mapping` at runtime -- the dependency
+    #: runs the other way and a cycle between them would be the wrong shape --
+    #: while the declared type is still the real one.
+    #:
+    #: It was `object` before, which meant every reader of `.mappings` had to
+    #: know what it really held and nothing could check that they did. Two
+    #: modules were reaching straight for `.mappings.mappings` through it.
+    mappings: MappingSet | None = None
 
     @property
     def facts_needing_review(self) -> tuple[ReportedFact, ...]:
@@ -360,7 +371,7 @@ DOCUMENT_CODES = (ReasonCode.SCALE_UNCONFIRMED, ReasonCode.CURRENCY_UNCONFIRMED)
 
 def confirm_metadata(
     result: ExtractionResult,
-    confirmations: "dict[str, str | None]",
+    confirmations: dict[str, str | None],
     *,
     actor: str,
     reason: str,
@@ -483,7 +494,7 @@ def _refresh_fact(
     fact: ReportedFact,
     *,
     locale: NumberLocale,
-    document_codes: "tuple[ReasonCode, ...]",
+    document_codes: tuple[ReasonCode, ...],
     review_threshold,
 ) -> ReportedFact:
     """Re-parse and re-score one fact against the current metadata."""

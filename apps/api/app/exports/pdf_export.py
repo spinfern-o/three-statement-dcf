@@ -72,9 +72,9 @@ class Cursor:
             self.y = MARGIN
 
 
-def _wrap(text: str, width: float, font: str, size: float) -> "list[str]":
+def _wrap(text: str, width: float, font: str, size: float) -> list[str]:
     """Greedy wrap on measured widths, because a character count is not one."""
-    lines: "list[str]" = []
+    lines: list[str] = []
     for paragraph in text.split("\n"):
         words = paragraph.split()
         if not words:
@@ -261,7 +261,11 @@ def build_report(model: ExportModel) -> pymupdf.Document:
 
 def _footers(document: pymupdf.Document, model: ExportModel) -> None:
     total = document.page_count
-    for index, page in enumerate(document, start=1):
+    # By index rather than by iterating the Document: pymupdf ships no type
+    # information, so iterating it yields an untyped value and `insert_text`
+    # below is then a call on nothing in particular.
+    for index in range(1, total + 1):
+        page = document[index - 1]
         page.insert_text(
             (MARGIN, PAGE_HEIGHT - MARGIN + 12),
             f"Three-Statement DCF - {model.version_id[:26]}... - "

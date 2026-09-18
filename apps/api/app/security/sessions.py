@@ -78,7 +78,7 @@ class Session:
 
 
 def issue(key: bytes, *, now: int | None = None,
-          lifetime: int = LIFETIME_SECONDS) -> "tuple[str, Session]":
+          lifetime: int = LIFETIME_SECONDS) -> tuple[str, Session]:
     """Mint a cookie value for a browser that has just proved the password."""
     moment = int(time.time() if now is None else now)
     session = Session(

@@ -11,7 +11,6 @@ from .drivers import DRIVERS, REQUIRED, Driver, driver
 from .gate import evaluate
 from .impact import Impact, MovedValue, preview, reaches, unread_assumptions
 from .proposals import Proposal, propose_from_schedules, unproposable
-from .store import ScenarioStore
 from .scenarios import (
     BASE,
     Probability,
@@ -28,6 +27,7 @@ from .schema import (
     SourceType,
     Status,
 )
+from .store import ScenarioStore
 from .workflow import GateResult, StatusChange, WorkflowError, transition
 
 __all__ = [

@@ -36,8 +36,8 @@ from ..extraction.jobs import FactVerificationState
 from ..extraction.records import AuditEvent, ExtractionResult, ReportedFact
 from .chart import line_item
 from .checks import duplicate_counting
-from .proposals import explain_no_proposal, infer_sign, propose
 from .normalized import statement_of_fact
+from .proposals import explain_no_proposal, infer_sign, propose
 from .sets import (
     FactMapping,
     MappingError,
@@ -65,7 +65,7 @@ def _fact(result: ExtractionResult, fact_id: str) -> ReportedFact:
     raise MappingError(f"no fact {fact_id!r} in document {result.document.id}")
 
 
-def _sign(fact: ReportedFact, code: str, override: "bool | None", amount=None):
+def _sign(fact: ReportedFact, code: str, override: bool | None, amount=None):
     """11.8. Infer the flip from the chart's convention unless told otherwise.
 
     A filing printing "(300,000)" for SG&A has printed an expense as negative;
@@ -206,7 +206,7 @@ def map_fact(
 def split_fact(
     result: ExtractionResult,
     fact_id: str,
-    allocations: "list[tuple[str, str]]",
+    allocations: list[tuple[str, str]],
     *,
     basis: str,
     actor: str,
@@ -285,7 +285,7 @@ def split_fact(
 
 def combine_facts(
     result: ExtractionResult,
-    fact_ids: "list[str]",
+    fact_ids: list[str],
     canonical_code: str,
     *,
     actor: str,

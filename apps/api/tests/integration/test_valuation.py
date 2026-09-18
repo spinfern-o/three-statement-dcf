@@ -244,7 +244,7 @@ def test_a_market_input_in_the_wrong_unit_is_refused(forecast, scenarios):
             unit="currency",
         )
     )
-    with pytest.raises(ValuationError, match="18.12"):
+    with pytest.raises(ValuationError, match=r"18\.12"):
         build_scenario_valuation(forecast, wrong)
 
 
@@ -305,7 +305,7 @@ def test_a_high_terminal_share_warns_and_does_not_fail(valuation):
     assert strict.is_above_threshold
     assert "WARNING and not a failure" in strict.describe()
     assert "no threshold tells the two apart" in strict.describe()
-    assert DEFAULT_TERMINAL_THRESHOLD == D("0.75")
+    assert D("0.75") == DEFAULT_TERMINAL_THRESHOLD
 
 
 def test_wacc_must_exceed_the_growth_rate(forecast, scenarios):

@@ -263,7 +263,7 @@ def test_recalculation_gives_the_same_answer_as_calculating_from_scratch():
     assert incremental.fingerprint == complete.fingerprint
 
 
-def test_the_prior_model_is_preserved(): 
+def test_the_prior_model_is_preserved():
     """18.9."""
     first = calculate(CHAIN, money(
         revenue="100", cogs="40", operating_expenses="30", interest_expense="5"

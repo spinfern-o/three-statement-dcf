@@ -209,7 +209,7 @@ def test_a_set_needs_a_base_scenario():
 )
 def test_a_name_that_implies_probability_is_refused(name):
     """14.9, and 1.19 behind it: this system models no distribution."""
-    with pytest.raises(ScenarioError, match="likelihood|distribution"):
+    with pytest.raises(ScenarioError, match=r"likelihood|distribution"):
         Scenario(id="x", name=name)
 
 
@@ -308,7 +308,7 @@ def test_a_status_change_needs_a_reason():
 
 
 def test_reviewed_needs_a_named_reviewer():
-    with pytest.raises(WorkflowError, match="named.*reviewer"):
+    with pytest.raises(WorkflowError, match=r"named.*reviewer"):
         transition(make(), Status.REVIEWED, actor="larry", reason="checked p.31")
 
 

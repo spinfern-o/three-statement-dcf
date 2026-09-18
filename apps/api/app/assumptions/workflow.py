@@ -42,7 +42,7 @@ from .schema import Assumption, AssumptionError, Status
 
 #: Which status may follow which. Declared as data so the diagram above and
 #: the code cannot drift.
-LEGAL_TRANSITIONS: "dict[Status, frozenset[Status]]" = {
+LEGAL_TRANSITIONS: dict[Status, frozenset[Status]] = {
     Status.DRAFT: frozenset({Status.NEEDS_SOURCE, Status.REVIEWED, Status.REJECTED}),
     Status.NEEDS_SOURCE: frozenset({Status.DRAFT, Status.REVIEWED, Status.REJECTED}),
     Status.REVIEWED: frozenset({Status.APPROVED, Status.REJECTED, Status.DRAFT}),
@@ -88,7 +88,7 @@ def transition(
     actor: str,
     reason: str,
     reviewer: str = "",
-) -> "tuple[Assumption, StatusChange]":
+) -> tuple[Assumption, StatusChange]:
     """Move one assumption's status, or refuse and say why.
 
     The reason is mandatory for the same reason `review/actions.py` makes it
@@ -168,13 +168,13 @@ class GateResult:
     """Whether a forecast may calculate, and exactly what is in the way."""
 
     #: Required driver choices with nothing supplied at all.
-    missing: "tuple[str, ...]"
+    missing: tuple[str, ...]
     #: Supplied, but with a status that is not an answer.
-    unresolved: "tuple[tuple[str, str], ...]"
+    unresolved: tuple[tuple[str, str], ...]
     #: Both members of a one-of-two pair declared (STEP 14/18).
-    ambiguous: "tuple[str, ...]"
+    ambiguous: tuple[str, ...]
     #: Approved on the strength of the owner's own review.
-    self_reviewed: "tuple[str, ...]"
+    self_reviewed: tuple[str, ...]
 
     @property
     def may_calculate(self) -> bool:

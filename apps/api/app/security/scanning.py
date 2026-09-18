@@ -100,7 +100,7 @@ def configured_command(environ=None) -> str:
     return ((environ or os.environ).get(SCAN_COMMAND_ENV) or "").strip()
 
 
-def scan(path: "str | Path", *, environ=None, timeout: int = SCAN_TIMEOUT_SECONDS) -> ScanResult:
+def scan(path: str | Path, *, environ=None, timeout: int = SCAN_TIMEOUT_SECONDS) -> ScanResult:
     """Run the configured scanner over one file, before anything parses it."""
     command = configured_command(environ)
     if not command:
@@ -139,7 +139,7 @@ def scan(path: "str | Path", *, environ=None, timeout: int = SCAN_TIMEOUT_SECOND
     )
 
 
-def quarantine(path: "str | Path", storage_root: "str | Path", result: ScanResult) -> ScanResult:
+def quarantine(path: str | Path, storage_root: str | Path, result: ScanResult) -> ScanResult:
     """Move a failed file aside and record where, rather than deleting it.
 
     Deleting destroys the evidence of why an upload was refused, and the
@@ -162,7 +162,7 @@ def quarantine(path: "str | Path", storage_root: "str | Path", result: ScanResul
     )
 
 
-def scan_state(storage_root: "str | Path", result=None) -> ScanResult:
+def scan_state(storage_root: str | Path, result=None) -> ScanResult:
     """What is known about scanning on this deployment, for the settings page.
 
     Reported per deployment rather than per document, because that is what is

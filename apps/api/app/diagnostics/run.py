@@ -65,7 +65,7 @@ def _skip(check: Check, detail: str, blocked_by: str = "") -> Outcome:
 class Diagnostics:
     """Every Section 17 check for one model, in the specification's order."""
 
-    outcomes: "tuple[Outcome, ...]"
+    outcomes: tuple[Outcome, ...]
 
     def by_code(self, code: str) -> Outcome:
         for outcome in self.outcomes:
@@ -74,18 +74,18 @@ class Diagnostics:
         raise KeyError(code)
 
     @property
-    def failed(self) -> "tuple[Outcome, ...]":
+    def failed(self) -> tuple[Outcome, ...]:
         return tuple(o for o in self.outcomes if o.status is Status.FAIL)
 
     @property
-    def skipped(self) -> "tuple[Outcome, ...]":
+    def skipped(self) -> tuple[Outcome, ...]:
         return tuple(o for o in self.outcomes if o.status is Status.SKIP)
 
     @property
-    def passed(self) -> "tuple[Outcome, ...]":
+    def passed(self) -> tuple[Outcome, ...]:
         return tuple(o for o in self.outcomes if o.status is Status.PASS)
 
-    def outstanding_at(self, severity: Severity) -> "tuple[Outcome, ...]":
+    def outstanding_at(self, severity: Severity) -> tuple[Outcome, ...]:
         return tuple(
             o for o in self.outcomes
             if o.is_outstanding and o.check.severity is severity
@@ -117,7 +117,7 @@ UNEVALUABLE = {
 }
 
 
-def _no_nan_or_infinity(values) -> "tuple[bool, str]":
+def _no_nan_or_infinity(values) -> tuple[bool, str]:
     """17.27, which is the one check that is about the numbers themselves."""
     bad = []
     for label, value in values:
@@ -134,6 +134,8 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
     that did not build reports SKIP naming the stage. That is what keeps a
     single missing mapping from producing twenty unrelated failures.
     """
+    from model.checks import Tolerance
+
     from ..assumptions.gate import evaluate as evaluate_gate
     from ..assumptions.schema import Status as AssumptionStatus
     from ..forecast.build import ForecastError, build_scenario_forecast, forecast_periods
@@ -146,11 +148,10 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
     from ..statements.checks import run_historical_checks
     from ..valuation.build import ValuationError, build_scenario_valuation
     from ..valuation.checks import headroom
-    from model.checks import Tolerance
 
     progress = review_progress(result)
     document = result.document
-    outcomes: "dict[str, Outcome]" = {}
+    outcomes: dict[str, Outcome] = {}
     by_clause = {check.clause: check for check in REGISTRY}
 
     def record(clause: str, status: Status, detail: str, blocked_by: str = "") -> None:
@@ -310,7 +311,11 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
     else:
         valuation_error = forecast_error or "no forecast"
 
-    if valuation is None:
+    # `forecast is not None` is implied by `valuation is not None` -- a
+    # valuation is only built from a forecast -- and is stated because nothing
+    # in the name says so and the implication is exactly the kind that goes
+    # quietly wrong when somebody adds a second way to build one.
+    if valuation is None or forecast is None:
         for clause in ("17.22", "17.23", "17.24", "17.25", "17.26"):
             record(clause, Status.SKIP, "there is no valuation to check",
                    blocked_by=valuation_error)
@@ -385,7 +390,7 @@ def _schedule(record, clause: str, outcome) -> None:
     record(clause, outcome.status, outcome.detail)
 
 
-def _finite(built, valuation) -> "tuple[Status, str]":
+def _finite(built, valuation) -> tuple[Status, str]:
     """17.27: no NaN, Infinity or null in a released calculation."""
     values = []
     if built is not None:
@@ -406,7 +411,7 @@ def _finite(built, valuation) -> "tuple[Status, str]":
     )
 
 
-def _rounding_ties(built) -> "tuple[Status, str]":
+def _rounding_ties(built) -> tuple[Status, str]:
     """17.29: a displayed value must tie back to its full-precision one.
 
     Checked by re-rounding rather than by comparing to a stored display
@@ -432,7 +437,7 @@ def _rounding_ties(built) -> "tuple[Status, str]":
     )
 
 
-def _lineage(built) -> "tuple[Status, str]":
+def _lineage(built) -> tuple[Status, str]:
     """17.30: every released output has source and formula lineage."""
     if built is None:
         return Status.SKIP, "nothing has been released yet"
@@ -448,7 +453,7 @@ def _lineage(built) -> "tuple[Status, str]":
     return Status.PASS, "every cell cites either a page of the filing or the formula that produced it"
 
 
-def _benchmark_attestation() -> "tuple[Status, str]":
+def _benchmark_attestation() -> tuple[Status, str]:
     """17.28 and 4.20, which is a rule about what may be CLAIMED.
 
     "Never claim less than 0.0001% error until the benchmark suite passes and

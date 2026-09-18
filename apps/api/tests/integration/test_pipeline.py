@@ -28,7 +28,6 @@ from apps.api.tests.conftest import (
     TRUNCATED,
 )
 
-
 # --- refusals ---------------------------------------------------------------
 
 @pytest.mark.parametrize(

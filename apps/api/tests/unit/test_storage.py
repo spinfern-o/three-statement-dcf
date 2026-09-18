@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
 from apps.api.app.core.errors import IngestionRefusal

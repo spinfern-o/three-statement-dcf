@@ -24,7 +24,7 @@ from ..extraction.records import ExtractionResult
 
 #: Caption patterns, most specific first. A caption matching none of them is
 #: not bookmarked rather than being filed under a guess.
-STATEMENT_PATTERNS: tuple[tuple[str, "re.Pattern[str]"], ...] = (
+STATEMENT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("Income statement", re.compile(r"(?i)statements?\s+of\s+(operations|income|profit)|income\s+statement|profit\s+and\s+loss|gewinn")),
     ("Balance sheet", re.compile(r"(?i)balance\s+sheets?|statements?\s+of\s+financial\s+position|bilanz")),
     ("Cash flow statement", re.compile(r"(?i)statements?\s+of\s+cash\s+flows?|cash\s+flow\s+statement|kapitalfluss")),

@@ -153,7 +153,7 @@ def test_the_assumed_nil_residuals_are_named_rather_than_silent(built, formulas)
 
 # --- 4.17: extremes, on inputs no filing would produce ---------------------
 
-def _ledger_pair(values: "dict[str, str]"):
+def _ledger_pair(values: dict[str, str]):
     """One income-statement ledger, and the matching formula environment."""
     year = "2025A"
     ledger = Ledger(Statement.INCOME, (year,))

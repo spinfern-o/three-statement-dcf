@@ -19,12 +19,12 @@ from decimal import Decimal
 import pytest
 
 from apps.api.app.formula.parse import (
+    FUNCTIONS,
+    OPERATORS,
     Binary,
     Call,
-    FUNCTIONS,
     FormulaSyntaxError,
     Literal,
-    OPERATORS,
     Reference,
     Unary,
     parse,
@@ -48,7 +48,7 @@ def test_the_package_never_calls_anything_that_runs_code(name):
     for path in sorted(PACKAGE.glob("*.py")):
         for number, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("#") or stripped.startswith('"'):
+            if stripped.startswith(("#", '"')):
                 continue
             if pattern.search(line):
                 offenders.append(f"{path.name}:{number}: {stripped}")

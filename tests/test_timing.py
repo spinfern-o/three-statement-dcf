@@ -69,7 +69,7 @@ def test_the_terminal_value_uses_the_same_convention_as_the_flows():
         assert schedule.terminal == schedule.fractions[-1]
 
 
-def test_every_convention_describes_itself(): 
+def test_every_convention_describes_itself():
     """16.11 asks that the choice be DOCUMENTED, not merely made."""
     for timing in Timing:
         assert len(timing.description.split()) >= 15

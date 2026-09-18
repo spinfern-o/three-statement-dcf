@@ -20,6 +20,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from ..extraction.records import AuditEvent
+
 
 @dataclass(frozen=True)
 class Filters:
@@ -78,13 +80,13 @@ def _matches(event, filters: Filters) -> bool:
 
 @dataclass(frozen=True)
 class Log:
-    events: "tuple[object, ...]"
+    events: tuple[AuditEvent, ...]
     filters: Filters
     #: How many events exist before filtering, so a reader knows what was hidden.
     total: int
 
     @property
-    def actors(self) -> "tuple[str, ...]":
+    def actors(self) -> tuple[str, ...]:
         return tuple(sorted({e.actor for e in self.events}))
 
     @property
@@ -101,7 +103,7 @@ def filter_events(result, filters: Filters | None = None) -> Log:
     return Log(tuple(matching), filters, len(events))
 
 
-def choices(result) -> "dict[str, tuple[str, ...]]":
+def choices(result) -> dict[str, tuple[str, ...]]:
     """The values actually present, so the filter controls offer real options.
 
     A select populated from a fixed list offers filters that match nothing;

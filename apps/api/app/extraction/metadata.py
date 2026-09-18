@@ -82,7 +82,7 @@ class DetectedField:
     def confirmed(self) -> bool:
         return self.state in (ConfirmationState.CONFIRMED, ConfirmationState.CORRECTED)
 
-    def confirm(self) -> "DetectedField":
+    def confirm(self) -> DetectedField:
         """10.13. A reviewer accepts the detected value as it stands."""
         if self.value is None:
             raise ValueError(
@@ -90,7 +90,7 @@ class DetectedField:
             )
         return replace(self, state=ConfirmationState.CONFIRMED)
 
-    def correct(self, value: str) -> "DetectedField":
+    def correct(self, value: str) -> DetectedField:
         """10.13/10.32. A reviewer supplies or replaces the value."""
         if not value or not value.strip():
             raise ValueError(f"{self.name} cannot be corrected to an empty value")
@@ -193,7 +193,7 @@ _ONLY_DOT_DECIMAL = re.compile(r"\b\d{1,3}(?:,\d{3})+\.\d+\b|\b\d{1,3}(?:,\d{3})
 _ONLY_COMMA_DECIMAL = re.compile(r"\b\d{1,3}(?:\.\d{3})+,\d+\b|\b\d{1,3}(?:\.\d{3}){2,}\b")
 
 
-def _locate(page: "pymupdf.Page", text: str) -> BoundingBox | None:
+def _locate(page: pymupdf.Page, text: str) -> BoundingBox | None:
     """Find the matched text on the page so the reviewer sees it highlighted."""
     try:
         hits = page.search_for(text[:60])
@@ -205,7 +205,7 @@ def _locate(page: "pymupdf.Page", text: str) -> BoundingBox | None:
     return BoundingBox.from_parser((r.x0, r.y0, r.x1, r.y1))
 
 
-def _scan_pages(doc: "pymupdf.Document", limit: int) -> list[tuple[int, str, "pymupdf.Page"]]:
+def _scan_pages(doc: pymupdf.Document, limit: int) -> list[tuple[int, str, pymupdf.Page]]:
     return [(n + 1, doc[n].get_text(), doc[n]) for n in range(min(limit, doc.page_count))]
 
 
@@ -225,7 +225,7 @@ def _first_match(pages, pattern, transform, detector, name, *, required=True) ->
     return DetectedField(name=name, value=None, required=required)
 
 
-def _largest_span(doc: "pymupdf.Document") -> tuple[str, int, BoundingBox] | None:
+def _largest_span(doc: pymupdf.Document) -> tuple[str, int, BoundingBox] | None:
     """The biggest piece of text on page 1 -- a heuristic, and labelled as one."""
     if not doc.page_count:
         return None
@@ -244,7 +244,7 @@ def _largest_span(doc: "pymupdf.Document") -> tuple[str, int, BoundingBox] | Non
     return best[1], 1, BoundingBox.from_parser(best[2])
 
 
-def detect_metadata(doc: "pymupdf.Document") -> DetectedMetadata:
+def detect_metadata(doc: pymupdf.Document) -> DetectedMetadata:
     """Run every detector. Returns UNCONFIRMED fields, never values. 10.10, 10.11."""
     pages = _scan_pages(doc, COVER_PAGES)
     whole = _scan_pages(doc, doc.page_count)
@@ -351,7 +351,7 @@ def detect_metadata(doc: "pymupdf.Document") -> DetectedMetadata:
     return DetectedMetadata(fields=fields)
 
 
-def _period_end_iso(match: "re.Match[str]") -> str | None:
+def _period_end_iso(match: re.Match[str]) -> str | None:
     month_name = match.group("m1") or match.group("m2")
     day = match.group("d1") or match.group("d2")
     year = match.group("y1") or match.group("y2")

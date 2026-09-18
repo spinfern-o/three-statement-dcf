@@ -8,15 +8,16 @@ happens here.
 
 from __future__ import annotations
 
-from .assumptions import Assumptions, Basis
 from decimal import Decimal
 
-from .checks import CheckResult, Status, Tolerance, summarize
-from .numeric import quantize_for_display
+from .assumptions import Assumptions, Basis
+from .checks import CheckResult, Tolerance, summarize
 from .dcf import CostOfCapital, FCFFYear, Valuation
 from .forecast import ForecastResult
-from .profile import CompanyProfile
+from .numeric import quantize_for_display
+from .profile import CompanyProfile, Periods, SourceMap
 from .sensitivity import SensitivityCell
+from .statements import Ledger
 
 WIDTH = 78
 
@@ -42,7 +43,9 @@ def _fmt(value: Decimal | None, places: int = 1) -> str:
     return "--" if value is None else f"{quantize_for_display(value, places):,.{places}f}"
 
 
-def statement_block(title: str, ledger, accounts: tuple[str, ...], years: tuple[str, ...]) -> str:
+def statement_block(
+    title: str, ledger: Ledger, accounts: tuple[str, ...], years: tuple[str, ...]
+) -> str:
     lines = [header(title), _row("", list(years))]
     for account in accounts:
         if not any(ledger.has(account, y) for y in years):
@@ -51,7 +54,9 @@ def statement_block(title: str, ledger, accounts: tuple[str, ...], years: tuple[
     return "\n".join(lines)
 
 
-def profile_block(profile: CompanyProfile, source_map, periods) -> str:
+def profile_block(
+    profile: CompanyProfile, source_map: SourceMap, periods: Periods
+) -> str:
     lines = [header("STEP 1-3 -- IDENTIFICATION"), profile.describe()]
     missing = source_map.missing()
     if missing:

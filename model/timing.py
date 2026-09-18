@@ -43,7 +43,7 @@ from datetime import date
 from decimal import Decimal
 from enum import Enum
 
-from .numeric import CALCULATION_CONTEXT, D, ONE, power
+from .numeric import CALCULATION_CONTEXT, ONE, D, power
 from .provenance import ProvenanceError
 
 #: 16.12's day count. 365 rather than 365.25: a leap day is a real day, and
@@ -101,8 +101,8 @@ class Schedule:
     """
 
     timing: Timing
-    years: "tuple[str, ...]"
-    fractions: "tuple[Decimal, ...]"
+    years: tuple[str, ...]
+    fractions: tuple[Decimal, ...]
     terminal: Decimal
     #: The convention in words, for the screen and the report (16.11).
     basis: str
@@ -120,7 +120,7 @@ class Schedule:
         return f"{self.timing.value}: {pairs}, terminal t={self.terminal}"
 
 
-def _year_end_date(year_label: str, fiscal_year_end: "date | None") -> date:
+def _year_end_date(year_label: str, fiscal_year_end: date | None) -> date:
     """The last day of a forecast year, on the company's own fiscal calendar."""
     number = int(year_label[:4])
     if fiscal_year_end is None:
@@ -155,7 +155,7 @@ def _exact_fraction(valuation_date: date, cash_flow_date: date) -> Decimal:
 
 
 def build_schedule(
-    forecast_years: "tuple[str, ...]",
+    forecast_years: tuple[str, ...],
     timing: Timing = Timing.YEAR_END,
     *,
     valuation_date: date | None = None,

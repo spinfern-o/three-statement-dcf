@@ -11,3 +11,12 @@ playwright>=1.40
 
 # Static checks.
 pyflakes>=3.0
+
+# Items 154 and 155. Both are configured in pyproject.toml, where every rule
+# selection and every exclusion says what it is for.
+#
+# Pinned to a minor series rather than floating: a new ruff rule or a stricter
+# mypy release turning CI red is a thing to adopt deliberately, on a commit
+# that says so, not a thing to discover on an unrelated pull request.
+ruff>=0.16,<0.17
+mypy>=2.3,<2.4

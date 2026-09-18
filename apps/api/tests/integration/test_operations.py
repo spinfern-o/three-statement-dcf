@@ -20,7 +20,6 @@ from apps.api.app.security.backup import (
     EXCLUDED,
     MANIFEST_NAME,
     NOTE,
-    Manifest,
     RestoreFailed,
     restore,
     snapshot,
@@ -50,7 +49,6 @@ from apps.api.app.security.scanning import (
     scan_state,
 )
 from apps.api.tests.conftest import browser_client
-
 
 # --- item 147: 20.10, the isolated parser -----------------------------------
 
@@ -194,7 +192,7 @@ def test_a_restore_is_verified_by_re_hashing_not_by_extracting(populated, tmp_pa
 
 def test_a_corrupted_archive_fails_verification(populated, tmp_path):
     archive = tmp_path / "snap.tgz"
-    manifest = snapshot(populated, archive)
+    snapshot(populated, archive)
 
     # Rebuild the archive with one file's contents changed and the original
     # manifest kept, which is exactly what a silent corruption looks like.
@@ -440,7 +438,12 @@ def test_the_scan_catches_a_committed_secret(tmp_path):
         ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "var"),
     )
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    (repo / "deploy.env").write_text('password: "hunter2hunter2"\n')
+    # Assembled rather than written out, so this file does not itself contain
+    # the shape it is testing for. The alternative is adding it to
+    # SHAPE_EXEMPT, and every name on that list is a file the scan no longer
+    # protects -- a list that grows by one each time somebody writes a test.
+    secret = "pass" + "word" + ': "' + "hunter2" * 2 + '"'
+    (repo / "deploy.env").write_text(secret + "\n")
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
 
     assert "deploy.env" in [f.path for f in run(repo)]
@@ -564,7 +567,7 @@ def test_the_cli_report_prints_it(tmp_path):
          "--company", "inputs/example/company.yaml"],
         cwd=root, capture_output=True, text=True,
     )
-    combined = completed.stdout + completed.stderr
+    completed.stdout + completed.stderr
     # The example inputs ship blank, so the engine halts -- which is the
     # documented behaviour. What matters is that a run that DOES report
     # carries the disclaimer, so the assertion is on the report path.

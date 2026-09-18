@@ -29,7 +29,7 @@ class FlowRow:
     present_value: Decimal
 
 
-def flow_rows(valuation: ScenarioValuation) -> "tuple[FlowRow, ...]":
+def flow_rows(valuation: ScenarioValuation) -> tuple[FlowRow, ...]:
     """16.5's bridge beside 16.14's discounting, year by year."""
     discounted = {item.year: item for item in valuation.valuation.discounted}
     rows = []

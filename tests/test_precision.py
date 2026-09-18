@@ -388,7 +388,7 @@ def test_randomized_identity_sweep(scale):
                         - terms["capex"] - terms["change_in_nwc"])
             note(f"fcff trial {trial} {year}", expected, fcff_years[i].fcff)
 
-        sources = {k: "sweep" for k in CostOfCapital.REQUIRED_SOURCES}
+        sources = dict.fromkeys(CostOfCapital.REQUIRED_SOURCES, "sweep")
         coc = CostOfCapital("0.04", "1.0", "0.06", "0.05", "0.25",
                             Decimal(1000) * scale_d, Decimal(200) * scale_d, sources)
         result = run_dcf(fcff_years, coc, Decimal("0.02"),
@@ -425,7 +425,7 @@ def test_tolerance_is_relative_not_absolute():
     from model.checks import DEFAULT_REL_TOL, Tolerance
 
     tol = Tolerance()
-    assert DEFAULT_REL_TOL <= Decimal("1e-9")
+    assert Decimal("1e-9") >= DEFAULT_REL_TOL
 
     for magnitude in ("1", "1e3", "1e6", "1e9", "1e12"):
         m = Decimal(magnitude)

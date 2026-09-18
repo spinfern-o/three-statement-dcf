@@ -78,7 +78,7 @@ class Finding:
         return f"{self.path}: {self.what}" + (f" -- {self.detail}" if self.detail else "")
 
 
-def tracked_files(root: Path = ROOT) -> "list[str]":
+def tracked_files(root: Path = ROOT) -> list[str]:
     """Every file Git tracks. The working tree is not the question; the repository is."""
     result = subprocess.run(
         ["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True,
@@ -90,7 +90,7 @@ def _is_fixture(path: str) -> bool:
     return any(path.startswith(f"{directory}/") for directory in FIXTURE_DIRS)
 
 
-def _accounted_for(root: Path) -> "set[str]":
+def _accounted_for(root: Path) -> set[str]:
     """Every fixture the repository can vouch for.
 
     Two conditions, both from files already in the tree, so this check cannot
@@ -117,10 +117,10 @@ def _accounted_for(root: Path) -> "set[str]":
     return pinned & built
 
 
-def scan_documents(root: Path = ROOT) -> "list[Finding]":
+def scan_documents(root: Path = ROOT) -> list[Finding]:
     """20.4: no source PDF in the repository that is not an accounted-for fixture."""
     accounted = _accounted_for(root)
-    findings: "list[Finding]" = []
+    findings: list[Finding] = []
     for name in tracked_files(root):
         if not name.lower().endswith(DOCUMENT_SUFFIXES):
             continue
@@ -141,9 +141,9 @@ def scan_documents(root: Path = ROOT) -> "list[Finding]":
     return findings
 
 
-def scan_secrets(root: Path = ROOT) -> "list[Finding]":
+def scan_secrets(root: Path = ROOT) -> list[Finding]:
     """20.4: no secret *value* in the repository. Names are fine."""
-    findings: "list[Finding]" = []
+    findings: list[Finding] = []
     for name in tracked_files(root):
         if name in SHAPE_EXEMPT:
             continue
@@ -161,7 +161,7 @@ def scan_secrets(root: Path = ROOT) -> "list[Finding]":
     return findings
 
 
-def run(root: Path = ROOT) -> "list[Finding]":
+def run(root: Path = ROOT) -> list[Finding]:
     return scan_documents(root) + scan_secrets(root)
 
 

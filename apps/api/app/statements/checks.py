@@ -77,11 +77,16 @@ def cash_reconciles(built: BuiltStatements, tol: Tolerance) -> CheckResult:
     for earlier, later in zip(built.years, built.years[1:]):
         opening = balance.get(accounts.CASH, earlier)
         closing = balance.get(accounts.CASH, later)
-        flows = [cashflow.get(code, later) for code in (accounts.CFO, accounts.CFI, accounts.CFF)]
-        if opening is None or closing is None or any(f is None for f in flows):
+        cfo = cashflow.get(accounts.CFO, later)
+        cfi = cashflow.get(accounts.CFI, later)
+        cff = cashflow.get(accounts.CFF, later)
+        # Each named rather than `any(f is None for f in flows)`: both guard
+        # the same thing, and only this form shows that the three values added
+        # below are present.
+        if opening is None or closing is None or cfo is None or cfi is None or cff is None:
             continue
         checked += 1
-        expected = opening + flows[0] + flows[1] + flows[2]
+        expected = opening + cfo + cfi + cff
         if not tol.close(expected, closing):
             failures.append(
                 f"{later}: {opening:,} + the three subtotals gives {expected:,}, "
@@ -177,7 +182,11 @@ def every_cell_is_cited(built: BuiltStatements, tol: Tolerance) -> CheckResult:
                     missing.append(f"{statement.value} {code} {year}")
     if missing:
         return _result(name, Status.FAIL, ", ".join(missing[:5]))
-    total = sum(len(l.accounts_present(y)) for l in built.ledgers.values() for y in built.years)
+    total = sum(
+        len(ledger.accounts_present(y))
+        for ledger in built.ledgers.values()
+        for y in built.years
+    )
     return _result(name, Status.PASS, f"{total} cell(s), each with a document, page and reported label")
 
 
@@ -212,7 +221,7 @@ def run_historical_checks(
     return tuple(check(built, tol) for check in HISTORICAL_CHECKS)
 
 
-def summarize(results: "tuple[CheckResult, ...]") -> str:
+def summarize(results: tuple[CheckResult, ...]) -> str:
     counts = {status: sum(1 for r in results if r.status is status) for status in Status}
     return (
         f"{counts[Status.PASS]} PASS   {counts[Status.FAIL]} FAIL   "

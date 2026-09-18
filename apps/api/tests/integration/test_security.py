@@ -360,7 +360,6 @@ def test_a_record_with_no_recorded_owner_is_refused(stored):
 
 def test_every_document_route_goes_through_the_checked_loader():
     """Item 146 is one line in one place only if nothing bypasses it."""
-    import re
     from pathlib import Path
 
     source = (

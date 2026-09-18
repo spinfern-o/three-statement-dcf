@@ -98,7 +98,7 @@ class Credential:
     key: bytes
 
     @classmethod
-    def parse(cls, stored: str) -> "Credential":
+    def parse(cls, stored: str) -> Credential:
         parts = stored.split("$")
         if len(parts) != 6 or parts[0] != SCHEME:
             raise CredentialError(
@@ -117,7 +117,7 @@ class Credential:
             raise CredentialError(f"{CREDENTIAL_ENV} is malformed: {exc}") from exc
 
     @classmethod
-    def load(cls, environ=None) -> "Credential | None":
+    def load(cls, environ=None) -> Credential | None:
         """The configured credential, or None when none is configured."""
         stored = (environ or os.environ).get(CREDENTIAL_ENV, "").strip()
         return cls.parse(stored) if stored else None
@@ -156,7 +156,7 @@ def signing_key(environ=None) -> bytes:
     return secrets.token_bytes(32)
 
 
-def _main(argv: "list[str] | None" = None) -> int:
+def _main(argv: list[str] | None = None) -> int:
     import argparse
     import getpass
 

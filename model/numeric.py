@@ -53,7 +53,7 @@ CALCULATION_CONTEXT = decimal.Context(
 assert CALCULATION_PRECISION >= MINIMUM_PRECISION, "violates specification 4.7"
 
 #: What `D()` will accept. Note the absence of `float`.
-Numeric = Union[str, int, Decimal]
+Numeric = Union[str, int, Decimal]  # noqa: UP007 - a runtime alias, not an annotation
 
 
 class PrecisionError(ValueError):

@@ -16,27 +16,26 @@ empty, and carries its reason -- the same rule the screens follow.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 
 from model.accounts import Statement
 from model.disclaimer import DISCLAIMER
-from model.checks import Status
 
 from ..assumptions.scenarios import BASE, ScenarioSet
 from ..diagnostics.run import evaluate as run_diagnostics
 from ..forecast.build import ForecastError, build_scenario_forecast
-from ..forecast.views import columns as forecast_columns, statement_rows
-from ..forecast.views import driver_rows as forecast_drivers
+from ..forecast.views import columns as forecast_columns
+from ..forecast.views import statement_rows
 from ..mapping.sets import MappingSet
 from ..schedules.build import build_schedules
-from ..schedules.views import driver_rows as wc_drivers, working_capital_rows
+from ..schedules.rollforward import RollForwardSchedule
+from ..schedules.views import driver_rows as wc_drivers
+from ..schedules.views import working_capital_rows
 from ..statements.build import BuildError, build_statements
 from ..statements.reported import reported_strings
 from ..statements.views import statement_view
 from ..valuation.build import ValuationError, build_scenario_valuation
 from ..valuation.checks import terminal_share
 from ..valuation.sensitivity import build_grid
-from ..valuation.views import flow_rows
 from .tables import (
     DERIVED,
     FORECAST,
@@ -118,7 +117,7 @@ def metadata_field(result, name: str) -> str:
     return field.value if field.confirmed else f"{field.value} (unconfirmed)"
 
 
-def _units(result) -> "tuple[str, str]":
+def _units(result) -> tuple[str, str]:
     return (
         metadata_field(result, "reporting_currency"),
         metadata_field(result, "displayed_scale"),
@@ -347,7 +346,7 @@ def _schedules(built, note: str) -> Table:
         columns.append(Column(year, year, "currency"))
     columns.append(Column("note", "Note"))
 
-    rows: "list[tuple[Cell, ...]]" = []
+    rows: list[tuple[Cell, ...]] = []
 
     def add(schedule, label: str, values, note_text: str = "", origin: str = DERIVED,
             kind: str = "currency"):
@@ -380,17 +379,28 @@ def _schedules(built, note: str) -> Table:
         )
 
     for key in ("ppe", "debt", "retained_earnings", "common_equity"):
+        # Narrowed to the roll-forward type: `by_key` returns the base
+        # `Schedule`, and only a roll-forward has periods with movements. The
+        # four keys above are all roll-forwards, and this says so in code
+        # rather than leaving the next reader to check the builder.
         schedule = schedules.by_key(key)
+        if not isinstance(schedule, RollForwardSchedule):  # pragma: no cover
+            raise TypeError(f"{key!r} is not a roll-forward schedule")
         by_year = {year.year: year for year in schedule.years}
-        def series(pick):
+
+        def series(pick, by_year=by_year):
+            # `by_year` bound as a default rather than closed over: the closure
+            # is called within this iteration today, and a late-binding bug
+            # here would silently report one schedule's figures under another
+            # schedule's name.
             return tuple(
                 pick(by_year[year]) if year in by_year else None
                 for year in schedules.years
             )
         add(schedule, "Beginning balance", series(lambda y: y.beginning.value))
-        labels = []
-        for year in schedule.years:
-            for line in year.movements:
+        labels: list[str] = []
+        for period in schedule.years:
+            for line in period.movements:
                 if line.label not in labels:
                     labels.append(line.label)
         for label in labels:
@@ -531,7 +541,7 @@ def _dcf(valuation, note: str) -> Table:
         )
     result = valuation.valuation
     capital = valuation.cost_of_capital
-    rows: "list[tuple[Cell, ...]]" = []
+    rows: list[tuple[Cell, ...]] = []
 
     def add(label: str, value, detail: str = "", origin: str = DERIVED,
             kind: str = "currency"):
@@ -656,8 +666,8 @@ def _checks(outcomes) -> Table:
 
 
 def _audit(result) -> Table:
-    counts: "dict[tuple[str, str], int]" = {}
-    latest: "dict[tuple[str, str], str]" = {}
+    counts: dict[tuple[str, str], int] = {}
+    latest: dict[tuple[str, str], str] = {}
     for event in result.audit:
         key = (event.actor, event.action)
         counts[key] = counts.get(key, 0) + 1

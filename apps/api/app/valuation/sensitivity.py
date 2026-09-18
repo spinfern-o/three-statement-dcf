@@ -38,9 +38,9 @@ DEFAULT_STEPS_EACH_WAY = 2
 class Grid:
     """The grid, its axes, and the assumptions 16.23 requires be displayed."""
 
-    wacc_values: "tuple[Decimal, ...]"
-    growth_values: "tuple[Decimal, ...]"
-    rows: "tuple[tuple[SensitivityCell, ...], ...]"
+    wacc_values: tuple[Decimal, ...]
+    growth_values: tuple[Decimal, ...]
+    rows: tuple[tuple[SensitivityCell, ...], ...]
     base_wacc: Decimal
     base_growth: Decimal
     wacc_step: Decimal
@@ -53,7 +53,7 @@ class Grid:
         return self.rows[len(self.rows) // 2][len(self.growth_values) // 2]
 
     @property
-    def blocked(self) -> "tuple[SensitivityCell, ...]":
+    def blocked(self) -> tuple[SensitivityCell, ...]:
         """16.16's corners, shown with their reason rather than left blank."""
         return tuple(cell for row in self.rows for cell in row if cell.note)
 
@@ -65,7 +65,7 @@ class Grid:
         )
 
 
-def _axis(centre: Decimal, step: Decimal, each_way: int) -> "tuple[Decimal, ...]":
+def _axis(centre: Decimal, step: Decimal, each_way: int) -> tuple[Decimal, ...]:
     return tuple(
         centre + step * D(offset) for offset in range(-each_way, each_way + 1)
     )

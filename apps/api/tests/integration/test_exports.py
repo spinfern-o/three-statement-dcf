@@ -353,7 +353,7 @@ def test_the_workbook_and_the_csv_neutralize_the_same_cells():
 
 def test_the_legend_explains_every_style_it_uses():
     assert len(LEGEND) == 4
-    for name, meaning in LEGEND:
+    for _name, meaning in LEGEND:
         assert meaning.strip()
 
 
@@ -401,7 +401,9 @@ def test_survives_the_workbook_is_the_files_question_not_the_doubles():
     # because the string is 0.08500000000000001 -- which parses back to the
     # same double and displays as 0.085. Nothing was lost.
     exposed = Decimal("0.085")
-    assert Decimal("%.16g" % float(exposed)) != exposed, "the string is noisy"
+    # Spelled the way openpyxl spells it, because the assertion is about that
+    # exact expression rather than about formatting a number.
+    assert Decimal("%.16g" % float(exposed)) != exposed, "the string is noisy"  # noqa: UP031
     assert survives_the_workbook(exposed), "the number survives anyway"
 
 
@@ -630,7 +632,7 @@ def test_every_extreme_survives_the_csv_exactly(extreme_model):
     table = extreme_model.table("cover")
     body = table_to_csv(extreme_model, table)
     rows = list(csv.reader(
-        io.StringIO("\n".join(l for l in body.splitlines() if not l.startswith("#")))
+        io.StringIO("\n".join(x for x in body.splitlines() if not x.startswith("#")))
     ))
     assert [Decimal(row[1]) for row in rows[1:]] == [value for _, value in EXTREMES]
 

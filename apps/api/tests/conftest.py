@@ -129,7 +129,6 @@ def stored(ingest_fixture, repository):
 @pytest.fixture
 def client(store_root, stored):
     """A test client over a store that already holds one extraction."""
-    from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
 
@@ -141,7 +140,6 @@ def client(store_root, stored):
 @pytest.fixture
 def empty_client(tmp_path):
     """A client over a store with nothing in it, for the empty state."""
-    from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
 
@@ -262,7 +260,6 @@ def forecast_client(tmp_path, forecastable):
     application stores it, so the screens read the same JSON a reviewer's own
     session would.
     """
-    from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
     from apps.api.app.assumptions.store import ScenarioStore
@@ -363,7 +360,6 @@ def three_statement_client(tmp_path, three_statements):
     review, which is the right subject for the source room and the wrong one
     for a screen that only has something to show once mappings are approved.
     """
-    from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
     from apps.api.app.persistence.json_store import JsonDocumentRepository

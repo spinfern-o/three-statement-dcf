@@ -78,7 +78,7 @@ REASONS = {
 
 def nav_items(
     document_id: str | None, current: str = "", status: ModelStatus | None = None
-) -> "tuple[NavItem, ...]":
+) -> tuple[NavItem, ...]:
     """The left navigation for one model, or the portfolio when there is none."""
     items = [
         NavItem(

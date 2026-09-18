@@ -125,7 +125,7 @@ REQUIRED_CHOICES = tuple(
     if driver.required
 )
 #: Deduplicated, because a pair appears once per member.
-REQUIRED: "tuple[frozenset[str], ...]" = tuple(sorted(set(REQUIRED_CHOICES), key=sorted))
+REQUIRED: tuple[frozenset[str], ...] = tuple(sorted(set(REQUIRED_CHOICES), key=sorted))
 
 
 def driver(code: str) -> Driver:
@@ -137,7 +137,7 @@ def driver(code: str) -> Driver:
     return BY_CODE[base]
 
 
-def describe_choice(choice: "frozenset[str]") -> str:
+def describe_choice(choice: frozenset[str]) -> str:
     codes = sorted(choice)
     if len(codes) == 1:
         return codes[0]

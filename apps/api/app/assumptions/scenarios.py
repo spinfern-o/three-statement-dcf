@@ -181,7 +181,7 @@ class Resolved:
     #: The scenario whose own record supplied this value.
     from_scenario: str
     #: The chain walked to reach it, nearest first.
-    lineage: "tuple[str, ...]"
+    lineage: tuple[str, ...]
 
     @property
     def is_inherited(self) -> bool:
@@ -197,12 +197,12 @@ class ScenarioSet:
     scenario that can be edited in place makes that reference meaningless.
     """
 
-    scenarios: "tuple[Scenario, ...]"
-    assumptions: "tuple[Assumption, ...]" = ()
+    scenarios: tuple[Scenario, ...]
+    assumptions: tuple[Assumption, ...] = ()
     version: int = 1
 
     def __post_init__(self) -> None:
-        by_id: "dict[str, Scenario]" = {}
+        by_id: dict[str, Scenario] = {}
         for scenario in self.scenarios:
             if scenario.id in by_id:
                 raise ScenarioError(f"two scenarios share the id {scenario.id!r}")
@@ -243,7 +243,7 @@ class ScenarioSet:
             f"no scenario {scenario_id!r}; known: {[s.id for s in self.scenarios]}"
         )
 
-    def lineage(self, scenario_id: str) -> "tuple[str, ...]":
+    def lineage(self, scenario_id: str) -> tuple[str, ...]:
         """This scenario, then its parent, then its parent's parent."""
         chain = [scenario_id]
         node = self.scenario(scenario_id)
@@ -252,10 +252,10 @@ class ScenarioSet:
             node = self.scenario(node.parent_id)
         return tuple(chain)
 
-    def own(self, scenario_id: str) -> "tuple[Assumption, ...]":
+    def own(self, scenario_id: str) -> tuple[Assumption, ...]:
         return tuple(a for a in self.assumptions if a.scenario_id == scenario_id)
 
-    def resolve(self, scenario_id: str, period: str | None = None) -> "dict[str, Resolved]":
+    def resolve(self, scenario_id: str, period: str | None = None) -> dict[str, Resolved]:
         """14.7: every assumption this scenario sees, and where each came from.
 
         Two precedence rules, in this order.
@@ -273,8 +273,8 @@ class ScenarioSet:
         differ. Without this the two would race on insertion order.
         """
         chain = self.lineage(scenario_id)
-        out: "dict[str, Resolved]" = {}
-        general: "dict[str, Resolved]" = {}
+        out: dict[str, Resolved] = {}
+        general: dict[str, Resolved] = {}
         for source_scenario in chain:
             for assumption in self.own(source_scenario):
                 if period is not None and not assumption.applies_to(period):
@@ -291,7 +291,9 @@ class ScenarioSet:
             out.setdefault(code, resolved)
         return out
 
-    def differences(self, scenario_id: str) -> "tuple[tuple[str, Decimal, Decimal], ...]":
+    def differences(
+        self, scenario_id: str
+    ) -> tuple[tuple[str, Decimal | None, Decimal], ...]:
         """14.6: what this scenario actually departs from its parent in.
 
         `(code, parent value, this scenario's value)` for every code where the
@@ -309,7 +311,10 @@ class ScenarioSet:
             before = inherited.assumption.value if inherited else None
             if before is None or before != assumption.value:
                 out.append((assumption.code, before, assumption.value))
-        return tuple(sorted(out))
+        # Sorted on the code, not on the whole row: `before` is None for an
+        # assumption the parent does not carry, and sorting whole rows would
+        # compare a Decimal against None the moment two codes matched.
+        return tuple(sorted(out, key=lambda row: row[0]))
 
     def check_differences(self, scenario_id: str) -> str:
         """14.6, as a sentence. Empty when the scenario is a real variant."""
@@ -326,12 +331,12 @@ class ScenarioSet:
         return ""
 
     # --- writing ------------------------------------------------------------
-    def with_scenario(self, scenario: Scenario) -> "ScenarioSet":
+    def with_scenario(self, scenario: Scenario) -> ScenarioSet:
         return replace(
             self, scenarios=self.scenarios + (scenario,), version=self.version + 1
         )
 
-    def with_assumption(self, assumption: Assumption) -> "ScenarioSet":
+    def with_assumption(self, assumption: Assumption) -> ScenarioSet:
         kept = tuple(
             a for a in self.assumptions
             if not (
@@ -352,8 +357,8 @@ class ScenarioSet:
         *,
         owner: str,
         rationale: str,
-        periods: "tuple[str, ...]" = (),
-    ) -> "ScenarioSet":
+        periods: tuple[str, ...] = (),
+    ) -> ScenarioSet:
         """14.7: override an inherited assumption, keeping its lineage.
 
         The override records the scenario it departs from and carries the

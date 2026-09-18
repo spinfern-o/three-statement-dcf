@@ -32,7 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal, DivisionByZero, InvalidOperation
 
-from model.numeric import D, ZERO
+from model.numeric import ZERO, D
 
 from .parse import Binary, Call, Literal, Node, Reference, Unary, parse
 from .units import Unit, UnitError, add, divide, multiply, power, same
@@ -45,7 +45,7 @@ class EvaluationError(ValueError):
 class MissingInput(EvaluationError):
     """18.14. A reference the environment does not carry."""
 
-    def __init__(self, path: str, available: "tuple[str, ...]"):
+    def __init__(self, path: str, available: tuple[str, ...]):
         self.path = path
         near = [name for name in available if name.split(".")[-1] == path.split(".")[-1]]
         hint = f" Did you mean {', '.join(sorted(near))}?" if near else ""
@@ -90,9 +90,9 @@ class Environment:
     formula cannot reach a method or a dunder on anything (18.3).
     """
 
-    values: "dict[str, Quantity]" = field(default_factory=dict)
+    values: dict[str, Quantity] = field(default_factory=dict)
 
-    def put(self, path: str, amount, unit: Unit, origin: str = "") -> "Environment":
+    def put(self, path: str, amount, unit: Unit, origin: str = "") -> Environment:
         self.values[path] = Quantity(amount, unit, origin or path)
         return self
 
@@ -105,7 +105,7 @@ class Environment:
         return path in self.values
 
     @property
-    def paths(self) -> "tuple[str, ...]":
+    def paths(self) -> tuple[str, ...]:
         return tuple(sorted(self.values))
 
 
@@ -120,7 +120,7 @@ class Evaluation:
     #: 18.11: the same expression with each reference replaced by its value.
     substituted: str
     #: 18.11: the exact inputs used, by reference path.
-    inputs: "dict[str, Decimal]"
+    inputs: dict[str, Decimal]
 
     def explain(self) -> str:
         return f"{self.formula} = {self.substituted} = {self.value:,}"
@@ -135,7 +135,7 @@ def _format(value: Decimal) -> str:
     return f"{value:,}"
 
 
-def _evaluate(node: Node, environment: Environment, inputs: "dict[str, Decimal]") -> "tuple[Decimal, Unit, str]":
+def _evaluate(node: Node, environment: Environment, inputs: dict[str, Decimal]) -> tuple[Decimal, Unit, str]:
     """Returns the value, its unit, and the substituted text for this subtree."""
     if isinstance(node, Literal):
         return node.value, _literal_unit(node), node.raw
@@ -170,7 +170,7 @@ def _literal_unit(node: Literal) -> Unit:
     return RATIO
 
 
-def _binary(node: Binary, environment: Environment, inputs) -> "tuple[Decimal, Unit, str]":
+def _binary(node: Binary, environment: Environment, inputs) -> tuple[Decimal, Unit, str]:
     left, left_unit, left_text = _evaluate(node.left, environment, inputs)
 
     if node.op == "^":
@@ -221,7 +221,7 @@ def _power(node: Binary, base, base_unit, base_text, environment, inputs):
     return base ** whole, power(base_unit, whole), f"({base_text} ^ {exponent_text})"
 
 
-def _call(node: Call, environment: Environment, inputs) -> "tuple[Decimal, Unit, str]":
+def _call(node: Call, environment: Environment, inputs) -> tuple[Decimal, Unit, str]:
     evaluated = [_evaluate(argument, environment, inputs) for argument in node.arguments]
     values = [item[0] for item in evaluated]
     texts = [item[2] for item in evaluated]
@@ -235,7 +235,7 @@ def _call(node: Call, environment: Environment, inputs) -> "tuple[Decimal, Unit,
 
 
 def evaluate(
-    formula: "str | Node", environment: Environment, expected_unit: Unit | None = None
+    formula: str | Node, environment: Environment, expected_unit: Unit | None = None
 ) -> Evaluation:
     """Evaluate one formula, exactly, and return it with its trace.
 
@@ -245,7 +245,7 @@ def evaluate(
     which one was meant.
     """
     node = parse(formula) if isinstance(formula, str) else formula
-    inputs: "dict[str, Decimal]" = {}
+    inputs: dict[str, Decimal] = {}
     value, unit, substituted = _evaluate(node, environment, inputs)
 
     if expected_unit is not None and unit.exponents != expected_unit.exponents:

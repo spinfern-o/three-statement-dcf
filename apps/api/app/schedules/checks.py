@@ -37,16 +37,25 @@ def _result(name: str, status: Status, detail: str = "") -> CheckResult:
     return CheckResult(name, status, detail)
 
 
-def _difference(reconciliation: Reconciliation) -> str:
-    """One failure, written so a reviewer can go and find it in the filing."""
-    delta: Decimal = reconciliation.difference
+def _difference(
+    reconciliation: Reconciliation, computed: Decimal, reported: Decimal
+) -> str:
+    """One failure, written so a reviewer can go and find it in the filing.
+
+    `computed` and `reported` are passed in rather than read off the
+    reconciliation, which holds them as `Decimal | None`. The caller has
+    already established both are present -- taking them as arguments carries
+    that across the function boundary instead of restating it as an
+    annotation the checker cannot verify.
+    """
+    delta = computed - reported
     text = (
-        f"{reconciliation.year}: schedule ends at {reconciliation.computed:,} but "
-        f"{reconciliation.statement_line} reports {reconciliation.reported:,}, "
+        f"{reconciliation.year}: schedule ends at {computed:,} but "
+        f"{reconciliation.statement_line} reports {reported:,}, "
         f"unexplained {delta:,}"
     )
-    if reconciliation.reported != ZERO:
-        text += f" ({relative_error(reconciliation.computed, reconciliation.reported):.6f}%)"
+    if reported != ZERO:
+        text += f" ({relative_error(computed, reported):.6f}%)"
     if reconciliation.note:
         text += f". {reconciliation.note}"
     return text
@@ -71,19 +80,20 @@ def reconcile(schedule: Schedule, tol: Tolerance) -> CheckResult:
 
     checked, failures, skipped, within_tolerance = 0, [], [], []
     for reconciliation in schedule.reconciliations:
-        if reconciliation.computed is None or reconciliation.reported is None:
-            missing = "the schedule's own closing figure" if reconciliation.computed is None else None
+        computed, reported = reconciliation.computed, reconciliation.reported
+        if computed is None or reported is None:
+            missing = "the schedule's own closing figure" if computed is None else None
             missing = missing or f"{reconciliation.statement_line}"
             skipped.append(f"{reconciliation.year} ({missing} is absent)")
             continue
         checked += 1
-        if not tol.close(reconciliation.computed, reconciliation.reported):
-            failures.append(_difference(reconciliation))
+        if not tol.close(computed, reported):
+            failures.append(_difference(reconciliation, computed, reported))
         elif not reconciliation.ties:
             # Inside the tolerance is not the same claim as tying, and saying
             # the second when only the first is true is how a rounding
             # difference and a missing disposal come to look identical.
-            within_tolerance.append(_difference(reconciliation))
+            within_tolerance.append(_difference(reconciliation, computed, reported))
 
     if not checked:
         return _result(
@@ -126,22 +136,25 @@ def interest_basis_is_stated(schedules: ScheduleSet, tol: Tolerance) -> CheckRes
         )
     from .interest import ENGINE_BASIS
 
-    engine_rates = [row.on(ENGINE_BASIS) for row in schedules.interest]
-    if any(rate is None for rate in engine_rates):
+    # Paired with its year, so the skip message below can name the period
+    # without calling `on()` a second time -- and so the None check narrows the
+    # values this function goes on to use rather than a throwaway list.
+    engine_rates = [(row.year, row.on(ENGINE_BASIS)) for row in schedules.interest]
+    if any(rate is None for _year, rate in engine_rates):
         return _result(
             name, Status.FAIL,
             f"the basis model/forecast.py uses ({ENGINE_BASIS} debt) is not among "
             "the bases this schedule reports, so the historical rate and the "
             "forecast rate are not the same measurement",
         )
-    computed = [rate for rate in engine_rates if rate.rate is not None]
+    present = [(year, rate) for year, rate in engine_rates if rate is not None]
+    computed = [rate for _year, rate in present if rate.rate is not None]
     if not computed:
         return _result(
             name, Status.SKIP,
             f"the {ENGINE_BASIS}-debt rate could not be computed for any period: "
             + "; ".join(
-                f"{row.year} ({row.on(ENGINE_BASIS).unavailable_reason})"
-                for row in schedules.interest
+                f"{year} ({rate.unavailable_reason})" for year, rate in present
             ),
         )
     return _result(
@@ -186,7 +199,7 @@ RECONCILED = (
 
 def run_schedule_checks(
     schedules: ScheduleSet, tol: Tolerance | None = None
-) -> "tuple[CheckResult, ...]":
+) -> tuple[CheckResult, ...]:
     """13.8 across the set, plus the two checks about the set itself."""
     tolerance = tol or Tolerance()
     results = [reconcile(schedules.by_key(key), tolerance) for key in RECONCILED]
@@ -195,8 +208,8 @@ def run_schedule_checks(
     return tuple(results)
 
 
-def summarize(results: "tuple[CheckResult, ...]") -> str:
-    counts = {status: 0 for status in Status}
+def summarize(results: tuple[CheckResult, ...]) -> str:
+    counts = dict.fromkeys(Status, 0)
     for result in results:
         counts[result.status] += 1
     return (

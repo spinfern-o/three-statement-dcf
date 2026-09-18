@@ -83,7 +83,7 @@ class Check:
 #: Generated from docs/validation-policy.md section 4. A test regenerates this
 #: and fails if the two disagree, because a registry that drifts from the
 #: document describing it is worse than either alone.
-REGISTRY: "tuple[Check, ...]" = (
+REGISTRY: tuple[Check, ...] = (
     Check(
         code="VAL-017-001",
         clause="17.1",

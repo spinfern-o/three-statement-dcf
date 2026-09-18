@@ -75,18 +75,18 @@ class Tombstone:
         )
 
 
-def tombstone_path(storage_root: "str | Path", document_id: str) -> Path:
+def tombstone_path(storage_root: str | Path, document_id: str) -> Path:
     return Path(storage_root) / TOMBSTONE_DIRNAME / f"{document_id}.json"
 
 
-def load_tombstone(storage_root: "str | Path", document_id: str) -> "Tombstone | None":
+def load_tombstone(storage_root: str | Path, document_id: str) -> Tombstone | None:
     path = tombstone_path(storage_root, document_id)
     if not path.exists():
         return None
     return Tombstone(**json.loads(path.read_text()))
 
 
-def tombstones(storage_root: "str | Path") -> "tuple[Tombstone, ...]":
+def tombstones(storage_root: str | Path) -> tuple[Tombstone, ...]:
     directory = Path(storage_root) / TOMBSTONE_DIRNAME
     if not directory.exists():
         return ()
@@ -119,7 +119,7 @@ def check_confirmation(result, typed: str, reason: str) -> None:
 
 def delete_permanently(
     result,
-    storage_root: "str | Path",
+    storage_root: str | Path,
     *,
     actor: str,
     reason: str,

@@ -53,7 +53,7 @@ from openpyxl.utils import get_column_letter
 
 from .csv_export import neutralize
 from .gather import gather
-from .tables import CALCULATED, Cell, ExportModel, Table
+from .tables import Cell, ExportModel, Table
 
 #: 21.2's convention, stated once. Blue is the modelling world's "somebody
 #: typed this"; black is "the model computed it".
@@ -73,7 +73,7 @@ LEGEND = (
 )
 
 
-def _styles(workbook: Workbook) -> "dict[str, NamedStyle]":
+def _styles(workbook: Workbook) -> dict[str, NamedStyle]:
     """Named styles, so the distinction survives without colour."""
     made = {}
     for name, colour in (
@@ -123,7 +123,7 @@ def survives_the_workbook(value: Decimal) -> bool:
     number we had.
     """
     try:
-        written = "%.*g" % (WORKBOOK_DIGITS, float(value))
+        written = f"{float(value):.{WORKBOOK_DIGITS}g}"
         return Decimal(repr(float(written))) == value
     except (OverflowError, ValueError):
         return False

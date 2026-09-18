@@ -141,8 +141,11 @@ class Periods:
             m = YEAR_RE.match(year)
             if not m or m.group(2) != "E":
                 raise ProvenanceError(f"Forecast year {year!r} must be formatted like '2026E' (E = Estimate, STEP 12)")
-        hist = [int(YEAR_RE.match(y).group(1)) for y in self.historical]
-        fore = [int(YEAR_RE.match(y).group(1)) for y in self.forecast]
+        # Every label was validated against YEAR_RE above, so `match` cannot
+        # be None here -- but `_year_of` says that in code rather than leaving
+        # it as something a reader has to verify by scrolling up.
+        hist = [_year_of(y) for y in self.historical]
+        fore = [_year_of(y) for y in self.forecast]
         if hist != sorted(hist) or fore != sorted(fore):
             raise ProvenanceError("Historical and forecast years must each be in ascending order.")
         if len(set(hist)) != len(hist) or len(set(fore)) != len(fore):
@@ -193,3 +196,14 @@ class Periods:
         if year not in self.forecast:
             raise KeyError(f"{year!r} is not a forecast year")
         return self.forecast.index(year) + 1
+
+
+def _year_of(label: str) -> int:
+    """The four-digit year out of a validated period label."""
+    match = YEAR_RE.match(label)
+    if match is None:
+        raise ProvenanceError(
+            f"{label!r} is not a period label; it should have been refused "
+            "before reaching here"
+        )
+    return int(match.group(1))

@@ -30,7 +30,7 @@ from decimal import Decimal
 
 from model import accounts
 from model.accounts import Statement
-from model.numeric import D, ZERO, quantize_for_display
+from model.numeric import ZERO, D, quantize_for_display
 from model.statements import Ledger
 
 from .base import Availability, Caveat, Reconciliation, Schedule, ScheduleLine
@@ -66,7 +66,7 @@ class WorkingCapitalYear:
     drivers: tuple[Driver, ...]
 
     @staticmethod
-    def _total(lines: "tuple[ScheduleLine, ...]") -> Decimal | None:
+    def _total(lines: tuple[ScheduleLine, ...]) -> Decimal | None:
         present = [line.value for line in lines if line.value is not None]
         return sum(present, ZERO) if present else None
 
@@ -109,7 +109,7 @@ class WorkingCapitalSchedule(Schedule):
     excluded: tuple[str, ...] = ()
 
 
-def _lines(ledger: Ledger, year: str, names: "tuple[str, ...]", side: str) -> "tuple[ScheduleLine, ...]":
+def _lines(ledger: Ledger, year: str, names: tuple[str, ...], side: str) -> tuple[ScheduleLine, ...]:
     out = []
     for name in names:
         value = ledger.get(name, year)
@@ -169,7 +169,7 @@ def _days(
 
 
 def working_capital_schedule(
-    ledgers: dict, years: "tuple[str, ...]", days_in_year: Decimal = DAYS_IN_YEAR
+    ledgers: dict, years: tuple[str, ...], days_in_year: Decimal = DAYS_IN_YEAR
 ) -> WorkingCapitalSchedule:
     """13.1, built for every period the filing reports."""
     balance: Ledger = ledgers[Statement.BALANCE]

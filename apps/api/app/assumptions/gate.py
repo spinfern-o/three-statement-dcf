@@ -21,13 +21,13 @@ from .workflow import GateResult
 
 
 def evaluate(
-    scenarios: ScenarioSet, scenario_id: str, periods: "tuple[str, ...]"
+    scenarios: ScenarioSet, scenario_id: str, periods: tuple[str, ...]
 ) -> GateResult:
     """14.1 for one scenario across its forecast periods."""
-    missing: "list[str]" = []
-    unresolved: "list[tuple[str, str]]" = []
-    ambiguous: "list[str]" = []
-    self_reviewed: "list[str]" = []
+    missing: list[str] = []
+    unresolved: list[tuple[str, str]] = []
+    ambiguous: list[str] = []
+    self_reviewed: list[str] = []
 
     for period in periods:
         resolved = scenarios.resolve(scenario_id, period=period)

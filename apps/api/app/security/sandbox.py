@@ -25,6 +25,7 @@ feature on the strength of a guarantee it never made.
 
 from __future__ import annotations
 
+import contextlib
 import multiprocessing
 import os
 import traceback
@@ -67,20 +68,19 @@ def _apply(limits: Limits) -> None:
         constant = getattr(resource, name, None)
         if constant is None:
             continue
-        soft, hard = resource.getrlimit(constant)
+        _soft, hard = resource.getrlimit(constant)
         ceiling = value if hard in (resource.RLIM_INFINITY, -1) else min(value, hard)
-        try:
+        # A limit this platform will not let us lower is one `is_available` and
+        # the incident notes report, rather than one we pretend to have set.
+        with contextlib.suppress(ValueError, OSError):
             resource.setrlimit(constant, (ceiling, hard))
-        except (ValueError, OSError):
-            # A limit we cannot lower is one we report rather than pretend to.
-            pass
 
 
 def _child(connection, limits: Limits, func, args, kwargs) -> None:
     _apply(limits)
     try:
         connection.send(("ok", func(*args, **kwargs)))
-    except BaseException as exc:  # noqa: BLE001 - the point is to report anything
+    except BaseException as exc:
         connection.send(("error", f"{type(exc).__name__}: {exc}", traceback.format_exc()))
     finally:
         connection.close()

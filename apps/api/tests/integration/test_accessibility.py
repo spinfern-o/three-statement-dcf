@@ -19,6 +19,7 @@ one stays green rather than red for the wrong reason.
 
 from __future__ import annotations
 
+import itertools
 import socket
 import threading
 from pathlib import Path
@@ -274,7 +275,7 @@ def test_focus_moves_down_the_page_not_around_it(page):
     )
     assert positions, "nothing focusable in the main region"
     backwards = [
-        (a, b) for a, b in zip(positions, positions[1:]) if b < a - 60
+        (a, b) for a, b in itertools.pairwise(positions) if b < a - 60
     ]
     assert not backwards, f"focus jumps back up the page at: {backwards[:3]}"
 
@@ -475,7 +476,7 @@ def test_the_schedules_screen_is_reachable_and_structured(browser, served_schedu
         levels = page.eval_on_selector_all(
             "h1, h2, h3", "nodes => nodes.map(n => Number(n.tagName[1]))"
         )
-        for previous, current in zip(levels, levels[1:]):
+        for previous, current in itertools.pairwise(levels):
             assert current <= previous + 1, f"heading level jumps {previous} -> {current}"
         for index in range(page.locator("table").count()):
             table = page.locator("table").nth(index)

@@ -6,9 +6,10 @@ from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from .dcf import CostOfCapital, EquityBridge, FCFFYear, run_dcf
-from .numeric import D, ZERO
+from .numeric import D
 from .profile import Periods
 from .provenance import ProvenanceError
+from .timing import Schedule
 
 
 @dataclass(frozen=True)
@@ -30,7 +31,7 @@ def sensitivity_grid(
     growth_values: list[Decimal],
     diluted_shares: Decimal | None = None,
     shares_source: str | None = None,
-    schedule=None,
+    schedule: Schedule | None = None,
 ) -> list[list[SensitivityCell]]:
     """Rows are WACC, columns are terminal growth.
 

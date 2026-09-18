@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import math
-from decimal import Decimal
-
-import pytest
-
 import model.accounts as A
-from model.numeric import D
 from model.checks import Status, run_all_checks
+from model.numeric import D
 from model.statements import Ledger
 
 
@@ -282,6 +277,7 @@ def test_a_broken_balance_sheet_fails_rather_than_being_plugged(forecast, fcff_y
 def test_a_missing_input_skips_rather_than_passes(forecast, fcff_years, valuation):
     """A check that cannot run reports SKIP. A silent PASS would be worse."""
     import copy
+
     from model.accounts import Statement
     from model.statements import Ledger
 

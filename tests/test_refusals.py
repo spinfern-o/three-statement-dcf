@@ -11,8 +11,8 @@ import pytest
 
 from model.assumptions import Assumption, Assumptions, Basis, Conflict
 from model.dcf import CostOfCapital, EquityBridge, FCFFYear, run_dcf
-from model.profile import CompanyProfile, Periods, Units
 from model.numeric import D
+from model.profile import CompanyProfile, Periods, Units
 from model.provenance import Figure, ProvenanceError, Source
 from model.schedules import TaxSchedule, debt_schedule
 
@@ -107,7 +107,7 @@ def test_step25_cost_of_capital_requires_sources():
 
 def test_step27_market_equity_cannot_be_zero_or_negative():
     """STEP 27: do not automatically use book equity for market cap."""
-    sources = {k: "stated" for k in CostOfCapital.REQUIRED_SOURCES}
+    sources = dict.fromkeys(CostOfCapital.REQUIRED_SOURCES, "stated")
     with pytest.raises(ProvenanceError, match="market_value_equity"):
         CostOfCapital("0.042", "1.1", "0.055", "0.055", "0.24", "0", "1000", sources)
 
@@ -115,7 +115,7 @@ def test_step27_market_equity_cannot_be_zero_or_negative():
 def test_step31_wacc_must_exceed_terminal_growth(loaded):
     """STEP 31: 'The model must satisfy: WACC > Terminal Growth Rate.'"""
     periods = Periods(("2024A", "2025A"), ("2026E",))
-    sources = {k: "stated" for k in CostOfCapital.REQUIRED_SOURCES}
+    sources = dict.fromkeys(CostOfCapital.REQUIRED_SOURCES, "stated")
     coc = CostOfCapital("0.042", "1.1", "0.055", "0.055", "0.24", "4000", "1000", sources)
     years = [FCFFYear("2026E", D("200"), D("0.24"), D("80"), D("100"), D("15"))]
     with pytest.raises(ProvenanceError, match="must exceed"):
@@ -125,7 +125,7 @@ def test_step31_wacc_must_exceed_terminal_growth(loaded):
 def test_step35_share_count_requires_a_source():
     """STEP 35: state the source and date for diluted shares outstanding."""
     periods = Periods(("2024A", "2025A"), ("2026E",))
-    sources = {k: "stated" for k in CostOfCapital.REQUIRED_SOURCES}
+    sources = dict.fromkeys(CostOfCapital.REQUIRED_SOURCES, "stated")
     coc = CostOfCapital("0.042", "1.1", "0.055", "0.055", "0.24", "4000", "1000", sources)
     years = [FCFFYear("2026E", D("200"), D("0.24"), D("80"), D("100"), D("15"))]
     with pytest.raises(ProvenanceError, match="source and date"):
@@ -171,7 +171,7 @@ def test_f7a_shifting_wacc_refuses_rather_than_missing_its_target():
     from model.dcf import CostOfCapital
     from model.sensitivity import _shift_wacc
 
-    sources = {k: "test" for k in CostOfCapital.REQUIRED_SOURCES}
+    sources = dict.fromkeys(CostOfCapital.REQUIRED_SOURCES, "test")
     base = CostOfCapital("0.04", "0", "0.06", "0.05", "0.25", "1000", "200", sources)
     with pytest.raises(ProvenanceError, match="beta is zero"):
         _shift_wacc(base, Decimal("0.12"))
@@ -258,7 +258,6 @@ def test_f7c_dividends_reject_two_declared_methods():
 
 def test_units_multiplier_values_are_pinned():
     """Unused today, load-bearing the moment 2.3.a permits a second document."""
-    from model.profile import Units
 
     assert Units.DOLLARS.multiplier == 1
     assert Units.THOUSANDS.multiplier == 1_000

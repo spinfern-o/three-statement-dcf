@@ -20,6 +20,7 @@ and silently adjusting either side destroys the evidence that would find it.
 
 from __future__ import annotations
 
+import itertools
 import re
 from dataclasses import dataclass
 from decimal import Decimal
@@ -271,7 +272,7 @@ def cross_statement_reconciliation(
     findings.extend(_net_income_linkage(ledger, tol))
 
     years = sorted(p for p in {key[1] for key in ledger} if _YEAR.match(p))
-    for earlier, later in zip(years, years[1:]):
+    for earlier, later in itertools.pairwise(years):
         if int(later) != int(earlier) + 1:
             continue
         opening = ledger.get((accounts.CASH, earlier, StatementType.BALANCE))
@@ -280,13 +281,24 @@ def cross_statement_reconciliation(
             ledger.get((code, later, StatementType.CASHFLOW))
             for code in (accounts.CFO, accounts.CFI, accounts.CFF)
         ]
-        if opening is None or closing is None or any(f is None for f in flows):
+        if opening is None or closing is None:
             continue
-        if opening.value is None or closing.value is None or any(f.value is None for f in flows):
+        # Each flow named, rather than `any(f is None for f in flows)`: both
+        # guard the same thing, and only this form lets a checker -- or a
+        # reader adding a fourth subtotal -- see that the three values added
+        # below are present. An unguarded None here is a TypeError on the
+        # first filing that omits a cash-flow subtotal.
+        cfo, cfi, cff = flows
+        if cfo is None or cfi is None or cff is None:
+            continue
+        opening_value, closing_value = opening.value, closing.value
+        if opening_value is None or closing_value is None:
+            continue
+        if cfo.value is None or cfi.value is None or cff.value is None:
             continue
 
-        expected = opening.value + flows[0].value + flows[1].value + flows[2].value
-        if tol.close(expected, closing.value):
+        expected = opening_value + cfo.value + cfi.value + cff.value
+        if tol.close(expected, closing_value):
             continue
         findings.append(
             Finding(
@@ -294,16 +306,18 @@ def cross_statement_reconciliation(
                 canonical_code=accounts.CASH,
                 period_label=later,
                 message=(
-                    f"opening cash {opening.value:,} plus the three {later} cash-flow "
+                    f"opening cash {opening_value:,} plus the three {later} cash-flow "
                     f"subtotals gives {expected:,}, but the balance sheet reports "
-                    f"{closing.value:,}. A cash roll-forward that does not close "
+                    f"{closing_value:,}. A cash roll-forward that does not close "
                     f"means a flow is mapped to the wrong side, or a flow is "
                     f"missing entirely."
                 ),
                 fact_ids=opening.contributors + closing.contributors
-                + tuple(fid for f in flows for fid in f.contributors),
+                + tuple(
+                    fid for flow in (cfo, cfi, cff) for fid in flow.contributors
+                ),
                 expected=expected,
-                actual=closing.value,
+                actual=closing_value,
             )
         )
     return tuple(findings)

@@ -104,3 +104,37 @@ jobs:
         # checklist: a secret committed today is compromised from that commit,
         # and finding it at release time is finding it too late.
         run: python -m apps.api.app.security.repository_scan
+
+  # Items 154 and 155. Its own job rather than a step in `test`, so a lint
+  # failure and a test failure are distinguishable at a glance and neither
+  # hides the other.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Lint (item 154)
+        # Rules and exclusions are in pyproject.toml, each with its reason.
+        run: python -m ruff check .
+
+      - name: Formatting (item 154)
+        # `--diff` rather than `--check`: a failure prints what it would
+        # change, which is the difference between a red job and an actionable
+        # one.
+        run: python -m ruff format --diff .
+
+      - name: Type check (item 155)
+        # Strict over model/, the arithmetic core. Checked but not strict over
+        # apps/api/app, which sits on untyped third-party libraries -- see the
+        # note in pyproject.toml.
+        run: python -m mypy

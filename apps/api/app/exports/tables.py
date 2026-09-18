@@ -70,11 +70,11 @@ class Cell:
         return self.origin in CALCULATED
 
     @classmethod
-    def text(cls, value: object, *, note: str = "") -> "Cell":
+    def text(cls, value: object, *, note: str = "") -> Cell:
         return cls(display="" if value is None else str(value), note=note)
 
     @classmethod
-    def missing(cls, note: str) -> "Cell":
+    def missing(cls, note: str) -> Cell:
         """Rule 1.3: an absent figure is shown as absent, with its reason."""
         return cls(display="", absent=True, note=note)
 
@@ -82,7 +82,7 @@ class Cell:
     def number(
         cls, value: Decimal | None, *, origin: str = REPORTED, note: str = "",
         kind: str = "currency",
-    ) -> "Cell":
+    ) -> Cell:
         """One figure, displayed the way the website displays it.
 
         The display string comes from `app/display.py`, which every template
@@ -109,8 +109,8 @@ class Table:
 
     name: str
     title: str
-    columns: "tuple[Column, ...]"
-    rows: "tuple[tuple[Cell, ...], ...]" = ()
+    columns: tuple[Column, ...]
+    rows: tuple[tuple[Cell, ...], ...] = ()
     #: Shown above the table. Where an unavailable schedule says why.
     note: str = ""
     #: True when the table could not be built at all, `note` saying why.
@@ -142,10 +142,10 @@ class ExportModel:
     currency: str
     units: str
     valuation_date: str
-    tables: "tuple[Table, ...]" = ()
+    tables: tuple[Table, ...] = ()
     #: 21.6's limitations section, and the reason it is not optional.
-    limitations: "tuple[str, ...]" = ()
-    version_components: "tuple[tuple[str, str], ...]" = field(default_factory=tuple)
+    limitations: tuple[str, ...] = ()
+    version_components: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
     def table(self, name: str) -> Table:
         for candidate in self.tables:
@@ -154,5 +154,5 @@ class ExportModel:
         raise KeyError(name)
 
     @property
-    def names(self) -> "tuple[str, ...]":
+    def names(self) -> tuple[str, ...]:
         return tuple(table.name for table in self.tables)

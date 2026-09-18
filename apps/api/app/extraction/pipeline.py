@@ -29,8 +29,8 @@ a request, a session or a database handle.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Callable
 
 import pymupdf
 
@@ -78,7 +78,7 @@ def ingest(
     company_id: str,
     config: IngestionConfig,
     store: SourceStore,
-    existing_id_for_hash: Callable[[str], "str | None"] = lambda _h: None,
+    existing_id_for_hash: Callable[[str], str | None] = lambda _h: None,
     allow_linked_duplicate: bool = False,
     link_reason: str | None = None,
     actor: str = "owner",

@@ -23,7 +23,7 @@ from decimal import Decimal
 
 from model import accounts
 from model.accounts import Statement
-from model.numeric import D, ZERO, quantize_for_display
+from model.numeric import ZERO, D, quantize_for_display
 from model.statements import Ledger
 
 RATE_PLACES = 4
@@ -93,7 +93,7 @@ def _implied(
     return ImpliedRate(basis, expense / denominator, denominator, explanation)
 
 
-def implied_interest_rates(ledgers: dict, years: "tuple[str, ...]") -> "tuple[InterestYear, ...]":
+def implied_interest_rates(ledgers: dict, years: tuple[str, ...]) -> tuple[InterestYear, ...]:
     """One row per period that has a prior period to take an opening debt from."""
     balance: Ledger = ledgers[Statement.BALANCE]
     income: Ledger = ledgers[Statement.INCOME]

@@ -55,7 +55,7 @@ LOGIN_PATH = "/login"
 class Guarded:
     """What the middleware resolved about one request."""
 
-    session: "sessions.Session | None"
+    session: sessions.Session | None
     csrf_token: str
     #: True when no credential is configured and the app is serving anyway.
     local_review: bool

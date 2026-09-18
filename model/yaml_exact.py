@@ -28,7 +28,9 @@ class ExactLoader(yaml.SafeLoader):
 
 
 def _keep_as_written(loader: yaml.SafeLoader, node: yaml.Node) -> str:
-    return loader.construct_scalar(node)
+    # `construct_scalar` is untyped in PyYAML's stubs, so the cast is the
+    # annotation: this loader is registered only for scalar tags.
+    return str(loader.construct_scalar(node))
 
 
 # Only int and float are intercepted. bool, null, timestamp and str keep
