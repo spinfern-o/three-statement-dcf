@@ -576,15 +576,23 @@ def test_the_schedules_page_marks_the_interest_basis_the_forecast_uses(
     assert "the basis the forecast uses" in body
 
 
-def test_the_schedules_page_says_why_three_of_them_are_missing(
+def test_the_schedules_page_says_why_the_missing_ones_are_missing(
     three_statement_client,
 ):
-    """1.14: a gap is reported, not left blank."""
+    """1.14: a gap is reported, not left blank.
+
+    The wording moved when the chart grew (F-17). It used to say the chart had
+    no lease liability line; it now says the ending balance exists and the
+    movements are in a footnote this system does not read. The assertion
+    follows the substance rather than the old phrase, and checks that the
+    superseded claim does not come back.
+    """
     client = three_statement_client
     body = client.get(f"/documents/{client.document_id}/schedules").text
     assert "Schedules this filing cannot support" in body
     assert "not available" in body
-    assert "right-of-use asset" in body
+    assert "footnote extraction, not more canonical lines" in body
+    assert "The chart has no lease liability" not in body
 
 
 def test_the_schedules_page_keeps_the_accessibility_contract(

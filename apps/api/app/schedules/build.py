@@ -20,11 +20,12 @@ from .rollforward import (
     RollForwardSchedule,
     common_equity_schedule,
     debt_schedule,
+    intangibles_schedule,
     ppe_schedule,
     retained_earnings_schedule,
 )
 from .tax import TaxScheduleView, tax_schedule
-from .unavailable import intangibles_schedule, lease_schedule, share_count_schedule
+from .unavailable import lease_schedule, share_count_schedule
 from .working_capital import WorkingCapitalSchedule, working_capital_schedule
 
 
@@ -91,7 +92,7 @@ def build_schedules(built: BuiltStatements) -> ScheduleSet:
         years=years,
         working_capital=working_capital_schedule(ledgers, years),
         ppe=ppe_schedule(ledgers, years),
-        intangibles=intangibles_schedule(),
+        intangibles=intangibles_schedule(ledgers, years),
         debt=debt_schedule(ledgers, years),
         interest=implied_interest_rates(ledgers, years),
         leases=lease_schedule(),

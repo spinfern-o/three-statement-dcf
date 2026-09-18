@@ -204,12 +204,26 @@ def test_every_label_on_the_fixture_now_maps(full):
     assert outcome.status is Status.PASS, outcome.detail
 
 
-def test_two_clauses_report_that_this_system_cannot_evaluate_them(full):
-    """17.12 and 17.21, each with the reason rather than a silent skip."""
+def test_17_12_now_skips_for_a_fact_about_the_filing_not_about_this_system(full):
+    """The difference between the two kinds of SKIP, which is the whole point.
+
+    17.12 reported "the chart has no intangibles line (F-17)" for eleven
+    phases -- a statement about this system, and a reader who met it went
+    looking for a missing feature. The chart now has the line and a separate
+    amortization line, so the check runs like 17.11 and 17.13. On this
+    fixture, which reports no intangibles, it skips because THIS FILING has no
+    opening balance to roll forward from, and a reader who meets that goes
+    looking at the balance sheet, where the answer is.
+    """
     intangibles = full.by_code(BY_CLAUSE["17.12"].code)
     assert intangibles.status is Status.SKIP
-    assert "F-17" in intangibles.detail
+    assert "no period has an opening 'intangibles' balance" in intangibles.detail
+    assert "F-17" not in intangibles.detail
+    assert "chart has no" not in intangibles.detail
 
+
+def test_one_clause_reports_that_this_system_cannot_evaluate_it(full):
+    """17.21, with the reason rather than a silent skip."""
     iterative = full.by_code(BY_CLAUSE["17.21"].code)
     assert iterative.status is Status.SKIP
     assert "no iterative calculation is configured" in iterative.detail

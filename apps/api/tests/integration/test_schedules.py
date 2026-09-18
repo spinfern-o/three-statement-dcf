@@ -77,12 +77,50 @@ def test_every_section_13_schedule_is_present_or_explained(schedules):
             assert schedule.reason, f"{schedule.key} gives no reason"
 
 
-def test_the_three_the_chart_cannot_carry_say_so(schedules):
-    """Items 71 and 73, and the share-count half of 75 (finding F-17)."""
-    assert {s.key for s in schedules.unavailable} == {"intangibles", "leases", "share_count"}
-    assert "goodwill" in schedules.by_key("intangibles").reason
-    assert "right-of-use" in schedules.by_key("leases").reason
+def test_the_two_the_chart_cannot_carry_say_so(schedules):
+    """Item 73 and the share-count half of 75.
+
+    13.3 used to be a third. Closing F-17 gave the chart `intangibles` and a
+    separate `amortization` line, so the roll-forward has both of its sides and
+    is built like the others -- see the test below for what it says on a filing
+    that reports no intangibles, which is a different statement from "this
+    system cannot build this".
+    """
+    assert {s.key for s in schedules.unavailable} == {
+        "intangibles",
+        "leases",
+        "share_count",
+    }
     assert "diluted" in schedules.by_key("share_count").reason
+
+    # Neither is a chart-length problem any more, and both reasons say so
+    # rather than implying the extension that closed F-17 simply missed them.
+    # 13.5 has its ending balance and needs footnote extraction for the
+    # movements; 13.7 needs a quantity, and this chart holds amounts.
+    leases = schedules.by_key("leases").reason
+    assert "footnote extraction, not more canonical lines" in leases
+    assert "that half was finding F-17 and is closed" in leases
+    assert "does not fix this one" in schedules.by_key("share_count").reason
+
+
+def test_the_intangibles_schedule_is_built_now_and_says_the_filing_has_none(schedules):
+    """13.3, and the difference between two kinds of absence.
+
+    The schedule reported "this system has no intangibles line" for eleven
+    phases. It now reports what is true of THIS filing: there is no opening
+    intangibles balance to roll forward from. A reviewer who reads the first
+    goes looking for a missing feature; one who reads the second goes looking
+    at the balance sheet, which is where the answer is.
+    """
+    intangibles = schedules.by_key("intangibles")
+    assert intangibles.rule == "13.3"
+    assert intangibles.availability is Availability.UNAVAILABLE
+    assert "no period has an opening" in intangibles.reason
+    # The old reason -- a statement about the chart -- must not come back.
+    assert "canonical chart has no" not in intangibles.reason
+    # And it is a real roll-forward: it carries 13.3's formula and its caveats.
+    assert "Amortization" in intangibles.formula
+    assert any("unexplained difference" in c.text for c in intangibles.caveats)
 
 
 def test_an_unavailable_schedule_cannot_be_built_without_a_reason():

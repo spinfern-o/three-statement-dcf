@@ -16,11 +16,15 @@ appear as PASS". A check whose inputs do not exist yet has not passed, and the
 release gate in `release.py` treats a skipped CRITICAL or ERROR exactly as it
 treats a failed one.
 
-A handful of the thirty cannot be evaluated by this system at all, and they
-say so rather than skipping silently -- 17.12's intangibles schedule, because
-the chart has no intangibles line (F-17); 17.21's iterative-calculation
-clause, because no iterative calculation is configured and the graph is
-checked for cycles regardless. Those reasons are part of the answer.
+One of the thirty cannot be evaluated by this system at all, and it says so
+rather than skipping silently: 17.21's iterative-calculation clause, because
+no iterative calculation is configured and the graph is checked for cycles
+regardless. That reason is part of the answer.
+
+17.12 was a second such clause until the chart grew an intangibles line and a
+separate amortization line (F-17). It now runs like 17.11 and 17.13 -- and on
+a filing with no intangibles it reports SKIP for the schedule's own reason,
+which is a statement about that filing rather than about this system.
 """
 
 from __future__ import annotations
@@ -99,12 +103,6 @@ class Diagnostics:
 #: reason rather than omitted from the registry, because a check missing from
 #: a diagnostics panel is a check nobody decided about.
 UNEVALUABLE = {
-    "17.12": (
-        "the chart has no intangibles or goodwill line and no separate "
-        "amortization line (F-17), so there is no intangibles schedule to "
-        "reconcile. A company with material intangibles needs the chart "
-        "extended before this check means anything."
-    ),
     "17.21": (
         "no iterative calculation is configured. The formula graph is checked "
         "for cycles unconditionally and refuses any it finds (18.6), so the "
@@ -242,6 +240,13 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
         schedules = build_schedules(built)
         tolerance = Tolerance()
         _schedule(record, "17.11", reconcile_schedule(schedules.ppe, tolerance))
+        # 17.12 reads like its neighbours now. It reported SKIP for eleven
+        # phases because the chart had no intangibles line and no separate
+        # amortization line to roll against; closing F-17 gave it both, so the
+        # check runs and `_schedule` reports SKIP with the schedule's own
+        # reason when a filing simply has no intangibles -- which is a
+        # statement about the filing rather than about this system.
+        _schedule(record, "17.12", reconcile_schedule(schedules.intangibles, tolerance))
         _schedule(record, "17.13", reconcile_schedule(schedules.debt, tolerance))
         _schedule(
             record,
@@ -258,7 +263,6 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
             "'where data permits' and the data does not",
         )
 
-    record("17.12", Status.SKIP, UNEVALUABLE["17.12"])
     record("17.21", Status.SKIP, UNEVALUABLE["17.21"])
 
     # --- 17.16-17.22: the forecast ------------------------------------------
