@@ -22,6 +22,7 @@ from model.checks import DEFAULT_ABS_TOL, DEFAULT_REL_TOL, Status, Tolerance, ru
 from model.dcf import build_fcff, run_dcf
 from model.forecast import build_forecast
 from model.loader import load_assumptions, load_historical, load_profile, load_valuation
+from model.disclaimer import block as disclaimer_block
 from model.numeric import PrecisionError
 from model.provenance import ProvenanceError
 from model.sensitivity import sensitivity_grid
@@ -115,6 +116,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     results = run_all_checks(forecast, fcff_years, valuation, tolerance)
     print(report.checks_block(results, tolerance))
+
+    # Section 25: "Do not bury this only in Terms. Show it in the model,
+    # release flow, and exports." A CLI report IS the model for whoever runs
+    # it, and this was the surface that had none.
+    print()
+    print(disclaimer_block())
 
     return 1 if any(r.status is Status.FAIL for r in results) else 0
 

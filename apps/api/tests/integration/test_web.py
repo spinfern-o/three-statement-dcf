@@ -310,9 +310,17 @@ def test_the_progress_meter_has_a_text_equivalent(client):
 
 
 def test_the_disclaimer_is_on_every_page(client, empty_client):
-    """20.19, 1.19, 1.20."""
+    """20.19, 1.19, 1.20, and Section 25's own wording.
+
+    This used to accept either "not investment advice" or "investment advice",
+    which a two-sentence trimmed version satisfied. Section 25 asks for the
+    same *meaning* as four sentences, and the two a short form drops are the
+    two about this system in particular. So the assertion is the whole text.
+    """
+    from model.disclaimer import DISCLAIMER
+
     for body in (_room(client).text, empty_client.get("/").text):
-        assert "not investment advice" in body or "investment advice" in body
+        assert DISCLAIMER in body
 
 
 def test_tokens_and_stylesheet_are_served(client):

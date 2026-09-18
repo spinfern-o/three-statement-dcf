@@ -34,6 +34,10 @@
       {% endif %}
       {{ readiness.describe() }}
     </p>
+    {# Section 25: "show it in the model, release flow, and exports". This is
+       the release flow, and it is where the language matters most -- a reader
+       here is deciding whether to rely on the thing. #}
+    <p class="small muted">{{ disclaimer }}</p>
     {% call region("Release checklist by stage") %}
     <table>
       <caption>Item 136's checklist, in the order the work happens</caption>

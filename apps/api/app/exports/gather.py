@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from model.accounts import Statement
+from model.disclaimer import DISCLAIMER
 from model.checks import Status
 
 from ..assumptions.scenarios import BASE, ScenarioSet
@@ -73,7 +74,7 @@ TAB_ORDER = (
 #: one model. Written out because a report whose limitations section says
 #: "none" is the one a reader should distrust.
 STANDING_LIMITATIONS = (
-    "This is not investment advice and not a fairness opinion (25.x).",
+    DISCLAIMER,
     "Every figure rests on one filing. A filing restated later restates this.",
     "Three of the seven Section 13 schedules cannot be built from the "
     "canonical chart: intangibles, leases and share count. Their lines are "

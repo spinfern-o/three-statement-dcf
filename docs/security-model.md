@@ -368,47 +368,71 @@ blocked by any decision.
 
 ---
 
-## 3. Summary: decidable now versus blocked
+## 3. Summary: where each requirement stands
 
-### Decidable and actionable now
+Rewritten after **Phase 15 (items 145-153)**, which built Section 20 rather than
+deciding it. 2.2.a, 2.2.b, 2.2.c, 2.2.d, 2.6.b, 2.6.c and 2.6.d are all answered,
+so nothing in this section is blocked on a decision any more.
 
-| # | Requirement | Note |
+### Built
+
+| # | Requirement | Where |
 |---|---|---|
-| 20.1 | PDFs are confidential | Classification is a property of the data |
-| 20.4 | Nothing secret or real in Git | Already enforced by test for `inputs/` |
-| 20.8 | Validate size, type, signature, page count | Shape fixed; limit **values** are OPEN |
-| 20.11 | Sanitize filenames; never execute content | Both halves invariant |
-| 20.12 | The vulnerability-class list | Properties of correct code |
-| 20.13 | Spreadsheet formula-injection prefixing | Most concrete rule in the section |
-| 20.15 | Log security events, not source values | 20.1 applied to logging |
-| 20.16 | Redact errors | Principle fixed; boundary blocked. Error codes (Phase 2 item 23) not blocked and not done |
-| 20.19 | Disclaimer | Text supplied by Section 25; in `README.md`, **not** in the CLI report |
+| 20.1 | PDFs are confidential | Enforced by what the log is allowed to carry (20.15) and by `repository_scan.py` |
+| 20.3 | Secrets in the environment only | [`credentials.py`](../apps/api/app/security/credentials.py); `.env.example` carries names |
+| 20.4 | Nothing secret or real in Git | [`repository_scan.py`](../apps/api/app/security/repository_scan.py), run in CI on every commit |
+| 20.6 | RBAC | **N/A** under 2.2.b/2.2.d — one user, one role. Not deferred |
+| 20.7 | Cross-model authorization | [`authorization.py`](../apps/api/app/security/authorization.py), at `routes.py:_load` |
+| 20.8 | Size, type, signature, page-count limits | `core/config.py` and the Phase 3 pipeline |
+| 20.9 | Scan uploads before processing | [`scanning.py`](../apps/api/app/security/scanning.py) — a hook, reporting **not scanned** when unset |
+| 20.10 | Isolate PDF processing | [`sandbox.py`](../apps/api/app/security/sandbox.py) — containment, **not** a code-execution boundary |
+| 20.11 | Sanitize filenames; never execute content | Storage paths derive from the hash; nothing is executed |
+| 20.12 | Path traversal, XSS, CSRF, IDOR, formula injection | [`csrf.py`](../apps/api/app/security/csrf.py), `guard.py`, `backup.py:restore`, `csv_export.py` |
+| 20.13 | Spreadsheet formula prefixing | `csv_export.py` and `xlsx_export.py`, on **raw text** only |
+| 20.14 | Rate limits | [`ratelimit.py`](../apps/api/app/security/ratelimit.py), by window and by concurrency |
+| 20.15 | Log events, not source values | [`logging.py`](../apps/api/app/security/logging.py) |
+| 20.16 | Redact errors | Same module; redaction runs on the way out, not at the call site |
+| 20.17 | Backup, restore, retention, deletion | [`backup.py`](../apps/api/app/security/backup.py), [`retention.py`](../apps/api/app/security/retention.py) |
+| 20.18 | Deletion confirmation | The filename typed back, not a button |
+| 20.19 | Disclaimer and limitations | [`model/disclaimer.py`](../model/disclaimer.py) — the model, the release flow **and** the exports |
+| 20.20 | Dependency and vulnerability scans | `pip-audit --strict` in CI on every commit |
+| 2.2.c | Authentication | [`credentials.py`](../apps/api/app/security/credentials.py), `sessions.py`, `guard.py` — closes **F-15** |
 
-### Blocked, and on what
+### The deployment's, not the application's
 
-| # | Requirement | Blocked on |
+Two requirements are satisfied by where this runs rather than by this code, and
+saying so is not a way of skipping them.
+
+| # | Requirement | Why it is not here |
 |---|---|---|
-| 20.2 | Encryption in transit and at rest | **2.2.a** (specification says "for hosted deployments") |
-| 20.3 | Approved secret manager | **2.2.a** for the mechanism |
-| 20.5 | Least-privilege credentials | **2.2.a**, **3.2.d** |
-| 20.6 | RBAC | **2.2.b**, **2.2.d** |
-| 20.7 | Cross-model authorization | **2.2.a**, **2.2.b** for applicability; design decidable now |
-| 20.9 | Scan uploads | **2.2.a** — "the approved security process" does not exist |
-| 20.10 | Isolate PDF/OCR processing | **2.2.a** for mechanism, **2.3.c** for whether OCR exists |
-| 20.14 | Rate limiting | **2.2.a**, **2.2.c** |
-| 20.17 | Backup, restore, retention, deletion | **2.6.b**, **2.6.c**, **2.6.d**, **2.2.a** |
-| 20.18 | Deletion confirmation | **2.6.c** |
-| 20.20 | Dependency and vulnerability scans | **2.2.a** for "production"; CI audit step not blocked |
+| 20.2 | Encryption in transit and at rest | TLS and the storage layer. This application must not implement its own cryptography, and does not |
+| 20.5 | Least-privilege credentials | There is no database yet; records are JSON files under the storage root, and the process's own filesystem permissions are the control |
 
-### Not blocked, not done
+### Residual risks, named
 
-Three items depend on no OPEN decision and have not been built:
+Listed here and in [`incident-response.md`](incident-response.md) §2, because a
+control whose limits are unstated gets treated as a guarantee it never made.
+
+- The isolated parser contains a crash, a runaway allocation and an endless
+  loop. It does **not** contain code execution: the child runs as the same user
+  with the same filesystem and network. A container, a seccomp filter or a
+  separate user would make it a boundary.
+- With `INGEST_SCAN_COMMAND` unset, nothing scans an upload. The result is
+  recorded as `NOT SCANNED` and is never reported as clean.
+- The rate limiters are per process. `Limiters.is_shared` returns `False`; a
+  deployment with N workers has N independent limiters.
+- A backup archive is not encrypted by the process that writes it, and its
+  manifest says so.
+- A session cannot be revoked individually. Rotating `REVIEW_SECRET_KEY`
+  invalidates all of them at once, which is the revocation mechanism.
+
+### Still not done
 
 1. **Structured error codes and severity** (Phase 2 item 23). The engine raises
-   prose exceptions with no codes.
-2. **A dependency audit step in CI** (3.5.c, 20.20).
-3. **The Section 25 disclaimer in the CLI report output** (20.19). It is in
-   `README.md` only.
+   prose exceptions with no codes. Not blocked on anything.
+2. **Legal review of the Section 25 language** before commercial use, which 25
+   itself asks for. The text is verbatim from the specification; nobody has
+   reviewed it for this deployment.
 
 ---
 

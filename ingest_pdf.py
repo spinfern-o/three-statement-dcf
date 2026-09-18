@@ -29,6 +29,8 @@ from apps.api.app.extraction.pipeline import ingest
 from apps.api.app.extraction.records import confirm_metadata
 from apps.api.app.extraction.storage import SourceStore
 from apps.api.app.persistence.json_store import JsonDocumentRepository
+from apps.api.app.security.logging import security_event
+from apps.api.app.security.scanning import quarantine, scan
 
 DEFAULT_STORE = Path("var/sources")
 
@@ -60,6 +62,26 @@ def main(argv: list[str] | None = None) -> int:
     config = IngestionConfig(storage_root=str(args.store))
     store = SourceStore(args.store)
     repository = JsonDocumentRepository(args.store)
+
+    # 20.9: scan before anything parses the bytes, and quarantine rather than
+    # delete a file that fails, so the refusal stays auditable. With no scanner
+    # configured this reports NOT SCANNED and proceeds -- it never reports
+    # clean for a file nothing looked at.
+    scan_result = scan(args.pdf)
+    if not scan_result.may_process:
+        scan_result = quarantine(args.pdf, args.store, scan_result)
+        print(f"\n{report.rule('=')}")
+        print("UPLOAD REFUSED BY THE SCANNER (20.9)")
+        print(report.rule('='))
+        print(f"  {scan_result.describe()}")
+        print(f"  quarantined at: {scan_result.quarantined_at}")
+        security_event(
+            "upload.refused", actor=args.company, outcome="refused",
+            detail=scan_result.describe(), document_id=args.pdf.name,
+        )
+        return 2
+    if not scan_result.outcome.is_known:
+        print(f"\n  NOTE: {scan_result.describe()}\n")
 
     outcome = ingest(
         args.pdf.read_bytes(),

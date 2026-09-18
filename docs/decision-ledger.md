@@ -575,24 +575,46 @@ stack, preserve it and document the deviation"); this is the documentation.
 The cost is real and worth naming: two front-end idioms in one repository once
 Phase 12 lands.
 
-### F-15 — OPEN. The review application has no authentication
+### F-15 — RESOLVED in Phase 15. The review application had no authentication
 
-Decision **2.2.c is CONFIRMED: authentication is required.** The reasoning in
-that row still holds — 2.2.a puts confidential financial PDFs behind a network
-endpoint, and 20.1 classifies them confidential.
+Decision **2.2.c is CONFIRMED: authentication is required** — 2.2.a puts
+confidential financial PDFs behind a network endpoint, and 20.1 classifies them
+confidential.
 
-**It is not implemented.** `review_server.py` binds to `127.0.0.1` by default
-and prints a warning if told to bind anywhere else, which is a mitigation, not
-the requirement. Until a credential sits in front of it, this is a local
-review tool, and deploying it as the private hosted application 2.2.a
-describes would put filings on a network with nothing guarding them.
+**It was unimplemented from Phase 4 to Phase 14**, with the mitigation that
+`review_server.py` binds to `127.0.0.1` and prints a warning if told to bind
+anywhere else. That was recorded here rather than left to be discovered, and it
+was the right thing to record: a mitigation is not the requirement, and a
+mitigation that depends on a reader passing the right flag and reading a warning
+is not even a good mitigation.
 
-What it needs, and why none of it is guessed here: a session mechanism, a
-credential store, and a decision about what the second factor is for a
-single-user application — none of which is a Section 2 row, and all of which
-belongs with Phase 15 (security and operations) rather than being half-built
-now. Recorded so it cannot be mistaken for done.
+Phase 15 item 145 built it, in
+[`apps/api/app/security/`](../apps/api/app/security):
 
+- a password verified against a `hashlib.scrypt` hash held in the environment,
+  never in the repository (20.3, 20.4);
+- a signed session cookie, `HttpOnly`, `SameSite=Strict`, `Secure` off loopback,
+  expiring **absolutely** eight hours after sign-in;
+- a CSRF token on every state-changing request (20.12), enforced in local-review
+  mode too, because authentication and CSRF are different defences;
+- login attempts rate-limited, with a successful sign-in clearing the count so
+  somebody else's guessing cannot lock the one real user out (20.14);
+- 20.7's authorization on every read, at the single point every document route
+  already passes through.
+
+And the warning became a **refusal**: `review_server.py` will not bind to
+anything but loopback without `REVIEW_PASSWORD_HASH` set. Without one it serves
+locally in local-review mode with a banner on every page saying so — which is
+not a way to turn 2.2.c off but the development affordance that would otherwise
+be somebody commenting out the middleware, made visible and constrained instead.
+
+The three things this row said it needed have answers, each recorded with its
+reasoning in the modules themselves: the session mechanism is a signed cookie
+with no server-side store (there is one user and one boolean to carry); the
+credential store is the environment; and there is **no second factor**, because
+2.2.c requires a credential and does not require two, and inventing an
+enrolment flow for a single user would be building a thing nobody asked for in
+the place where getting it wrong costs most.
 
 ### F-16 — RESOLVED in Phase 5. The canonical chart had no definitions
 
@@ -830,6 +852,31 @@ what the stylesheet claims.
 
 ---
 
+### F-30 — RESOLVED in Phase 15. A CSRF middleware ate every request body
+
+Written the obvious way — Starlette's `@app.middleware("http")` decorator — the
+guard checked the CSRF token by calling `await request.form()`, and that
+**consumes the request body**. `BaseHTTPMiddleware` offers no supported way to
+hand it on afterwards, so every route downstream saw an empty body.
+
+The failure is quiet in the way that matters. It does not raise anything about
+middleware or bodies; it surfaces as
+
+    422: {"loc": ["body", "page"], "msg": "Field required"}
+
+on a field the browser did send. A reader debugging that starts by looking at
+the form, then at the route signature, then at the browser — three places the
+bug is not.
+
+Twenty-one existing tests caught it here, which is the whole argument for
+building a security layer against a suite that already exercises every route.
+Had this shipped with the two routes a new phase happens to test, it would have
+broken the other thirty in a way nobody would attribute to CSRF.
+
+The fix is a raw ASGI middleware: at that layer the body is bytes, reading it
+is one loop and replaying it to the application is three lines. A test asserts a
+POST's fields arrive intact, so the shape cannot come back.
+
 ### F-27 — RESOLVED in Phase 14. Every export said the currency was unconfirmed
 
 `DetectedMetadata` is a dataclass holding **one field**, `fields: dict[str,
@@ -1008,6 +1055,142 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 15 (items 145-153) is built**, in
+[`apps/api/app/security/`](../apps/api/app/security) with
+[`incident-response.md`](incident-response.md) beside it. **F-15 is closed.**
+
+Decision 2.2.c has read "authentication required" since Phase 2, and F-15 has
+recorded it unimplemented since Phase 4 with the mitigation that
+`review_server.py` binds to localhost. A mitigation is not the requirement, and
+one that depends on a reader passing the right flag is not even a good one.
+`review_server.py` now **refuses** to bind anywhere but loopback without a
+credential, rather than printing a warning people scroll past.
+
+**No cryptography is invented.** 20.2's note in `security-model.md` says this
+application must not implement its own, and nothing here does: `hashlib.scrypt`
+for the password, `hmac.compare_digest` for every secret comparison,
+`secrets.token_bytes` for the key. The one construction assembled rather than
+called is a signed cookie -- HMAC-SHA256 over `issued|expires|nonce` -- which is
+twelve lines a reader can check, and is what every framework does.
+
+**scrypt rather than a hash that is merely cryptographic.** The threat to a
+password hash is offline guessing against a stolen copy, and a fast hash makes
+that cheap. The parameters ask for 32 MiB per verification: a fraction of a
+second for the one person logging in, and 32 MiB per guess for somebody working
+through a stolen hash. It is in the standard library, so the most costly place
+to get a dependency wrong does not have one.
+
+**The guard is a middleware and defaults to closed.** A per-route dependency
+has to be added to every route, and the failure mode of forgetting one is an
+unprotected endpoint that looks exactly like a protected one -- there are over
+thirty routes and more arrive each phase. `PUBLIC` is four entries, each with
+its reason written beside it, and everything else needs a session.
+
+**It is a raw ASGI middleware, and that is a finding rather than a preference
+-- F-30.** Checking a CSRF token means reading the form, and reading the form
+consumes the request body. Written on Starlette's `BaseHTTPMiddleware` the
+guard read the token and every route then saw an *empty* body -- which does not
+fail loudly: it surfaces as a validation error on a field the browser did send.
+Twenty-one tests caught it here. At the ASGI layer the body is bytes and
+replaying it is three lines.
+
+**Session expiry is absolute, not idle.** An idle timeout keeps a session alive
+indefinitely for somebody who leaves a tab open, and the tab is the thing
+likeliest to be left open on an unlocked screen.
+
+**CSRF is enforced in local-review mode too**, because authentication and CSRF
+are different defences: a local server is exactly what a page in another tab
+can post to. The token is derived from the session under the signing key rather
+than stored, so there is nothing to expire or clean up.
+
+**20.7's easy half and its hard half.** The check is one line in
+`routes.py:_load`, because every document route already comes through that
+function and a check a route must remember is a check a route will one day not
+have. The hard half is that **an unauthorized document answers exactly as one
+that does not exist** -- same status, same text. Distinguishing them tells a
+prober which identifiers are real, and an identifier here belongs to a filing
+nobody has released. A test asserts the two responses are byte-identical.
+
+Under 2.2.b every document has the same owner, so this check can never fail
+today. It is built and tested with a second owner anyway: the alternative is a
+system whose authorization is a comment saying it would not matter, and the day
+it starts to matter is the day somebody adds a second user -- not the day to
+discover that reads were never checked.
+
+**20.10's isolation says what it does not buy.** PDF parsing runs in a spawned
+child under memory, CPU and wall-clock limits, so a crash, a runaway allocation
+or an endless loop ends there rather than in the web process -- and the isolated
+render is asserted byte-for-byte identical to the in-process one, so the
+separation changed nothing. It is **not** a boundary against code execution: the
+child runs as the same user with the same filesystem and the same network.
+Writing that down matters more than the code, because an isolation layer whose
+limits are unstated gets treated as a sandbox and the next person builds on a
+guarantee it never made.
+
+**20.9 reports "not scanned" rather than "clean".** There is no scanner in this
+repository and bundling one would mean either a signature database that is
+stale the day it is committed, or sending a confidential filing to a third
+party. So it is a hook, and with nothing configured the result is a recorded
+fact that nothing looked at this file. A field reading "clean" because nobody
+looked is worse than no field: it answers the question a reviewer was about to
+ask, wrongly.
+
+**20.17's flagged interaction, answered.** `security-model.md` asked in Phase 2
+what happens to the `AuditEvent` rows referencing a deleted document, and named
+three options. Deletion **tombstones**: cascading deletes the record of the
+deletion along with everything else, which is the one entry somebody will later
+need, and refusing while references exist means a document can never be deleted
+because ingestion always writes one. The tombstone keeps the identifier, the
+hash and the filename; it keeps none of the content, which is the point of a
+permanent deletion.
+
+**20.18's confirmation is the filename typed back, not a button.** A button is
+the same gesture whatever it is attached to, and the gesture is what muscle
+memory performs. No default value and no autofocus.
+
+**"An untested backup is not a backup" is 2.6.d's own sentence, so the restore
+test is the deliverable.** `snapshot` writes an archive with a manifest naming
+every file and its SHA-256; `verify` restores into a scratch directory and
+re-hashes everything. A tar that extracts proves the tar is well-formed, not
+that the bytes inside are the bytes that went in. The quarterly restore test is
+a function that runs in CI on every commit rather than a calendar entry
+somebody honours.
+
+**20.20 runs on every commit, not before a release.** `pip-audit --strict` over
+the whole installed tree, transitive dependencies included, because a
+vulnerability disclosed today is in the tree today and a gate that only fires at
+release time reports it at the worst possible moment. Beside it,
+[`repository_scan.py`](../apps/api/app/security/repository_scan.py) refuses a
+commit carrying a source PDF or a secret *value* -- item 166's confirmation,
+made into a check rather than a box somebody ticks.
+
+The fixture test in that scan is worth recording, because the first version was
+wrong. It required each fixture PDF to label itself `FICTIONAL`, which they do
+not: the ledger's note about `FICTIONAL` is about the engine's YAML fixtures,
+not the PDFs. The real invariant is stronger and was already in the tree --
+every fixture is **pinned by hash** in `test_fixtures.py` *and* **built by**
+`build_fixtures.py`. A hash says what a file is; only the generator says where
+it came from.
+
+**Section 25's disclaimer was on one surface and a half.** 25 says "show it in
+the model, release flow, and exports", and the web footer carried a
+*two-sentence* version while the CLI report carried none. The two sentences the
+short form dropped are the two about this system in particular: that historical
+figures may carry extraction errors until reviewed, and that outputs must be
+verified before being relied on. Trimming a disclaimer keeps the part that
+sounds most like boilerplate. [`model/disclaimer.py`](../model/disclaimer.py)
+is now the single text, on every screen, in the release gate, in all four
+exports and at the end of the CLI report, with a test per surface.
+
+**`incident-response.md` names the residual risks before an incident.** The
+sandbox is not a security boundary, uploads are unscanned unless configured, the
+rate limiters are per process, the backup archive is not encrypted by the
+process that writes it, and a session cannot be revoked except by rotating the
+signing key. A procedure that does not say what it cannot defend against is read
+as a guarantee it never made. The document also fixes an order that matters:
+**rotate the signing key before the password**, or an existing session stays
+valid for up to eight hours.
 
 **Phase 14 (items 138-144) is built**, in
 [`apps/api/app/exports/`](../apps/api/app/exports) with

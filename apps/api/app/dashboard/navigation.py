@@ -48,6 +48,7 @@ SECTIONS = (
     ("Valuation", "valuation", "8"),
     ("Diagnostics", "diagnostics", "9"),
     ("Exports", "exports", "10"),
+    ("Settings", "settings", "11"),
 )
 
 #: The furthest status at which each section has something to show. A section

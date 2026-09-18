@@ -71,3 +71,36 @@ jobs:
           print(f"{ran} accessibility test(s) actually ran")
           sys.exit(0 if ran > 0 else 1)
           PY
+
+  # Item 152 / specification 20.20: "Complete dependency and vulnerability
+  # scans before production release." Run on every commit rather than before a
+  # release, because a vulnerability disclosed today is in the tree today, and
+  # a gate that only runs at release time reports it at the worst moment.
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install pip-audit
+
+      - name: Audit the dependency tree
+        # pip-audit queries the Python Packaging Advisory Database. It fails
+        # the job on any known vulnerability in anything installed, which is
+        # the whole tree rather than the four lines in requirements.txt --
+        # a transitive dependency is as present as a direct one.
+        run: python -m pip_audit --strict --progress-spinner off
+
+      - name: Check for a source PDF or a secret in the tree
+        # Item 166 and 20.4. Written here rather than left to a release
+        # checklist: a secret committed today is compromised from that commit,
+        # and finding it at release time is finding it too late.
+        run: python -m apps.api.app.security.repository_scan

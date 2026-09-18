@@ -218,6 +218,18 @@ def build_workbook(model: ExportModel) -> Workbook:
     )
     cover.cell(row=note_row + 1, column=1, value=f"Model version: {model.version_id}")
     cover.cell(row=note_row + 2, column=1, value=f"Generated at: {model.generated_at}")
+
+    # Section 25 and 20.19: the disclaimer and the model limitations belong in
+    # the export, not only in the report. A workbook is the artefact that gets
+    # forwarded, and it is the one most likely to be read on its own.
+    limits_row = note_row + 4
+    cover.cell(
+        row=limits_row, column=1, value="What this model does not say (Section 25, 20.19)"
+    ).font = Font(bold=True)
+    for offset, line in enumerate(model.limitations, start=1):
+        cover.cell(row=limits_row + offset, column=1, value=line).alignment = Alignment(
+            wrap_text=True, vertical="top"
+        )
     cover.column_dimensions["A"].width = 34
     cover.column_dimensions["B"].width = 80
     return workbook

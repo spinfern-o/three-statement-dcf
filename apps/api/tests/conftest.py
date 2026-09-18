@@ -27,6 +27,43 @@ NOT_A_PDF = FIXTURES / "not_actually_a_pdf.pdf"
 TRUNCATED = FIXTURES / "truncated.pdf"
 
 
+def browser_client(app):
+    """A `TestClient` that sends the CSRF token, the way a browser does.
+
+    20.12 requires every state-changing request to carry this session's token,
+    and a browser gets it from the hidden field in the form it is submitting.
+    A test posting without one is not testing the domain logic it was written
+    for -- it is testing the CSRF guard, which has its own tests in
+    `test_security.py` that supply no token, a stale token and a forged one.
+
+    So this fills the field in when the caller has not, and never overrides a
+    caller who has: a test that wants to submit a bad token still can.
+    """
+    from fastapi.testclient import TestClient
+
+    class _Browser(TestClient):
+        def post(self, url, *args, **kwargs):
+            data = kwargs.get("data")
+            if data is None and "files" not in kwargs and "json" not in kwargs:
+                data = {}
+            if isinstance(data, dict) and "csrf_token" not in data:
+                kwargs["data"] = {**data, "csrf_token": self.csrf_token()}
+            return super().post(url, *args, **kwargs)
+
+        def csrf_token(self) -> str:
+            """This client's current token, derived the way the guard does."""
+            from apps.api.app.security import csrf, sessions
+
+            state = self.app.state
+            cookie = self.cookies.get(sessions.COOKIE_NAME, "")
+            nonce = "local-review"
+            if state.credential is not None and cookie:
+                nonce = sessions.verify(state.signing_key, cookie).nonce
+            return csrf.token_for(state.signing_key, nonce)
+
+    return _Browser(app)
+
+
 @pytest.fixture
 def store_root(tmp_path):
     return tmp_path / "sources"
@@ -96,7 +133,7 @@ def client(store_root, stored):
 
     from apps.api.app.api.main import create_app
 
-    with TestClient(create_app(store_root)) as test_client:
+    with browser_client(create_app(store_root)) as test_client:
         test_client.document_id = stored.document.id
         yield test_client
 
@@ -108,7 +145,7 @@ def empty_client(tmp_path):
 
     from apps.api.app.api.main import create_app
 
-    with TestClient(create_app(tmp_path / "empty")) as test_client:
+    with browser_client(create_app(tmp_path / "empty")) as test_client:
         yield test_client
 
 
@@ -235,7 +272,7 @@ def forecast_client(tmp_path, forecastable):
     JsonDocumentRepository(root).save(forecastable)
     ScenarioStore(root).save(forecastable.document.id, approved_scenario("owner"))
 
-    with TestClient(create_app(root)) as test_client:
+    with browser_client(create_app(root)) as test_client:
         test_client.document_id = forecastable.document.id
         yield test_client
 
@@ -333,7 +370,7 @@ def three_statement_client(tmp_path, three_statements):
 
     root = tmp_path / "reviewed"
     JsonDocumentRepository(root).save(three_statements)
-    with TestClient(create_app(root)) as test_client:
+    with browser_client(create_app(root)) as test_client:
         test_client.document_id = three_statements.document.id
         yield test_client
 

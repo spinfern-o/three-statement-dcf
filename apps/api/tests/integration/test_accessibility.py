@@ -516,7 +516,7 @@ VIEWPORTS = (
 #: covers the one that happened to be easy.
 SCREENS = ("", "/mapping", "/statements", "/schedules", "/formulas",
            "/assumptions", "/forecast", "/valuation", "/diagnostics",
-           "/exports")
+           "/exports", "/settings")
 
 
 @pytest.mark.parametrize("name,width,height", VIEWPORTS, ids=lambda v: str(v))

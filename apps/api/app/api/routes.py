@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -48,6 +48,18 @@ from ..diagnostics.lineage import trace, traceable_lines
 from ..diagnostics.release import checklist, readiness
 from ..diagnostics.run import evaluate as run_diagnostics
 from ..dashboard.charts import line_chart
+from ..security.authorization import NOT_FOUND, require_access, visible
+from ..security.retention import RETENTION, DeletionRefused, delete_permanently
+from ..security.scanning import scan_state
+from ..security.guard import safe_next
+from ..security.logging import security_event
+from ..security.ratelimit import RateLimited
+from ..security.sessions import (
+    clear_cookie as clear_session_cookie,
+    is_secure_request,
+    issue as issue_session,
+    set_cookie as set_session_cookie,
+)
 from ..exports.csv_export import DICTIONARY, neutralized_cells, table_to_csv
 from ..exports.gather import gather
 from ..exports.json_export import schema_json, to_json
@@ -122,6 +134,13 @@ class _Shell:
             nav_items(document_id, current=_current_section(request.url.path)),
         )
         context.setdefault("context_units", _context_units(context))
+        # 20.12: every POST form needs this session's token, and a template
+        # that has to be passed it is a template somebody will forget. The
+        # guard put it on the request before any route ran.
+        context.setdefault(
+            "csrf_token", getattr(request.state, "guard", None)
+            and request.state.guard.csrf_token or ""
+        )
         return self.templates.TemplateResponse(
             request=request, name=name, context=context, **kwargs
         )
@@ -170,10 +189,24 @@ def _store(request: Request):
 
 
 def _load(request: Request, document_id: str):
+    """One document, after 20.7's check. The only way a route reads one.
+
+    The authorization check lives here rather than in each route because every
+    document route already comes through this function, and a check a route has
+    to remember is a check a route will one day not have. Item 146 is one line
+    in one place for exactly that reason.
+
+    Both failures return the same 404 with the same text. Distinguishing "does
+    not exist" from "not yours" tells a prober which document identifiers are
+    real, one request at a time -- and an identifier here belongs to a filing
+    nobody has released.
+    """
     try:
-        return _repository(request).load_result(document_id)
+        result = _repository(request).load_result(document_id)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"no document {document_id}") from None
+        raise HTTPException(status_code=404, detail=NOT_FOUND) from None
+    require_access(result, _actor(request))
+    return result
 
 
 def _back(document_id: str, page: int, **flash) -> RedirectResponse:
@@ -213,10 +246,16 @@ def index(request: Request):
     repository = _repository(request)
     store = _scenario_store(request)
 
+    actor = _actor(request)
     models = []
-    for document_id in repository.document_ids():
-        result = repository.load_result(document_id)
-        scenarios = store.load(document_id, owner=_actor(request))
+    # 20.7 again: a portfolio that lists a model the reader cannot open tells
+    # them it exists, which is the same leak the 404 above avoids.
+    for result in visible(
+        [repository.load_result(document_id) for document_id in repository.document_ids()],
+        actor,
+    ):
+        document_id = result.document.id
+        scenarios = store.load(document_id, owner=actor)
         models.append(
             _Model(
                 document=result.document,
@@ -1390,3 +1429,145 @@ def export_report(request: Request, document_id: str, scenario_id: str = BASE):
                 f'attachment; filename="{_download_name(model, "pdf")}"'
         },
     )
+
+
+# --- items 145, 146: the credential, the session, and the way out ----------
+
+@router.get("/login", response_class=HTMLResponse)
+def login_form(request: Request, next: str = "/", error: str = ""):
+    """2.2.c's credential prompt.
+
+    A plain form. There is no JavaScript anywhere in this application, so
+    there is no client-side validation to disagree with the server's, and no
+    fetch that could leave the password in a console.
+    """
+    if request.app.state.credential is None:
+        return RedirectResponse("/", status_code=303)
+    if request.state.guard.session is not None:
+        return RedirectResponse(safe_next(next), status_code=303)
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="login.html",
+        context={
+            "next": safe_next(next),
+            "error": error,
+            "csrf_token": request.state.guard.csrf_token,
+            "nav_items": (),
+            "context_units": "",
+            "current_section": "",
+        },
+    )
+
+
+@router.post("/login")
+def sign_in(
+    request: Request,
+    password: str = Form(""),
+    next: str = Form("/"),
+    csrf_token: str = Form(""),
+):
+    """Verify the credential, or refuse in a way that says nothing extra.
+
+    The failure message never distinguishes "no credential configured" from
+    "wrong password", and the rate limit is keyed on the client address so one
+    browser cannot spend another's budget.
+    """
+    state = request.app.state
+    if state.credential is None:
+        return RedirectResponse("/", status_code=303)
+
+    client = request.client.host if request.client else "unknown"
+    try:
+        state.limiters.authentication.check(client)
+    except RateLimited as exc:
+        return HTMLResponse(
+            f"<h1>Too many attempts</h1><p>{exc}</p>",
+            status_code=429,
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+
+    if not state.credential.verify(password):
+        security_event(
+            "authentication.failed", actor=client,
+            detail="the supplied password did not verify",
+        )
+        return RedirectResponse(
+            f"/login?next={quote(safe_next(next), safe='')}"
+            f"&error={quote('That password was not accepted.')}",
+            status_code=303,
+        )
+
+    state.limiters.authentication.clear(client)
+    cookie, _ = issue_session(state.signing_key)
+    response = RedirectResponse(safe_next(next), status_code=303)
+    set_session_cookie(
+        response, cookie,
+        secure=is_secure_request(
+            request.url.scheme, request.url.hostname
+        ),
+    )
+    security_event("authentication.succeeded", actor=client, detail="session issued")
+    return response
+
+
+@router.post("/logout")
+def sign_out(request: Request, csrf_token: str = Form("")):
+    """End the session. A POST, because a GET that logs you out can be a link."""
+    response = RedirectResponse("/login", status_code=303)
+    clear_session_cookie(response)
+    security_event("authentication.ended", actor=_actor(request), detail="signed out")
+    return response
+
+
+# --- items 150, 151: retention, permanent deletion, and the backup -----------
+
+@router.get("/documents/{document_id}/settings", response_class=HTMLResponse)
+def settings(request: Request, document_id: str, error: str = "", ok: str = ""):
+    """7.12 Settings, for one model: policies, retention and deletion."""
+    result = _load(request, document_id)
+    return _templates(request).TemplateResponse(
+        request=request, name="settings.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "retention": RETENTION,
+            "scan": scan_state(request.app.state.storage_root, result),
+            "error": error,
+            "ok": ok,
+        },
+    )
+
+
+@router.post("/documents/{document_id}/delete")
+def delete_document(
+    request: Request,
+    document_id: str,
+    confirm_filename: str = Form(""),
+    reason: str = Form(""),
+    csrf_token: str = Form(""),
+):
+    """2.6.c's permanent deletion, behind 20.18's confirmation.
+
+    The confirmation is the filename typed back, not a button. A button is the
+    same gesture whatever it is attached to, and the gesture is what muscle
+    memory performs.
+    """
+    result = _load(request, document_id)
+    try:
+        stone = delete_permanently(
+            result, request.app.state.storage_root,
+            actor=_actor(request),
+            reason=reason,
+            typed_filename=confirm_filename,
+            store=_store(request),
+            repository=_repository(request),
+        )
+    except DeletionRefused as exc:
+        return RedirectResponse(
+            f"/documents/{document_id}/settings?error={quote(str(exc))}",
+            status_code=303,
+        )
+    security_event(
+        "document.deleted", actor=_actor(request), outcome="deleted",
+        document_id=document_id, detail=stone.reason,
+    )
+    return RedirectResponse(f"/?ok={quote(stone.describe())}", status_code=303)

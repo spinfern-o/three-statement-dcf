@@ -8,7 +8,7 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–14 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–15 of 17** |
 
 ## Status, stated plainly
 
@@ -24,7 +24,7 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4 to 14, items 39–144. A browser interface showing
+   specification Phases 4 to 15, items 39–153. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
@@ -145,7 +145,35 @@ the trip. Each carries its exact value in a cell note, is styled `Inexact`, and
 is counted on the cover tab — rather than being rounded away where nobody
 would notice.
 
-1186 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**There is a credential in front of it now.** Decision 2.2.c has required one
+since Phase 2 and it went unimplemented for ten phases, mitigated only by
+binding to localhost. Phase 15 built it — a password hashed with `scrypt` from
+the standard library, a signed session cookie expiring absolutely eight hours
+after sign-in, a CSRF token on every state-changing request, rate-limited
+sign-ins — and turned the mitigation into a refusal: the server will not bind
+anywhere but loopback without a credential configured. Without one it serves
+locally and says so on every page, because a reviewer who cannot tell whether
+the thing in front of them is protected will assume it is.
+
+**The security layer says what it does not do.** PDF parsing runs in a child
+process under memory, CPU and time limits, which contains a crash or a runaway
+allocation and is explicitly *not* a boundary against code execution. Uploads
+are scanned only if a scanner is configured, and with none the result is
+recorded as "not scanned" — never as clean. The rate limiters are per process
+and say so. The backup archive is not encrypted by the process that writes it,
+and its own manifest says so. All of it is in
+[`docs/incident-response.md`](docs/incident-response.md), before an incident
+rather than after, because a procedure that does not name its gaps is read as a
+guarantee it never made.
+
+**An untested backup is not a backup**, so the restore test is the deliverable:
+a snapshot carries a manifest of every file's SHA-256, and verifying it restores
+into a scratch directory and re-hashes everything. A tar that extracts proves
+the tar is well-formed, not that the bytes inside it are the bytes that went in.
+That verification runs in CI on every commit rather than quarterly on a
+calendar.
+
+1297 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -547,6 +575,24 @@ Exports (specification Phase 14, items 138–144):
 | `apps/api/app/exports/xlsx_export.py` | 140 | The workbook, and a note on every value a spreadsheet cannot hold |
 | `apps/api/app/exports/pdf_export.py` | 141 | 21.6's nine sections, drawn with the PDF library already here |
 | `apps/api/app/api/templates/exports.html` | — | The 7.11 screen |
+
+Security and operations (specification Phase 15, items 145–153):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/security/credentials.py` | 145 | A password hashed with `hashlib.scrypt`, held in the environment |
+| `apps/api/app/security/sessions.py` | 145 | A signed cookie with an absolute eight-hour life |
+| `apps/api/app/security/guard.py` | 145 | The middleware that defaults to closed, and replays the body |
+| `apps/api/app/security/csrf.py` | — | 20.12's token, derived from the session rather than stored |
+| `apps/api/app/security/authorization.py` | 146 | 20.7, where "not yours" answers exactly like "does not exist" |
+| `apps/api/app/security/sandbox.py` | 147 | PDF parsing in a child process, and what that does not buy |
+| `apps/api/app/security/scanning.py` | 147 | 20.9's hook, reporting "not scanned" rather than "clean" |
+| `apps/api/app/security/ratelimit.py` | 148 | 20.14, by window and by concurrency |
+| `apps/api/app/security/logging.py` | 149 | Identifiers, never values, redacted on the way out |
+| `apps/api/app/security/backup.py` | 150 | A snapshot, and the restore that re-hashes every byte |
+| `apps/api/app/security/retention.py` | 151 | 2.6.c's deletion, behind 20.18, leaving a tombstone |
+| `apps/api/app/security/repository_scan.py` | 152 | No source PDF and no secret in Git, checked in CI |
+| [`docs/incident-response.md`](docs/incident-response.md) | 153 | What to do, and what this system does not defend against |
 
 Documentation:
 

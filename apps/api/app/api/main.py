@@ -17,8 +17,13 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from model.disclaimer import DISCLAIMER
+
 from ..core.config import IngestionConfig
 from ..display import FILTERS as DISPLAY_FILTERS
+from ..security.credentials import Credential, signing_key
+from ..security.guard import install as install_guard
+from ..security.ratelimit import Limiters
 from ..extraction.storage import SourceStore
 from ..persistence.json_store import JsonDocumentRepository
 from .routes import router
@@ -31,8 +36,29 @@ OWNER = "spinfern-o"  # decision 2.1.c
 FOOTER = "Private model - not for distribution"  # decision 2.1.c
 
 
-def create_app(storage_root: str | Path, *, actor: str = "owner") -> FastAPI:
-    """Build the review application over one storage root."""
+def create_app(
+    storage_root: str | Path,
+    *,
+    actor: str = "owner",
+    credential: "Credential | None" = None,
+    key: bytes | None = None,
+    environ=None,
+) -> FastAPI:
+    """Build the review application over one storage root.
+
+    `credential` is 2.2.c's. Passed explicitly so a test can build a guarded
+    application without setting an environment variable, and read from the
+    environment when it is not -- never read at import time, because a module
+    that reads configuration on import cannot be imported by a test that has
+    not set the environment first.
+
+    **When no credential is configured the application still serves**, in
+    local-review mode, with a banner on every page saying so. That is not a way
+    to turn 2.2.c off: `review_server.py` refuses to bind anywhere but loopback
+    without one. The alternative -- refusing to start -- would be a development
+    experience somebody works around by commenting out the middleware, which is
+    the same hole with nobody watching it.
+    """
     root = Path(storage_root)
     root.mkdir(parents=True, exist_ok=True)
 
@@ -44,7 +70,11 @@ def create_app(storage_root: str | Path, *, actor: str = "owner") -> FastAPI:
     )
     templates = Jinja2Templates(directory=str(HERE / "templates"))
     templates.env.globals.update(
-        product_name=PRODUCT_NAME, owner=OWNER, footer=FOOTER
+        product_name=PRODUCT_NAME, owner=OWNER, footer=FOOTER,
+        # Section 25 requires this in the model, the release flow and the
+        # exports. One global rather than one string per template, so the
+        # three surfaces cannot drift apart.
+        disclaimer=DISCLAIMER,
     )
     # 4.18, 4.19 and 21.8: one display precision, registered once, so a
     # template cannot reach a different formatter by accident and an export
@@ -57,6 +87,15 @@ def create_app(storage_root: str | Path, *, actor: str = "owner") -> FastAPI:
     app.state.repository = JsonDocumentRepository(root)
     app.state.templates = templates
     app.state.actor = actor
+    app.state.credential = (
+        credential if credential is not None else Credential.load(environ)
+    )
+    app.state.signing_key = key or signing_key(environ)
+    app.state.limiters = Limiters.build()
+    templates.env.globals.update(
+        local_review=app.state.credential is None,
+    )
+    install_guard(app)
 
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
     app.mount("/tokens", StaticFiles(directory=str(PACKAGES / "design-tokens")), name="tokens")

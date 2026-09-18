@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Settings &middot; {{ document.sanitized_filename }} &middot; {{ product_name }}{% endblock %}
+{% block context %}Settings &middot; {{ document.sanitized_filename }}{% endblock %}
+
+{% block body %}
+<main id="main" class="layout">
+  <h1>Settings</h1>
+
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="notice notice-success" role="status">{{ ok }}</div>{% endif %}
+
+  {# --- 7.12.b: display units and precision ----------------------------- #}
+  <section class="card" aria-labelledby="precision-heading">
+    <h2 id="precision-heading">Display units and precision (7.12.b)</h2>
+    <p class="small">
+      Calculation precision and display precision are separate (4.18). Every
+      figure is computed and stored as an exact decimal; the screens show
+      currency at whole units, percentages to one place, ratios to four and
+      discount factors to six, and any figure that had to be rounded to be
+      shown carries its full stored value in a tooltip (4.19).
+    </p>
+    <p class="small muted">
+      These are fixed rather than configurable. A per-reader precision setting
+      would mean two people reading the same model see different numbers and
+      cite them to each other.
+    </p>
+  </section>
+
+  {# --- 7.12.c: permissions --------------------------------------------- #}
+  <section class="card" aria-labelledby="access-heading">
+    <h2 id="access-heading">Access (7.12.c)</h2>
+    <dl class="small">
+      <dt>Users</dt>
+      <dd>One &mdash; the owner (2.2.b).</dd>
+      <dt>Roles</dt>
+      <dd>
+        One: owner (2.2.d). 20.6 applies role-based access control
+        &ldquo;if multi-user&rdquo;, so it is not applicable here rather than
+        deferred.
+      </dd>
+      <dt>Authentication</dt>
+      <dd>
+        {% if local_review %}
+        <span class="badge badge-warning">not configured</span>
+        This server is in local-review mode and refuses to bind anywhere but
+        localhost.
+        {% else %}
+        <span class="badge badge-success">required</span>
+        A password and a signed session, expiring eight hours after sign-in
+        (2.2.c).
+        {% endif %}
+      </dd>
+      <dt>Authorization</dt>
+      <dd>
+        Checked server-side on every request, including reads, against the
+        owner recorded on the document itself (20.7). A document somebody else
+        owns answers exactly as one that does not exist.
+      </dd>
+      <dt>Upload scanning</dt>
+      <dd>
+        {% if scan.outcome.is_known %}
+        <span class="badge badge-success">configured</span> {{ scan.detail }}
+        {% else %}
+        <span class="badge badge-warning">none</span> {{ scan.describe() }}
+        {% endif %}
+      </dd>
+    </dl>
+  </section>
+
+  {# --- 7.12.d: retention and deletion ---------------------------------- #}
+  <section class="card" aria-labelledby="retention-heading">
+    <h2 id="retention-heading">Retention and deletion (7.12.d)</h2>
+    <dl class="small">
+      <dt>Retention</dt>
+      <dd>{{ retention }}</dd>
+      <dt>Backup</dt>
+      <dd>
+        Nightly snapshot with 30-day retention, encrypted by the storage layer
+        (2.6.d, 20.2). A restore is verified by re-hashing every file against
+        the archive&rsquo;s manifest, and that verification runs in the test
+        suite on every commit rather than quarterly on a calendar &mdash; an
+        untested backup is not a backup.
+        <br>
+        <span class="raw">python3 -m apps.api.app.security.backup --store var/sources --out snap.tgz</span>
+      </dd>
+      <dt>Source documents</dt>
+      <dd>
+        Never overwritten (rule 1.12). Deletion removes; it does not write over
+        evidence in place.
+      </dd>
+    </dl>
+  </section>
+
+  {# --- 2.6.c and 20.18: permanent deletion ----------------------------- #}
+  <section class="card" aria-labelledby="delete-heading">
+    <h2 id="delete-heading">Delete this model permanently (2.6.c)</h2>
+    <div class="notice notice-error" role="note">
+      <strong>This cannot be undone.</strong>
+      The stored PDF, every extracted fact, every mapping and every rendered
+      page are removed. What remains is a tombstone recording the identifier,
+      the hash, the filename, and who deleted it and why &mdash; so the audit
+      entries that reference this document still have something to point at.
+    </div>
+
+    <form method="post" action="/documents/{{ document.id }}/delete">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <p>
+        <label for="confirm_filename">
+          Type this model&rsquo;s filename to confirm:
+          <span class="raw">{{ document.sanitized_filename }}</span>
+        </label><br>
+        {# 20.18: no default value and no autofocus. The confirmation has to be
+           something the person read, not a gesture they performed. #}
+        <input type="text" id="confirm_filename" name="confirm_filename"
+               autocomplete="off" required style="width:100%;max-width:28rem">
+      </p>
+      <p>
+        <label for="reason">Why is it being deleted?</label><br>
+        <input type="text" id="reason" name="reason" required
+               style="width:100%;max-width:28rem">
+      </p>
+      <p><button type="submit">Delete permanently</button></p>
+    </form>
+  </section>
+</main>
+{% endblock %}
