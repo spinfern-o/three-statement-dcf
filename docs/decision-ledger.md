@@ -577,8 +577,38 @@ silently missing.
 > (10.14). Outside that range it is recorded as a document-level finding the
 > reviewer must acknowledge, listed by page, and no fact is created from it.
 
-That requires the source map, which is Phase 4 work, so the change cannot land
-before then. Until it does, the current behaviour stands.
+**The stated blocker is gone; a different one took its place.** This finding
+said the change needed the source map, which was Phase 4 work. Phase 4 shipped
+it: `api/bookmarks.py` bookmarks a page as a statement when a table's caption
+names one, and 10.14's source map exists.
+
+Re-read against the amendment, that is not the map the amendment asks for. The
+bookmarks are **system-proposed** -- derived from a caption, which
+`bookmarks.py` says out loud in its own docstring -- and the amendment is
+worded "a page range the **reviewer has mapped**". Nothing in the review flow
+asks a reviewer to confirm which pages hold which statement; `confirm_metadata`
+confirms metadata fields, not page ranges.
+
+So there are two ways forward and they are not equivalent, which is the point
+of writing them both down rather than picking one:
+
+1. **Build the confirmation step**, then implement the amendment as worded. A
+   reviewer states which pages are the statements and the relevant notes, and
+   an image-only page outside that range becomes a finding rather than a
+   refusal. This is the amendment's own logic and it needs new review UI.
+2. **Reword the amendment to key off the system-proposed bookmarks.** Cheaper,
+   and weaker in a specific way worth naming: a caption match would then decide
+   whether a whole filing is refused. A scanned page whose caption happens not
+   to match any pattern would be treated as outside the statements and waved
+   through, and a filing could lose a statement page silently. That is the
+   failure rule 1.3 exists to prevent, arrived at from the other direction.
+
+**Still the owner's call**, and now a call about three things rather than one:
+whether to relax the rule at all, and if so which of these two, and — for (2) —
+whether a caption guess is an acceptable basis for that decision.
+
+Until then the current behaviour stands, and it is the safe direction: it never
+produces a model with pages silently missing.
 
 ### F-12 — RESOLVED in Phase 3. The extraction lifecycle enumerations were OPEN
 
