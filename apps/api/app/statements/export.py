@@ -101,7 +101,20 @@ def _confirmed(result: ExtractionResult, name: str) -> str:
 
 def _fiscal_year_end(value: str) -> str:
     """`12-31` -> `December 31`, which is what STEP 1 asks a human to write."""
-    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
     try:
         month, day = value.split("-")
         return f"{months[int(month) - 1]} {int(day)}"
@@ -149,15 +162,20 @@ def build_engine_inputs(
     forecast = [f"{last_actual + n}E" for n in range(1, FORECAST_YEARS + 1)]
 
     profile = _profile_yaml(
-        name=name, period=f"FY{period_end[:4]}", year_end=year_end,
-        currency=currency, units=SCALE_TO_UNITS[scale], audited=audited,
-        document=label, pages=pages, historical=statements.years, forecast=forecast,
+        name=name,
+        period=f"FY{period_end[:4]}",
+        year_end=year_end,
+        currency=currency,
+        units=SCALE_TO_UNITS[scale],
+        audited=audited,
+        document=label,
+        pages=pages,
+        historical=statements.years,
+        forecast=forecast,
         gaps=gaps,
     )
     historical = _historical_yaml(statements, label)
-    return EngineInputs(
-        company_profile=profile, raw_historical=historical, source_map_gaps=gaps
-    )
+    return EngineInputs(company_profile=profile, raw_historical=historical, source_map_gaps=gaps)
 
 
 def _profile_yaml(**k) -> str:
@@ -222,10 +240,7 @@ def _historical_yaml(built: BuiltStatements, document: str) -> str:
 
     for block, statement, order in STATEMENT_BLOCKS:
         ledger = built.ledgers[statement]
-        present = [
-            code for code in order
-            if any(ledger.has(code, year) for year in built.years)
-        ]
+        present = [code for code in order if any(ledger.has(code, year) for year in built.years)]
         lines.append("")
         lines.append(f"{block}:")
         if not present:

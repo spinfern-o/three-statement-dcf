@@ -59,8 +59,14 @@ def sensitivity_grid(
                 continue
             shifted = _shift_wacc(base_cost_of_capital, w)
             valuation = run_dcf(
-                fcff_years, shifted, g, bridge, periods, diluted_shares,
-                shares_source, schedule,
+                fcff_years,
+                shifted,
+                g,
+                bridge,
+                periods,
+                diluted_shares,
+                shares_source,
+                schedule,
             )
             row.append(
                 SensitivityCell(

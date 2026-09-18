@@ -54,8 +54,10 @@ class Severity(str, Enum):
     @property
     def tone(self) -> str:
         return {
-            "CRITICAL": "danger", "ERROR": "danger",
-            "WARNING": "warning", "INFO": "neutral",
+            "CRITICAL": "danger",
+            "ERROR": "danger",
+            "WARNING": "warning",
+            "INFO": "neutral",
         }[self.value]
 
 
@@ -90,8 +92,7 @@ REGISTRY: tuple[Check, ...] = (
         severity=Severity.ERROR,
         forced=False,
         compares=(
-            "A SourceDocument.immutable_hash exists and matches a rehash "
-            "of the stored bytes"
+            "A SourceDocument.immutable_hash exists and matches a rehash of the stored bytes"
         ),
     ),
     Check(
@@ -99,20 +100,14 @@ REGISTRY: tuple[Check, ...] = (
         clause="17.2",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "Every required metadata field is CONFIRMED, not UNCONFIRMED "
-            "(10.11–10.13)"
-        ),
+        compares=("Every required metadata field is CONFIRMED, not UNCONFIRMED (10.11–10.13)"),
     ),
     Check(
         code="VAL-017-003",
         clause="17.3",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "Every period resolves to one unambiguous basis and date "
-            "range (1.7, 10.24)"
-        ),
+        compares=("Every period resolves to one unambiguous basis and date range (1.7, 10.24)"),
     ),
     Check(
         code="VAL-017-004",
@@ -120,8 +115,7 @@ REGISTRY: tuple[Check, ...] = (
         severity=Severity.ERROR,
         forced=False,
         compares=(
-            "reporting_currency and displayed_scale are confirmed for "
-            "every document (1.9, 1.10)"
+            "reporting_currency and displayed_scale are confirmed for every document (1.9, 1.10)"
         ),
     ),
     Check(
@@ -142,9 +136,7 @@ REGISTRY: tuple[Check, ...] = (
         clause="17.6",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "Every FactMapping has approved_by set (11.10–11.11)"
-        ),
+        compares=("Every FactMapping has approved_by set (11.10–11.11)"),
     ),
     Check(
         code="VAL-017-007",
@@ -152,8 +144,7 @@ REGISTRY: tuple[Check, ...] = (
         severity=Severity.ERROR,
         forced=False,
         compares=(
-            "No source fact contributes to a subtotal both directly and "
-            "through a component (11.6)"
+            "No source fact contributes to a subtotal both directly and through a component (11.6)"
         ),
     ),
     Check(
@@ -161,94 +152,70 @@ REGISTRY: tuple[Check, ...] = (
         clause="17.8",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "total_assets = total_liabilities + total_equity, every "
-            "historical period"
-        ),
+        compares=("total_assets = total_liabilities + total_equity, every historical period"),
     ),
     Check(
         code="VAL-017-009",
         clause="17.9",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "cash_(t−1) + CFO + CFI + CFF = cash_t, historical"
-        ),
+        compares=("cash_(t−1) + CFO + CFI + CFF = cash_t, historical"),
     ),
     Check(
         code="VAL-017-010",
         clause="17.10",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "Every reported subtotal equals its mapped components (11.7, "
-            "12.4.i)"
-        ),
+        compares=("Every reported subtotal equals its mapped components (11.7, 12.4.i)"),
     ),
     Check(
         code="VAL-017-011",
         clause="17.11",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "SCH-PPE-01 ending balance = ppe_net on the balance sheet"
-        ),
+        compares=("SCH-PPE-01 ending balance = ppe_net on the balance sheet"),
     ),
     Check(
         code="VAL-017-012",
         clause="17.12",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "SCH-INTANGIBLES ending balance = intangibles on the balance "
-            "sheet (13.3)"
-        ),
+        compares=("SCH-INTANGIBLES ending balance = intangibles on the balance sheet (13.3)"),
     ),
     Check(
         code="VAL-017-013",
         clause="17.13",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "SCH-DEBT-01 ending balance = debt on the balance sheet"
-        ),
+        compares=("SCH-DEBT-01 ending balance = debt on the balance sheet"),
     ),
     Check(
         code="VAL-017-014",
         clause="17.14",
         severity=Severity.WARNING,
         forced=False,
-        compares=(
-            "Tax schedule reconciles where data permits (13.6)"
-        ),
+        compares=("Tax schedule reconciles where data permits (13.6)"),
     ),
     Check(
         code="VAL-017-015",
         clause="17.15",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "Equity schedule reconciles (13.7)"
-        ),
+        compares=("Equity schedule reconciles (13.7)"),
     ),
     Check(
         code="VAL-017-016",
         clause="17.16",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "total_assets = total_liabilities + total_equity, every "
-            "forecast period"
-        ),
+        compares=("total_assets = total_liabilities + total_equity, every forecast period"),
     ),
     Check(
         code="VAL-017-017",
         clause="17.17",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "cash_(t−1) + CFO + CFI + CFF = cash_t, forecast"
-        ),
+        compares=("cash_(t−1) + CFO + CFI + CFF = cash_t, forecast"),
     ),
     Check(
         code="VAL-017-018",
@@ -256,54 +223,42 @@ REGISTRY: tuple[Check, ...] = (
         severity=Severity.CRITICAL,
         forced=True,
         forced_by="14.1: 'No forecast may calculate until all required assumptions have a status'",
-        compares=(
-            "No required forecast assumption is missing (14.1)"
-        ),
+        compares=("No required forecast assumption is missing (14.1)"),
     ),
     Check(
         code="VAL-017-019",
         clause="17.19",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "No assumption with status = Rejected is used (14.2)"
-        ),
+        compares=("No assumption with status = Rejected is used (14.2)"),
     ),
     Check(
         code="VAL-017-020",
         clause="17.20",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "No hardcoded number inside a forecast formula (1.17)"
-        ),
+        compares=("No hardcoded number inside a forecast formula (1.17)"),
     ),
     Check(
         code="VAL-017-021",
         clause="17.21",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "The formula graph contains no cycles (18.4–18.6)"
-        ),
+        compares=("The formula graph contains no cycles (18.4–18.6)"),
     ),
     Check(
         code="VAL-017-022",
         clause="17.22",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "DCF FCFF equals the three-statement FCFF bridge"
-        ),
+        compares=("DCF FCFF equals the three-statement FCFF bridge"),
     ),
     Check(
         code="VAL-017-023",
         clause="17.23",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "Every WACC component has a source **and a date**"
-        ),
+        compares=("Every WACC component has a source **and a date**"),
     ),
     Check(
         code="VAL-017-024",
@@ -311,18 +266,14 @@ REGISTRY: tuple[Check, ...] = (
         severity=Severity.CRITICAL,
         forced=True,
         forced_by="16.16, 1.18",
-        compares=(
-            "WACC > terminal_growth"
-        ),
+        compares=("WACC > terminal_growth"),
     ),
     Check(
         code="VAL-017-025",
         clause="17.25",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "Every enterprise-to-equity adjustment is sourced (16.19)"
-        ),
+        compares=("Every enterprise-to-equity adjustment is sourced (16.19)"),
     ),
     Check(
         code="VAL-017-026",
@@ -330,10 +281,7 @@ REGISTRY: tuple[Check, ...] = (
         severity=Severity.CRITICAL,
         forced=True,
         forced_by="16.20",
-        compares=(
-            "Diluted shares are nonzero and sourced before per-share "
-            "value is shown"
-        ),
+        compares=("Diluted shares are nonzero and sourced before per-share value is shown"),
     ),
     Check(
         code="VAL-017-027",
@@ -341,9 +289,7 @@ REGISTRY: tuple[Check, ...] = (
         severity=Severity.CRITICAL,
         forced=True,
         forced_by="17.27; 4.4",
-        compares=(
-            "No NaN, Infinity or null in a released calculation"
-        ),
+        compares=("No NaN, Infinity or null in a released calculation"),
     ),
     Check(
         code="VAL-017-028",
@@ -352,8 +298,7 @@ REGISTRY: tuple[Check, ...] = (
         forced=True,
         forced_by="4.20",
         compares=(
-            "Primary and independent benchmark results meet the Section 4 "
-            "tolerance (4.15–4.16)"
+            "Primary and independent benchmark results meet the Section 4 tolerance (4.15–4.16)"
         ),
     ),
     Check(
@@ -362,8 +307,7 @@ REGISTRY: tuple[Check, ...] = (
         severity=Severity.ERROR,
         forced=False,
         compares=(
-            "Every displayed rounded value ties to its full-precision "
-            "stored value (4.18, 4.19)"
+            "Every displayed rounded value ties to its full-precision stored value (4.18, 4.19)"
         ),
     ),
     Check(
@@ -371,10 +315,9 @@ REGISTRY: tuple[Check, ...] = (
         clause="17.30",
         severity=Severity.ERROR,
         forced=False,
-        compares=(
-            "Every released output has source and formula lineage (24.12)"
-        ),
-    ),)
+        compares=("Every released output has source and formula lineage (24.12)"),
+    ),
+)
 
 BY_CODE = {check.code: check for check in REGISTRY}
 BY_CLAUSE = {check.clause: check for check in REGISTRY}

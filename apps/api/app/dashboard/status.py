@@ -43,8 +43,13 @@ class ModelStatus(str, Enum):
     @property
     def rank(self) -> int:
         order = {
-            "Draft": 0, "Extracting": 1, "Needs Review": 2, "Validated": 3,
-            "Forecast Ready": 4, "Valuation Ready": 5, "Archived": 6,
+            "Draft": 0,
+            "Extracting": 1,
+            "Needs Review": 2,
+            "Validated": 3,
+            "Forecast Ready": 4,
+            "Valuation Ready": 5,
+            "Archived": 6,
         }
         return order[self.value]
 

@@ -41,7 +41,12 @@ from .sets import FactMapping, MappingSet, MappingType, SignNormalization
 #: Which statement a table belongs to, from its caption. Used to tell a
 #: cross-statement duplicate (net income on both) from a double count.
 _STATEMENT_PATTERNS = (
-    (StatementType.INCOME, re.compile(r"(?i)statements?\s+of\s+(operations|income|profit)|income\s+statement|profit\s+and\s+loss|gewinn|verlustrechnung")),
+    (
+        StatementType.INCOME,
+        re.compile(
+            r"(?i)statements?\s+of\s+(operations|income|profit)|income\s+statement|profit\s+and\s+loss|gewinn|verlustrechnung"
+        ),
+    ),
     (StatementType.BALANCE, re.compile(r"(?i)balance\s+sheets?|financial\s+position|bilanz")),
     (StatementType.CASHFLOW, re.compile(r"(?i)cash\s+flows?|kapitalfluss")),
 )
@@ -145,14 +150,8 @@ def normalize(
     ledger: dict = {}
     for (code, period, statement), pairs in grouped.items():
         contributions = [_contribution(fact, mapping) for fact, mapping in pairs]
-        unreadable = [
-            fact for (fact, _), value in zip(pairs, contributions) if value is None
-        ]
-        kind = (
-            MappingType.AGGREGATE
-            if len(pairs) > 1
-            else pairs[0][1].mapping_type
-        )
+        unreadable = [fact for (fact, _), value in zip(pairs, contributions) if value is None]
+        kind = MappingType.AGGREGATE if len(pairs) > 1 else pairs[0][1].mapping_type
 
         if unreadable:
             names = ", ".join(f"{f.raw_label!r} ({f.raw_value!r})" for f in unreadable)
@@ -198,8 +197,7 @@ def lookup(
         item = line_item(code)
         if len(item.statement_types) != 1:
             raise KeyError(
-                f"{code} appears on {len(item.statement_types)} statements; say "
-                f"which one you mean"
+                f"{code} appears on {len(item.statement_types)} statements; say which one you mean"
             )
         statement = item.statement_types[0]
     return ledger.get((code, period, statement))

@@ -90,7 +90,9 @@ def _skip(name: str, detail: str) -> CheckResult:
     return CheckResult(name, Status.SKIP, detail)
 
 
-def _balance_check(name: str, balance: Ledger, years: tuple[str, ...], tol: Tolerance) -> CheckResult:
+def _balance_check(
+    name: str, balance: Ledger, years: tuple[str, ...], tol: Tolerance
+) -> CheckResult:
     """STEP 6/21: Assets = Liabilities + Equity, every year."""
     breaks, checked = [], 0
     for year in years:
@@ -165,8 +167,12 @@ def _reported_subtotals_reconcile(
 
 
 def _cashflow_reconciliation(
-    name: str, balance: Ledger, cashflow: Ledger, periods: Periods,
-    years: tuple[str, ...], tol: Tolerance,
+    name: str,
+    balance: Ledger,
+    cashflow: Ledger,
+    periods: Periods,
+    years: tuple[str, ...],
+    tol: Tolerance,
 ) -> CheckResult:
     """STEP 22/37: beginning cash + CFO + CFI + CFF = ending balance-sheet cash."""
     breaks, checked = [], 0
@@ -196,7 +202,9 @@ def _cashflow_reconciliation(
     return _ok(name, f"{checked} year(s) reconcile")
 
 
-def _net_income_linkage(income: Ledger, cashflow: Ledger, years: tuple[str, ...], tol: Tolerance) -> CheckResult:
+def _net_income_linkage(
+    income: Ledger, cashflow: Ledger, years: tuple[str, ...], tol: Tolerance
+) -> CheckResult:
     """STEP 9: net income flows into the cash flow statement."""
     name = "Net income linkage (IS -> CF)"
     breaks, checked = [], 0
@@ -244,7 +252,9 @@ def _schedule_linkage(
     return _fail(name, "; ".join(breaks)) if breaks else _ok(name, f"{checked} year(s) tie")
 
 
-def _fcff_matches_forecast(fcff_years: list[FCFFYear], forecast: ForecastResult, tol: Tolerance) -> CheckResult:
+def _fcff_matches_forecast(
+    fcff_years: list[FCFFYear], forecast: ForecastResult, tol: Tolerance
+) -> CheckResult:
     """STEP 37: FCFF is built from the forecast, not assembled separately.
 
     Reads each term straight out of the statements and schedules rather than
@@ -279,7 +289,9 @@ def _fcff_matches_forecast(fcff_years: list[FCFFYear], forecast: ForecastResult,
                 continue
             actual = getattr(item, field_name)
             if not tol.close(actual, want):
-                breaks.append(f"{year}.{field_name}: FCFF holds {actual:,.4f} vs statement {want:,.4f}")
+                breaks.append(
+                    f"{year}.{field_name}: FCFF holds {actual:,.4f} vs statement {want:,.4f}"
+                )
 
         # And the assembled FCFF itself. Each term is checked by name rather
         # than with `all(v is not None for v in ...)`: the comprehension guards
@@ -287,14 +299,20 @@ def _fcff_matches_forecast(fcff_years: list[FCFFYear], forecast: ForecastResult,
         # operands below are not None -- and neither can a reader adding a
         # sixth term.
         if (
-            ebit is not None and tax_rate is not None and d_and_a is not None
-            and capex is not None and change_in_nwc is not None
+            ebit is not None
+            and tax_rate is not None
+            and d_and_a is not None
+            and capex is not None
+            and change_in_nwc is not None
         ):
             rebuilt = ebit * (D(1) - tax_rate) + d_and_a - capex - change_in_nwc
             if not tol.close(item.fcff, rebuilt):
                 breaks.append(f"{year}: FCFF {item.fcff:,.4f} vs rebuilt {rebuilt:,.4f}")
-    return _fail(name, "; ".join(breaks)) if breaks else _ok(
-        name, f"{len(fcff_years)} year(s) rebuilt from the statements and tie")
+    return (
+        _fail(name, "; ".join(breaks))
+        if breaks
+        else _ok(name, f"{len(fcff_years)} year(s) rebuilt from the statements and tie")
+    )
 
 
 def _no_forecast_hardcodes(forecast: ForecastResult) -> CheckResult:
@@ -302,7 +320,9 @@ def _no_forecast_hardcodes(forecast: ForecastResult) -> CheckResult:
     name = "No unintended forecast hardcodes"
     found = []
     for ledger in (forecast.income, forecast.balance, forecast.cashflow):
-        found += [f"{ledger.statement.value}.{c}" for c in ledger.hardcodes_in(forecast.periods.forecast)]
+        found += [
+            f"{ledger.statement.value}.{c}" for c in ledger.hardcodes_in(forecast.periods.forecast)
+        ]
     if found:
         return _fail(name, f"{len(found)} hardcoded forecast cell(s): {', '.join(found[:6])}")
     return _ok(name, "every forecast cell carries a driver")
@@ -333,16 +353,30 @@ def run_all_checks(
         _balance_check("Historical balance sheet balances", forecast.balance, hist, tol),
         _balance_check("Forecast balance sheet balances", forecast.balance, fore, tol),
         _cashflow_reconciliation(
-            "Historical cash flow reconciliation", forecast.balance, forecast.cashflow, periods, hist, tol
+            "Historical cash flow reconciliation",
+            forecast.balance,
+            forecast.cashflow,
+            periods,
+            hist,
+            tol,
         ),
         _subtotals_match_components(
             "Forecast cash flow reconciliation", forecast.cashflow, fore, tol
         ),
         _net_income_linkage(forecast.income, forecast.cashflow, all_years, tol),
-        _schedule_linkage("PP&E schedule linkage", forecast.ppe, forecast.balance, A.PPE_NET, fore, tol),
-        _schedule_linkage("Debt schedule linkage", forecast.debt, forecast.balance, A.DEBT, fore, tol),
         _schedule_linkage(
-            "Retained earnings linkage", forecast.retained_earnings, forecast.balance, A.RETAINED_EARNINGS, fore, tol
+            "PP&E schedule linkage", forecast.ppe, forecast.balance, A.PPE_NET, fore, tol
+        ),
+        _schedule_linkage(
+            "Debt schedule linkage", forecast.debt, forecast.balance, A.DEBT, fore, tol
+        ),
+        _schedule_linkage(
+            "Retained earnings linkage",
+            forecast.retained_earnings,
+            forecast.balance,
+            A.RETAINED_EARNINGS,
+            fore,
+            tol,
         ),
         _cashflow_reconciliation(
             "Ending cash linkage", forecast.balance, forecast.cashflow, periods, fore, tol

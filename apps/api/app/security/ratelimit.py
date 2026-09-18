@@ -37,11 +37,11 @@ from dataclasses import dataclass, field
 
 #: 20.14's four classes, with the limit each one gets and why.
 LIMITS = {
-    "authentication": (5, 300),   # 5 attempts per 5 minutes: a person who has
-                                  # typed it wrong five times is not typing.
-    "upload": (20, 3600),         # 20 filings an hour, for one reviewer.
-    "extraction": (20, 3600),     # extraction follows upload one-for-one.
-    "export": (60, 3600),         # a reader may reasonably re-download often.
+    "authentication": (5, 300),  # 5 attempts per 5 minutes: a person who has
+    # typed it wrong five times is not typing.
+    "upload": (20, 3600),  # 20 filings an hour, for one reviewer.
+    "extraction": (20, 3600),  # extraction follows upload one-for-one.
+    "export": (60, 3600),  # a reader may reasonably re-download often.
 }
 
 #: How many of the expensive operations may run at once. One, deliberately:
@@ -54,9 +54,7 @@ class RateLimited(Exception):
     """The caller has used its budget, and this says when it refills."""
 
     def __init__(self, retry_after: int, name: str) -> None:
-        super().__init__(
-            f"too many {name} requests; try again in {retry_after} second(s)"
-        )
+        super().__init__(f"too many {name} requests; try again in {retry_after} second(s)")
         self.retry_after = retry_after
         self.name = name
 
@@ -141,8 +139,7 @@ class Limiters:
     def build(cls) -> Limiters:
         return cls(
             **{
-                name: RateLimit(allowed, window, name)
-                for name, (allowed, window) in LIMITS.items()
+                name: RateLimit(allowed, window, name) for name, (allowed, window) in LIMITS.items()
             },
             jobs=Concurrency(name="export"),
         )

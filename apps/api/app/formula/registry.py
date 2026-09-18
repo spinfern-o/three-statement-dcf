@@ -137,9 +137,7 @@ class FormulaDefinition:
         Rewording a definition is an editorial change and must not make a
         stored calculation look stale; changing the expression must.
         """
-        return _digest(
-            self.code, str(self.version), self.tree.text(), self.output_unit
-        )
+        return _digest(self.code, str(self.version), self.tree.text(), self.output_unit)
 
     def describe(self) -> str:
         return (
@@ -217,9 +215,7 @@ class FormulaSet:
         )
 
 
-def calculation_fingerprint(
-    formulas: FormulaSet, inputs: dict[str, Decimal]
-) -> str:
+def calculation_fingerprint(formulas: FormulaSet, inputs: dict[str, Decimal]) -> str:
     """18.7: "Hash inputs and formula version for reproducibility."
 
     The same formulas over the same inputs hash the same; one changed digit

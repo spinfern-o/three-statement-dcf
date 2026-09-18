@@ -120,9 +120,7 @@ class Evidence:
     def describe(self) -> str:
         parts = []
         if self.document_id:
-            parts.append(
-                f"{self.document_id} p.{self.page}" if self.page else self.document_id
-            )
+            parts.append(f"{self.document_id} p.{self.page}" if self.page else self.document_id)
         if self.url:
             parts.append(self.url)
         if self.measured_over:
@@ -174,9 +172,7 @@ class Assumption:
             raise AssumptionError("an assumption needs a code (14.4.a)")
         if not self.name.strip():
             raise AssumptionError(f"{self.code}: an assumption needs a clear name (14.4.a)")
-        object.__setattr__(
-            self, "value", D(self.value, what=f"assumption {self.code!r} value")
-        )
+        object.__setattr__(self, "value", D(self.value, what=f"assumption {self.code!r} value"))
         try:
             unit_for(self.unit)
         except UnitError as exc:
@@ -186,8 +182,7 @@ class Assumption:
             ) from None
         if not isinstance(self.source_type, SourceType):
             raise AssumptionError(
-                f"{self.code}: source type must be one of "
-                f"{[s.value for s in SourceType]} (14.3)"
+                f"{self.code}: source type must be one of {[s.value for s in SourceType]} (14.3)"
             )
         if not isinstance(self.status, Status):
             raise AssumptionError(
@@ -220,8 +215,7 @@ class Assumption:
             )
         elif kind is SourceType.COMPANY_GUIDANCE:
             need(
-                (bool(evidence.document_id) and evidence.page is not None)
-                or bool(evidence.url),
+                (bool(evidence.document_id) and evidence.page is not None) or bool(evidence.url),
                 "a document and page, or a URL, are required",
                 "Guidance is a thing a company said somewhere on a date.",
             )
@@ -232,8 +226,12 @@ class Assumption:
                 "to be current (14.4.g).",
             )
         elif kind is SourceType.EXTERNAL_MARKET_DATA:
-            need(bool(evidence.url), "a URL is required", "2.5's market assumptions "
-                 "must be reproducible, and a number with no source is not.")
+            need(
+                bool(evidence.url),
+                "a URL is required",
+                "2.5's market assumptions "
+                "must be reproducible, and a number with no source is not.",
+            )
             need(
                 bool(evidence.date),
                 "an observation date is required",

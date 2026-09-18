@@ -86,6 +86,7 @@ def test_the_refusal_says_where_it_stopped():
 
 # --- the grammar ------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "formula,text",
     [

@@ -23,7 +23,10 @@ def test_a_coordinate_becomes_an_exact_decimal():
 def test_corners_are_normalized():
     box = BoundingBox.from_parser((300.5, 712.0, 72.0, 700.0))
     assert (box.x0, box.y0, box.x1, box.y1) == (
-        Decimal("72.000"), Decimal("700.000"), Decimal("300.500"), Decimal("712.000")
+        Decimal("72.000"),
+        Decimal("700.000"),
+        Decimal("300.500"),
+        Decimal("712.000"),
     )
 
 

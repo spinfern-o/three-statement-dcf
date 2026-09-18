@@ -52,6 +52,7 @@ from apps.api.tests.conftest import browser_client
 
 # --- item 147: 20.10, the isolated parser -----------------------------------
 
+
 def _add(a, b):
     return a + b
 
@@ -108,6 +109,7 @@ def test_a_bad_page_number_still_raises_index_error_through_the_sandbox(store, s
 
 # --- item 147: 20.9, scanning -----------------------------------------------
 
+
 def test_with_no_scanner_configured_the_result_is_not_clean(tmp_path):
     """The claim this module exists not to make."""
     result = scan(tmp_path, environ={})
@@ -160,6 +162,7 @@ def test_the_settings_page_reports_scanning_per_deployment_not_per_document(tmp_
 
 
 # --- item 150: the backup, and the restore that proves it -------------------
+
 
 @pytest.fixture
 def populated(tmp_path, stored):
@@ -258,9 +261,7 @@ def test_the_render_cache_is_not_backed_up(populated, tmp_path):
     assert not any(name.startswith("renders/") for name in manifest.files)
 
 
-def test_the_manifest_says_what_the_archive_contains_and_how_sensitive_it_is(
-    populated, tmp_path
-):
+def test_the_manifest_says_what_the_archive_contains_and_how_sensitive_it_is(populated, tmp_path):
     archive = tmp_path / "snap.tgz"
     snapshot(populated, archive)
     with tarfile.open(archive, "r:gz") as tar:
@@ -283,6 +284,7 @@ def test_the_backup_retention_is_the_confirmed_one():
 
 
 # --- item 151: retention and permanent deletion -----------------------------
+
 
 def test_retention_is_a_stated_decision_not_an_absence():
     assert "Indefinite until the owner deletes" in RETENTION
@@ -314,10 +316,13 @@ def test_a_confirmed_deletion_removes_the_bytes_and_leaves_a_tombstone(
     stored, store_root, store, repository
 ):
     stone = delete_permanently(
-        stored, store_root,
-        actor="owner", reason="the filing was withdrawn by the issuer",
+        stored,
+        store_root,
+        actor="owner",
+        reason="the filing was withdrawn by the issuer",
         typed_filename=stored.document.sanitized_filename,
-        store=store, repository=repository,
+        store=store,
+        repository=repository,
     )
     assert not store.path_for(stored.document.immutable_hash).exists()
     assert not (Path(repository.root) / f"{stored.document.id}.json").exists()
@@ -334,29 +339,39 @@ def test_the_tombstone_keeps_the_identifier_and_not_the_content(
     """The flagged interaction, answered: an audit entry naming this document
     still has something to point at, and nothing confidential survives."""
     stone = delete_permanently(
-        stored, store_root, actor="owner", reason="withdrawn",
+        stored,
+        store_root,
+        actor="owner",
+        reason="withdrawn",
         typed_filename=stored.document.sanitized_filename,
-        store=store, repository=repository,
+        store=store,
+        repository=repository,
     )
-    body = json.loads(
-        (Path(store_root) / "tombstones" / f"{stored.document.id}.json").read_text()
-    )
+    body = json.loads((Path(store_root) / "tombstones" / f"{stored.document.id}.json").read_text())
     assert body["document_id"] == stored.document.id
     assert body["immutable_hash"] == stored.document.immutable_hash
     assert set(body) == {
-        "audit_events_kept", "deleted_at", "deleted_by", "document_id",
-        "facts_removed", "immutable_hash", "reason", "sanitized_filename",
+        "audit_events_kept",
+        "deleted_at",
+        "deleted_by",
+        "document_id",
+        "facts_removed",
+        "immutable_hash",
+        "reason",
+        "sanitized_filename",
     }
     assert stone.audit_events_kept > 0
 
 
-def test_a_deleted_document_is_gone_from_the_application(
-    stored, store_root, store, repository
-):
+def test_a_deleted_document_is_gone_from_the_application(stored, store_root, store, repository):
     delete_permanently(
-        stored, store_root, actor="owner", reason="withdrawn",
+        stored,
+        store_root,
+        actor="owner",
+        reason="withdrawn",
         typed_filename=stored.document.sanitized_filename,
-        store=store, repository=repository,
+        store=store,
+        repository=repository,
     )
     with browser_client(create_app(store_root)) as client:
         assert client.get(f"/documents/{stored.document.id}").status_code == 404
@@ -370,18 +385,26 @@ def test_deleting_removes_the_render_cache_too(stored, store_root, store, reposi
     assert cached, "this assertion proved nothing; nothing was cached"
 
     delete_permanently(
-        stored, store_root, actor="owner", reason="withdrawn",
+        stored,
+        store_root,
+        actor="owner",
+        reason="withdrawn",
         typed_filename=stored.document.sanitized_filename,
-        store=store, repository=repository,
+        store=store,
+        repository=repository,
     )
     assert not list((Path(store_root) / "renders").rglob("*.png"))
 
 
 def test_tombstones_are_listed_in_order(stored, store_root, store, repository):
     delete_permanently(
-        stored, store_root, actor="owner", reason="withdrawn",
+        stored,
+        store_root,
+        actor="owner",
+        reason="withdrawn",
         typed_filename=stored.document.sanitized_filename,
-        store=store, repository=repository,
+        store=store,
+        repository=repository,
     )
     listed = tombstones(store_root)
     assert len(listed) == 1 and isinstance(listed[0], Tombstone)
@@ -399,6 +422,7 @@ def test_the_settings_screen_names_the_file_that_must_be_typed(client, stored):
 
 # --- items 152, 153: the scans and the procedure ----------------------------
 
+
 def test_no_source_pdf_and_no_secret_is_committed():
     """20.4 and item 166, as a check that runs rather than a box somebody ticks."""
     from apps.api.app.security.repository_scan import run
@@ -415,7 +439,8 @@ def test_the_scan_catches_a_pdf_that_is_not_an_accounted_for_fixture(tmp_path):
 
     repo = tmp_path / "repo"
     shutil.copytree(
-        ROOT, repo,
+        ROOT,
+        repo,
         ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "var"),
     )
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
@@ -434,7 +459,8 @@ def test_the_scan_catches_a_committed_secret(tmp_path):
 
     repo = tmp_path / "repo"
     shutil.copytree(
-        ROOT, repo,
+        ROOT,
+        repo,
         ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "var"),
     )
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
@@ -473,17 +499,18 @@ def test_the_incident_procedure_exists_and_names_the_residual_risks():
 
     body = (ROOT / "docs" / "incident-response.md").read_text()
     for required in (
-        "not a security boundary",     # the sandbox's own limits
-        "NOT SCANNED",                 # 20.9 with no scanner configured
-        "per process",                 # the rate limiters
+        "not a security boundary",  # the sandbox's own limits
+        "NOT SCANNED",  # 20.9 with no scanner configured
+        "per process",  # the rate limiters
         "encrypted by the process that writes it",  # the backup archive
-        "--verify",                    # the restore test, by command
+        "--verify",  # the restore test, by command
         "Rotate the signing key first",  # the order that matters in 4.1
     ):
         assert required in body, required
 
 
 # --- 20.19 and Section 25: the disclaimer, on every surface ------------------
+
 
 def test_the_disclaimer_is_section_25s_own_language():
     from model.disclaimer import DISCLAIMER, SENTENCES
@@ -503,18 +530,14 @@ def test_the_disclaimer_is_in_the_model(forecast_client):
     from model.disclaimer import DISCLAIMER
 
     for screen in ("", "/statements", "/valuation", "/exports"):
-        page = forecast_client.get(
-            f"/documents/{forecast_client.document_id}{screen}"
-        ).text
+        page = forecast_client.get(f"/documents/{forecast_client.document_id}{screen}").text
         assert DISCLAIMER in page, screen
 
 
 def test_the_disclaimer_is_in_the_release_flow(forecast_client):
     from model.disclaimer import DISCLAIMER
 
-    page = forecast_client.get(
-        f"/documents/{forecast_client.document_id}/diagnostics"
-    ).text
+    page = forecast_client.get(f"/documents/{forecast_client.document_id}/diagnostics").text
     assert DISCLAIMER in page
     # Inside the release-readiness card, where a reader deciding whether to
     # rely on the model is looking -- not only in the footer at the bottom.
@@ -529,9 +552,7 @@ def test_the_disclaimer_is_in_every_export(forecast_client):
     from model.disclaimer import DISCLAIMER
 
     document_id = forecast_client.document_id
-    body = json.loads(
-        forecast_client.get(f"/documents/{document_id}/exports/model.json").text
-    )
+    body = json.loads(forecast_client.get(f"/documents/{document_id}/exports/model.json").text)
     assert DISCLAIMER in body["limitations"]
 
     import io
@@ -544,7 +565,9 @@ def test_the_disclaimer_is_in_every_export(forecast_client):
     )
     assert any(
         isinstance(cell.value, str) and "not investment" in cell.value
-        for sheet in workbook for row in sheet.iter_rows() for cell in row
+        for sheet in workbook
+        for row in sheet.iter_rows()
+        for cell in row
     )
 
     report = pymupdf.open(
@@ -563,9 +586,10 @@ def test_the_cli_report_prints_it(tmp_path):
 
     root = Path(__file__).resolve().parents[4]
     completed = subprocess.run(
-        [sys.executable, "run_model.py",
-         "--company", "inputs/example/company.yaml"],
-        cwd=root, capture_output=True, text=True,
+        [sys.executable, "run_model.py", "--company", "inputs/example/company.yaml"],
+        cwd=root,
+        capture_output=True,
+        text=True,
     )
     completed.stdout + completed.stderr
     # The example inputs ship blank, so the engine halts -- which is the

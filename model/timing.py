@@ -177,9 +177,7 @@ def build_schedule(
             "calculation context."
         )
     elif timing is Timing.MID_YEAR:
-        fractions = tuple(
-            D(index + 1) - D("0.5") for index in range(len(forecast_years))
-        )
+        fractions = tuple(D(index + 1) - D("0.5") for index in range(len(forecast_years)))
         basis = (
             "Mid-year: t = 0.5, 1.5, 2.5 ... Cash is assumed to arrive evenly "
             "through each year. This RAISES every present value against the "

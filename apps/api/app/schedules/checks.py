@@ -37,9 +37,7 @@ def _result(name: str, status: Status, detail: str = "") -> CheckResult:
     return CheckResult(name, status, detail)
 
 
-def _difference(
-    reconciliation: Reconciliation, computed: Decimal, reported: Decimal
-) -> str:
+def _difference(reconciliation: Reconciliation, computed: Decimal, reported: Decimal) -> str:
     """One failure, written so a reviewer can go and find it in the filing.
 
     `computed` and `reported` are passed in rather than read off the
@@ -67,13 +65,15 @@ def reconcile(schedule: Schedule, tol: Tolerance) -> CheckResult:
 
     if schedule.availability is Availability.UNAVAILABLE:
         return _result(
-            name, Status.SKIP,
+            name,
+            Status.SKIP,
             f"this schedule could not be built, so there is nothing to reconcile. "
             f"{schedule.reason}",
         )
     if not schedule.reconciliations:
         return _result(
-            name, Status.SKIP,
+            name,
+            Status.SKIP,
             "the schedule covers no period that can be reconciled -- a "
             "reconciliation needs a closing balance and the movements into it",
         )
@@ -97,9 +97,9 @@ def reconcile(schedule: Schedule, tol: Tolerance) -> CheckResult:
 
     if not checked:
         return _result(
-            name, Status.SKIP,
-            "no period has both a schedule figure and a reported one: "
-            + "; ".join(skipped),
+            name,
+            Status.SKIP,
+            "no period has both a schedule figure and a reported one: " + "; ".join(skipped),
         )
     if failures:
         return _result(name, Status.FAIL, " | ".join(failures))
@@ -107,16 +107,13 @@ def reconcile(schedule: Schedule, tol: Tolerance) -> CheckResult:
     exact = checked - len(within_tolerance)
     detail = f"{exact} period(s) tie exactly"
     if within_tolerance:
-        detail += (
-            f"; {len(within_tolerance)} within {tol.describe()} but not exact: "
-            + " | ".join(within_tolerance)
+        detail += f"; {len(within_tolerance)} within {tol.describe()} but not exact: " + " | ".join(
+            within_tolerance
         )
     if skipped:
         detail += f"; not checked: {', '.join(skipped)}"
     if schedule.availability is Availability.PARTIAL:
-        detail += (
-            f". The schedule is partial: {schedule.reason}"
-        )
+        detail += f". The schedule is partial: {schedule.reason}"
     return _result(name, Status.PASS, detail)
 
 
@@ -131,7 +128,8 @@ def interest_basis_is_stated(schedules: ScheduleSet, tol: Tolerance) -> CheckRes
     name = "Interest basis is stated and matches the forecast (13.4)"
     if not schedules.interest:
         return _result(
-            name, Status.SKIP,
+            name,
+            Status.SKIP,
             "no period has a prior-period debt balance to imply a rate from",
         )
     from .interest import ENGINE_BASIS
@@ -142,7 +140,8 @@ def interest_basis_is_stated(schedules: ScheduleSet, tol: Tolerance) -> CheckRes
     engine_rates = [(row.year, row.on(ENGINE_BASIS)) for row in schedules.interest]
     if any(rate is None for _year, rate in engine_rates):
         return _result(
-            name, Status.FAIL,
+            name,
+            Status.FAIL,
             f"the basis model/forecast.py uses ({ENGINE_BASIS} debt) is not among "
             "the bases this schedule reports, so the historical rate and the "
             "forecast rate are not the same measurement",
@@ -151,14 +150,14 @@ def interest_basis_is_stated(schedules: ScheduleSet, tol: Tolerance) -> CheckRes
     computed = [rate for _year, rate in present if rate.rate is not None]
     if not computed:
         return _result(
-            name, Status.SKIP,
+            name,
+            Status.SKIP,
             f"the {ENGINE_BASIS}-debt rate could not be computed for any period: "
-            + "; ".join(
-                f"{year} ({rate.unavailable_reason})" for year, rate in present
-            ),
+            + "; ".join(f"{year} ({rate.unavailable_reason})" for year, rate in present),
         )
     return _result(
-        name, Status.PASS,
+        name,
+        Status.PASS,
         f"interest is stated on {ENGINE_BASIS} debt, which is what "
         f"model/forecast.py charges (STEP 19); {len(computed)} period(s) computed, "
         "with the average-debt rate shown alongside and not used",
@@ -178,22 +177,27 @@ def unavailable_schedules_are_explained(schedules: ScheduleSet, tol: Tolerance) 
     missing = [s for s in schedules.unavailable if not s.reason]
     if missing:
         return _result(
-            name, Status.FAIL,
+            name,
+            Status.FAIL,
             "unavailable without a stated reason: " + ", ".join(s.key for s in missing),
         )
     if not schedules.unavailable:
         return _result(name, Status.PASS, "all seven schedules were built")
     return _result(
-        name, Status.PASS,
+        name,
+        Status.PASS,
         f"{len(schedules.unavailable)} of {len(schedules.all)} could not be built "
-        "and each says why: "
-        + "; ".join(f"{s.title} ({s.rule})" for s in schedules.unavailable),
+        "and each says why: " + "; ".join(f"{s.title} ({s.rule})" for s in schedules.unavailable),
     )
 
 
 #: The order the schedules screen reads them in.
 RECONCILED = (
-    "working_capital", "ppe", "debt", "retained_earnings", "common_equity",
+    "working_capital",
+    "ppe",
+    "debt",
+    "retained_earnings",
+    "common_equity",
 )
 
 
@@ -213,6 +217,5 @@ def summarize(results: tuple[CheckResult, ...]) -> str:
     for result in results:
         counts[result.status] += 1
     return (
-        f"{counts[Status.PASS]} passed, {counts[Status.FAIL]} failed, "
-        f"{counts[Status.SKIP]} skipped"
+        f"{counts[Status.PASS]} passed, {counts[Status.FAIL]} failed, {counts[Status.SKIP]} skipped"
     )

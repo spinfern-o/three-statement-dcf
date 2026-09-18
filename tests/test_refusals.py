@@ -81,8 +81,17 @@ def test_step10_duplicate_assumption_rejected():
 def test_step11_conflict_must_choose_a_recorded_source():
     """STEP 11: explicitly choose which source the model uses."""
     with pytest.raises(ProvenanceError, match="chosen"):
-        Conflict("capex", "10-K", "2026-02-01", "120", "Deck", "2026-03-15", "140",
-                 chosen="A third source", rationale="because")
+        Conflict(
+            "capex",
+            "10-K",
+            "2026-02-01",
+            "120",
+            "Deck",
+            "2026-03-15",
+            "140",
+            chosen="A third source",
+            rationale="because",
+        )
 
 
 def test_step8_schedule_refuses_to_break_its_chain():
@@ -119,7 +128,9 @@ def test_step31_wacc_must_exceed_terminal_growth(loaded):
     coc = CostOfCapital("0.042", "1.1", "0.055", "0.055", "0.24", "4000", "1000", sources)
     years = [FCFFYear("2026E", D("200"), D("0.24"), D("80"), D("100"), D("15"))]
     with pytest.raises(ProvenanceError, match="must exceed"):
-        run_dcf(years, coc, terminal_growth=D("0.50"), bridge=EquityBridge("0", "0"), periods=periods)
+        run_dcf(
+            years, coc, terminal_growth=D("0.50"), bridge=EquityBridge("0", "0"), periods=periods
+        )
 
 
 def test_step35_share_count_requires_a_source():
@@ -129,7 +140,15 @@ def test_step35_share_count_requires_a_source():
     coc = CostOfCapital("0.042", "1.1", "0.055", "0.055", "0.24", "4000", "1000", sources)
     years = [FCFFYear("2026E", D("200"), D("0.24"), D("80"), D("100"), D("15"))]
     with pytest.raises(ProvenanceError, match="source and date"):
-        run_dcf(years, coc, D("0.025"), EquityBridge("0", "0"), periods, diluted_shares=D("100"), shares_source="")
+        run_dcf(
+            years,
+            coc,
+            D("0.025"),
+            EquityBridge("0", "0"),
+            periods,
+            diluted_shares=D("100"),
+            shares_source="",
+        )
 
 
 # --- regressions for bugs found after the Decimal port --------------------
@@ -147,14 +166,18 @@ def test_f6_tolerance_flags_accept_a_decimal_string():
     root = _Path(__file__).resolve().parent.parent
     ok = subprocess.run(
         [sys.executable, "run_model.py", "--inputs", "tests/fixtures", "--rel-tol", "1e-8"],
-        cwd=root, capture_output=True, text=True,
+        cwd=root,
+        capture_output=True,
+        text=True,
     )
     assert ok.returncode == 0, ok.stderr
     assert "PrecisionError" not in ok.stderr
 
     bad = subprocess.run(
         [sys.executable, "run_model.py", "--inputs", "tests/fixtures", "--rel-tol", "banana"],
-        cwd=root, capture_output=True, text=True,
+        cwd=root,
+        capture_output=True,
+        text=True,
     )
     assert bad.returncode == 2, "an unparseable tolerance should exit 2, not traceback"
     assert "Traceback" not in bad.stderr
@@ -194,9 +217,18 @@ def test_f7b_report_survives_an_undefined_terminal_value_share():
     from model.profile import Periods
 
     valuation = Valuation(
-        Periods(("2024A", "2025A"), ("2026E",)), [], Decimal("0.02"), Decimal("0.1"),
-        Decimal(0), Decimal(0), Decimal(0), Decimal(0), Decimal(0),
-        EquityBridge("0", "0"), None, None,
+        Periods(("2024A", "2025A"), ("2026E",)),
+        [],
+        Decimal("0.02"),
+        Decimal("0.1"),
+        Decimal(0),
+        Decimal(0),
+        Decimal(0),
+        Decimal(0),
+        Decimal(0),
+        EquityBridge("0", "0"),
+        None,
+        None,
     )
     assert valuation.tv_share_of_ev is None
     text = report.valuation_block(valuation)  # must not raise
@@ -225,11 +257,18 @@ def test_f7c_dividends_reject_two_declared_methods():
         income.set_reported("cogs", year, Figure("500", year, src))
         income.set_reported("operating_expenses", year, Figure("200", year, src))
         for acct, value in (
-            ("cash", "100"), ("accounts_receivable", "100"), ("inventory", "50"),
-            ("other_current_assets", "10"), ("ppe_net", "500"), ("other_noncurrent_assets", "40"),
-            ("accounts_payable", "60"), ("other_current_liabilities", "30"),
-            ("debt", "200"), ("other_noncurrent_liabilities", "10"),
-            ("common_equity", "200"), ("retained_earnings", "300"),
+            ("cash", "100"),
+            ("accounts_receivable", "100"),
+            ("inventory", "50"),
+            ("other_current_assets", "10"),
+            ("ppe_net", "500"),
+            ("other_noncurrent_assets", "40"),
+            ("accounts_payable", "60"),
+            ("other_current_liabilities", "30"),
+            ("debt", "200"),
+            ("other_noncurrent_liabilities", "10"),
+            ("common_equity", "200"),
+            ("retained_earnings", "300"),
         ):
             balance.set_reported(acct, year, Figure(value, year, src))
     for ledger in (income, balance, cashflow):
@@ -241,13 +280,19 @@ def test_f7c_dividends_reject_two_declared_methods():
         assumptions.add(Assumption(name, value, Basis.MODEL_ASSUMPTION, "test", year))
 
     for name, value in (
-        ("revenue_growth", "0.05"), ("cogs_pct_revenue", "0.5"), ("opex_pct_revenue", "0.2"),
-        ("dso", "36.5"), ("inventory_days", "36.5"), ("dpo", "36.5"),
+        ("revenue_growth", "0.05"),
+        ("cogs_pct_revenue", "0.5"),
+        ("opex_pct_revenue", "0.2"),
+        ("dso", "36.5"),
+        ("inventory_days", "36.5"),
+        ("dpo", "36.5"),
         ("other_current_assets_pct_revenue", "0.01"),
         ("other_current_liabilities_pct_revenue", "0.03"),
-        ("depreciation_pct_beginning_ppe", "0.1"), ("capex_pct_revenue", "0.1"),
+        ("depreciation_pct_beginning_ppe", "0.1"),
+        ("capex_pct_revenue", "0.1"),
         ("interest_rate_on_debt", "0.05"),
-        ("dividend_payout_ratio", "0.1"), ("dividends_amount", "5"),
+        ("dividend_payout_ratio", "0.1"),
+        ("dividends_amount", "5"),
     ):
         add(name, value)
     taxes = TaxSchedule("statutory", {"2026E": "0.25"})

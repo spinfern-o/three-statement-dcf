@@ -97,7 +97,9 @@ class Conflict:
                 "STEP 11 requires explicitly choosing which one the model uses."
             )
         if not self.rationale.strip():
-            raise ProvenanceError(f"Conflict {self.topic!r}: a rationale for the choice is required (STEP 11)")
+            raise ProvenanceError(
+                f"Conflict {self.topic!r}: a rationale for the choice is required (STEP 11)"
+            )
 
     def describe(self) -> str:
         return (
@@ -153,7 +155,9 @@ class Assumptions:
 
     def unused(self) -> list[str]:
         """Declared but never read -- usually a typo or a stale driver."""
-        return sorted(f"{n} [{y or 'all years'}]" for (n, y) in self._items if (n, y) not in self._used)
+        return sorted(
+            f"{n} [{y or 'all years'}]" for (n, y) in self._items if (n, y) not in self._used
+        )
 
     def by_basis(self) -> dict[Basis, list[Assumption]]:
         """STEP 10: report the three categories separately."""

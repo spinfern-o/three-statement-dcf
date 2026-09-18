@@ -82,7 +82,9 @@ def nav_items(
     """The left navigation for one model, or the portfolio when there is none."""
     items = [
         NavItem(
-            label="Portfolio", href="/", glyph="0",
+            label="Portfolio",
+            href="/",
+            glyph="0",
             current=(current == "portfolio"),
         )
     ]
@@ -91,9 +93,7 @@ def nav_items(
 
     for label, suffix, glyph in SECTIONS:
         needed = REQUIRES.get(label)
-        reachable = (
-            status is None or needed is None or status.rank >= needed.rank
-        )
+        reachable = status is None or needed is None or status.rank >= needed.rank
         items.append(
             NavItem(
                 label=label,

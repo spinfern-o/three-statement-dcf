@@ -18,8 +18,11 @@ from apps.api.app.mapping.sets import (
 
 def _proposed(fact_id="f1", code="revenue"):
     return proposal(
-        fact_id=fact_id, code=code, rule="the whole label is a revenue line",
-        score=Decimal("0.95"), note="system proposal",
+        fact_id=fact_id,
+        code=code,
+        rule="the whole label is a revenue line",
+        score=Decimal("0.95"),
+        note="system proposal",
     )
 
 
@@ -63,11 +66,22 @@ def test_approving_records_who_and_when():
 
 def test_a_fact_is_approved_only_when_all_its_mappings_are():
     """A split produces several mappings; approving one is not approving it."""
-    a = manual(fact_id="f1", code="revenue", note="n", mapping_type=MappingType.SPLIT,
-               allocation_amount=Decimal("10"), allocation_basis="note 3")
-    b = manual(fact_id="f1", code="other_income_expense", note="n",
-               mapping_type=MappingType.SPLIT, allocation_amount=Decimal("5"),
-               allocation_basis="note 3")
+    a = manual(
+        fact_id="f1",
+        code="revenue",
+        note="n",
+        mapping_type=MappingType.SPLIT,
+        allocation_amount=Decimal("10"),
+        allocation_basis="note 3",
+    )
+    b = manual(
+        fact_id="f1",
+        code="other_income_expense",
+        note="n",
+        mapping_type=MappingType.SPLIT,
+        allocation_amount=Decimal("5"),
+        allocation_basis="note 3",
+    )
     subject = MappingSet.empty().add(a, b, actor="owner", reason="split")
     assert not subject.is_approved("f1")
     subject = subject.update(a.approve(actor="owner", note="ok"), actor="owner", reason="half")
@@ -77,10 +91,11 @@ def test_a_fact_is_approved_only_when_all_its_mappings_are():
 
 
 def test_a_rejected_mapping_does_not_make_a_fact_verified():
-    """"I looked at this and it is not a statement line" is worth recording,
+    """ "I looked at this and it is not a statement line" is worth recording,
     and it is not a verified figure IN the model."""
-    rejected = manual(fact_id="f1", code="revenue", note="a page number",
-                      mapping_type=MappingType.REJECTED).approve(actor="owner", note="not a line")
+    rejected = manual(
+        fact_id="f1", code="revenue", note="a page number", mapping_type=MappingType.REJECTED
+    ).approve(actor="owner", note="not a line")
     subject = MappingSet.empty().add(rejected, actor="owner", reason="rejected")
     assert subject.is_excluded("f1")
     assert not subject.is_approved("f1")
@@ -88,9 +103,7 @@ def test_a_rejected_mapping_does_not_make_a_fact_verified():
 
 def test_replacing_a_facts_mappings_drops_the_old_ones():
     subject = MappingSet.empty().add(_proposed(), actor="system", reason="proposals")
-    subject = subject.replace_fact(
-        "f1", _proposed(code="cogs"), actor="owner", reason="corrected"
-    )
+    subject = subject.replace_fact("f1", _proposed(code="cogs"), actor="owner", reason="corrected")
     assert [m.canonical_code for m in subject.for_fact("f1")] == ["cogs"]
 
 

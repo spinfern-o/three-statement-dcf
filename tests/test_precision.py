@@ -109,19 +109,32 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
 
     tax = {k: _d(v) for k, v in asm["tax"]["rates"].items()}
     fy = list(loaded["periods"].forecast)
-    bs = {a: {y: _d(v) for y, v in blk["values"].items()} for a, blk in raw["balance_sheet"].items()}
-    ist = {a: {y: _d(v) for y, v in blk["values"].items()} for a, blk in raw["income_statement"].items()}
+    bs = {
+        a: {y: _d(v) for y, v in blk["values"].items()} for a, blk in raw["balance_sheet"].items()
+    }
+    ist = {
+        a: {y: _d(v) for y, v in blk["values"].items()}
+        for a, blk in raw["income_statement"].items()
+    }
 
     one = Decimal(1)
     days = Decimal(365)
 
     prev = dict(
-        revenue=ist["revenue"]["2025A"], ppe=bs["ppe_net"]["2025A"], debt=bs["debt"]["2025A"],
-        re=bs["retained_earnings"]["2025A"], cash=bs["cash"]["2025A"],
+        revenue=ist["revenue"]["2025A"],
+        ppe=bs["ppe_net"]["2025A"],
+        debt=bs["debt"]["2025A"],
+        re=bs["retained_earnings"]["2025A"],
+        cash=bs["cash"]["2025A"],
         common=bs["common_equity"]["2025A"],
-        onca=bs["other_noncurrent_assets"]["2025A"], oncl=bs["other_noncurrent_liabilities"]["2025A"],
-        nwc=(bs["accounts_receivable"]["2025A"] + bs["inventory"]["2025A"] + bs["other_current_assets"]["2025A"])
-            - (bs["accounts_payable"]["2025A"] + bs["other_current_liabilities"]["2025A"]),
+        onca=bs["other_noncurrent_assets"]["2025A"],
+        oncl=bs["other_noncurrent_liabilities"]["2025A"],
+        nwc=(
+            bs["accounts_receivable"]["2025A"]
+            + bs["inventory"]["2025A"]
+            + bs["other_current_assets"]["2025A"]
+        )
+        - (bs["accounts_payable"]["2025A"] + bs["other_current_liabilities"]["2025A"]),
     )
 
     worst = Decimal(0)
@@ -131,7 +144,9 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
     def check(label, mine, theirs):
         nonlocal worst, compared
         assert theirs is not None, f"{label}: engine produced nothing, expected {mine!r}"
-        assert isinstance(theirs, Decimal), f"{label}: engine returned {type(theirs).__name__}, not Decimal"
+        assert isinstance(theirs, Decimal), (
+            f"{label}: engine returned {type(theirs).__name__}, not Decimal"
+        )
         compared += 1
         if mine != theirs:
             inexact.append(f"{label}: benchmark {mine} vs engine {theirs}")
@@ -146,8 +161,11 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
         check(f"hist {year}.gross_profit", gp, loaded["income"].get(A.GROSS_PROFIT, year))
         check(f"hist {year}.ebit", ebit_h, loaded["income"].get(A.EBIT, year))
         check(f"hist {year}.pretax", pretax_h, loaded["income"].get(A.PRETAX_INCOME, year))
-        check(f"hist {year}.net_income", pretax_h - ist["taxes"][year],
-              loaded["income"].get(A.NET_INCOME, year))
+        check(
+            f"hist {year}.net_income",
+            pretax_h - ist["taxes"][year],
+            loaded["income"].get(A.NET_INCOME, year),
+        )
 
     for year in fy:
         rev = prev["revenue"] * (one + drv("revenue_growth", year))
@@ -182,7 +200,9 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
         retained = prev["re"] + net_income - dividends
         common = prev["common"] + sbc - buybacks
 
-        oo, oi, of_ = (opt(k, year) for k in ("other_operating", "other_investing", "other_financing"))
+        oo, oi, of_ = (
+            opt(k, year) for k in ("other_operating", "other_investing", "other_financing")
+        )
         cfo = net_income + dep + sbc - dnwc + oo
         cfi = -capex - opt("acquisitions", year) + disposals + oi
         cff = issuance - repayment - buybacks - dividends + of_
@@ -207,17 +227,33 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
         check(f"BS {year}.other_cl", ocl, forecast.balance.get(A.OTHER_CURRENT_LIABILITIES, year))
         check(f"BS {year}.ppe", ppe, forecast.balance.get(A.PPE_NET, year))
         check(f"BS {year}.debt", debt, forecast.balance.get(A.DEBT, year))
-        check(f"BS {year}.retained_earnings", retained, forecast.balance.get(A.RETAINED_EARNINGS, year))
+        check(
+            f"BS {year}.retained_earnings",
+            retained,
+            forecast.balance.get(A.RETAINED_EARNINGS, year),
+        )
         check(f"BS {year}.common_equity", common, forecast.balance.get(A.COMMON_EQUITY, year))
         check(f"BS {year}.other_nca", onca, forecast.balance.get(A.OTHER_NONCURRENT_ASSETS, year))
-        check(f"BS {year}.other_ncl", oncl, forecast.balance.get(A.OTHER_NONCURRENT_LIABILITIES, year))
-        check(f"BS {year}.total_assets", cash + ar + inv + oca + ppe + onca,
-              forecast.balance.get(A.TOTAL_ASSETS, year))
-        check(f"BS {year}.total_liabilities", ap + ocl + debt + oncl,
-              forecast.balance.get(A.TOTAL_LIABILITIES, year))
-        check(f"BS {year}.total_equity", common + retained, forecast.balance.get(A.TOTAL_EQUITY, year))
+        check(
+            f"BS {year}.other_ncl", oncl, forecast.balance.get(A.OTHER_NONCURRENT_LIABILITIES, year)
+        )
+        check(
+            f"BS {year}.total_assets",
+            cash + ar + inv + oca + ppe + onca,
+            forecast.balance.get(A.TOTAL_ASSETS, year),
+        )
+        check(
+            f"BS {year}.total_liabilities",
+            ap + ocl + debt + oncl,
+            forecast.balance.get(A.TOTAL_LIABILITIES, year),
+        )
+        check(
+            f"BS {year}.total_equity", common + retained, forecast.balance.get(A.TOTAL_EQUITY, year)
+        )
 
-        check(f"CF {year}.depreciation", dep, forecast.cashflow.get(A.DEPRECIATION_AMORTIZATION, year))
+        check(
+            f"CF {year}.depreciation", dep, forecast.cashflow.get(A.DEPRECIATION_AMORTIZATION, year)
+        )
         check(f"CF {year}.capex", -capex, forecast.cashflow.get(A.CAPEX, year))
         check(f"CF {year}.cfo", cfo, forecast.cashflow.get(A.CFO, year))
         check(f"CF {year}.cfi", cfi, forecast.cashflow.get(A.CFI, year))
@@ -228,15 +264,27 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
         check(f"SCH {year}.re", retained, forecast.retained_earnings.ending(year))
         check(f"SCH {year}.nwc", nwc, forecast.working_capital.nwc(year))
 
-        prev = dict(revenue=rev, ppe=ppe, debt=debt, re=retained, cash=cash,
-                    common=common, onca=onca, oncl=oncl, nwc=nwc)
+        prev = dict(
+            revenue=rev,
+            ppe=ppe,
+            debt=debt,
+            re=retained,
+            cash=cash,
+            common=common,
+            onca=onca,
+            oncl=oncl,
+            nwc=nwc,
+        )
 
     for i, year in enumerate(fy):
         terms = forecast.fcff_inputs(year)
         nopat = terms["ebit"] * (one - terms["tax_rate"])
         check(f"FCFF {year}.nopat", nopat, fcff_years[i].nopat)
-        check(f"FCFF {year}", nopat + terms["d_and_a"] - terms["capex"] - terms["change_in_nwc"],
-              fcff_years[i].fcff)
+        check(
+            f"FCFF {year}",
+            nopat + terms["d_and_a"] - terms["capex"] - terms["change_in_nwc"],
+            fcff_years[i].fcff,
+        )
 
     coc = val["cost_of_capital"]
     ke = _d(coc["risk_free_rate"]) + _d(coc["beta"]) * _d(coc["equity_risk_premium"])
@@ -263,9 +311,11 @@ def test_independent_recomputation(loaded, forecast, fcff_years, valuation):
     check("terminal_value", tv, valuation.terminal_value)
     check("pv_terminal_value", pvtv, valuation.pv_terminal_value)
     check("enterprise_value", pv + pvtv, valuation.enterprise_value)
-    check("equity_value",
-          pv + pvtv + _d(val["equity_bridge"]["cash"]) - _d(val["equity_bridge"]["debt"]),
-          valuation.equity_value)
+    check(
+        "equity_value",
+        pv + pvtv + _d(val["equity_bridge"]["cash"]) - _d(val["equity_bridge"]["debt"]),
+        valuation.equity_value,
+    )
 
     assert compared >= 180, f"expected a broad comparison, only made {compared}"
     # Exact decimal arithmetic on both sides: the engine should agree exactly,
@@ -285,12 +335,16 @@ def _random_case(rng: random.Random, scale: Decimal):
     cogs = rev * r(0.35, 0.75)
     opex = rev * r(0.10, 0.30)
     parts = dict(
-        cash=rev * r(0.05, 0.40), accounts_receivable=rev * r(0.05, 0.30),
-        inventory=cogs * r(0.05, 0.35), other_current_assets=rev * r(0.0, 0.05),
-        ppe_net=rev * r(0.20, 1.50), other_noncurrent_assets=rev * r(0.0, 0.20),
+        cash=rev * r(0.05, 0.40),
+        accounts_receivable=rev * r(0.05, 0.30),
+        inventory=cogs * r(0.05, 0.35),
+        other_current_assets=rev * r(0.0, 0.05),
+        ppe_net=rev * r(0.20, 1.50),
+        other_noncurrent_assets=rev * r(0.0, 0.20),
         accounts_payable=cogs * r(0.05, 0.25),
         other_current_liabilities=rev * r(0.0, 0.08),
-        debt=rev * r(0.0, 0.80), other_noncurrent_liabilities=rev * r(0.0, 0.10),
+        debt=rev * r(0.0, 0.80),
+        other_noncurrent_liabilities=rev * r(0.0, 0.10),
     )
     assets = sum((parts[k] for k in A.ASSET_ACCOUNTS), Decimal(0))
     liabs = sum((parts[k] for k in A.LIABILITY_ACCOUNTS), Decimal(0))
@@ -374,26 +428,50 @@ def test_randomized_identity_sweep(scale):
             note(f"A=L+E trial {trial} {year}", total_a, total_l + total_e)
 
             flows = sum((forecast.cashflow.get(k, year) for k in (A.CFO, A.CFI, A.CFF)), Decimal(0))
-            note(f"cash trial {trial} {year}", prev_cash + flows, forecast.balance.get(A.CASH, year))
+            note(
+                f"cash trial {trial} {year}", prev_cash + flows, forecast.balance.get(A.CASH, year)
+            )
             prev_cash = forecast.balance.get(A.CASH, year)
 
             # These three involve no division, so they must be exactly equal.
             assert forecast.ppe.ending(year) == forecast.balance.get(A.PPE_NET, year)
             assert forecast.debt.ending(year) == forecast.balance.get(A.DEBT, year)
-            assert forecast.retained_earnings.ending(year) == forecast.balance.get(A.RETAINED_EARNINGS, year)
+            assert forecast.retained_earnings.ending(year) == forecast.balance.get(
+                A.RETAINED_EARNINGS, year
+            )
 
         for i, year in enumerate(periods.forecast):
             terms = forecast.fcff_inputs(year)
-            expected = (terms["ebit"] * (Decimal(1) - terms["tax_rate"]) + terms["d_and_a"]
-                        - terms["capex"] - terms["change_in_nwc"])
+            expected = (
+                terms["ebit"] * (Decimal(1) - terms["tax_rate"])
+                + terms["d_and_a"]
+                - terms["capex"]
+                - terms["change_in_nwc"]
+            )
             note(f"fcff trial {trial} {year}", expected, fcff_years[i].fcff)
 
         sources = dict.fromkeys(CostOfCapital.REQUIRED_SOURCES, "sweep")
-        coc = CostOfCapital("0.04", "1.0", "0.06", "0.05", "0.25",
-                            Decimal(1000) * scale_d, Decimal(200) * scale_d, sources)
-        result = run_dcf(fcff_years, coc, Decimal("0.02"),
-                         EquityBridge(cash=Decimal(10) * scale_d, debt=Decimal(20) * scale_d), periods)
-        rebuilt = sum((d.fcff * d.discount_factor for d in result.discounted), Decimal(0)) + result.pv_terminal_value
+        coc = CostOfCapital(
+            "0.04",
+            "1.0",
+            "0.06",
+            "0.05",
+            "0.25",
+            Decimal(1000) * scale_d,
+            Decimal(200) * scale_d,
+            sources,
+        )
+        result = run_dcf(
+            fcff_years,
+            coc,
+            Decimal("0.02"),
+            EquityBridge(cash=Decimal(10) * scale_d, debt=Decimal(20) * scale_d),
+            periods,
+        )
+        rebuilt = (
+            sum((d.fcff * d.discount_factor for d in result.discounted), Decimal(0))
+            + result.pv_terminal_value
+        )
         note(f"ev trial {trial}", rebuilt, result.enterprise_value)
 
     assert models == 25

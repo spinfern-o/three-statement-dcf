@@ -49,7 +49,10 @@ def document_block(result: ExtractionResult) -> str:
 
 
 def pages_block(pages: tuple[PageProfile, ...]) -> str:
-    lines = [heading("PAGES (10.6)"), f"  {'page':>5}  {'kind':13} {'chars':>7} {'images':>7}  rotation"]
+    lines = [
+        heading("PAGES (10.6)"),
+        f"  {'page':>5}  {'kind':13} {'chars':>7} {'images':>7}  rotation",
+    ]
     for page in pages:
         lines.append(
             f"  {page.page_number:>5}  {page.kind.value:13} {page.character_count:>7} "

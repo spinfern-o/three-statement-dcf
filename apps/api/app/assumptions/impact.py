@@ -81,10 +81,7 @@ class Impact:
                 "nothing reads is usually a driver that is misnamed."
             )
         if self.changes_nothing:
-            return (
-                f"{head}. {len(self.reaches)} output(s) depend on it and none "
-                "of them moves."
-            )
+            return f"{head}. {len(self.reaches)} output(s) depend on it and none of them moves."
         return f"{head}. {len(self.moved)} of {len(self.reaches)} dependent output(s) move."
 
 
@@ -140,9 +137,7 @@ def preview(
         if before_model.value(target) != after_model.value(target)
     )
     unavailable = {
-        target: reason
-        for target, reason in after_model.unavailable.items()
-        if target in reaches
+        target: reason for target, reason in after_model.unavailable.items() if target in reaches
     }
     return Impact(
         code=code,
@@ -171,9 +166,7 @@ def unread_assumptions(
     """
     graph = DependencyGraph(formulas)
     known = graph.required_inputs | graph.targets
-    return tuple(
-        sorted(code for code in scenarios.resolve(scenario_id) if code not in known)
-    )
+    return tuple(sorted(code for code in scenarios.resolve(scenario_id) if code not in known))
 
 
 def model_for(

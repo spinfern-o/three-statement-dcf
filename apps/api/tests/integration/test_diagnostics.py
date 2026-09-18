@@ -62,6 +62,7 @@ def historical_only(three_statements):
 
 # --- item 131: the registry -------------------------------------------------
 
+
 def test_all_thirty_checks_are_present():
     assert len(REGISTRY) == 30
     assert {c.clause for c in REGISTRY} == {f"17.{n}" for n in range(1, 31)}
@@ -76,9 +77,7 @@ def test_the_registry_agrees_with_the_document_it_came_from():
     policy = (
         pathlib.Path(__file__).resolve().parents[4] / "docs" / "validation-policy.md"
     ).read_text()
-    rows = re.findall(
-        r"\| `(VAL-017-\d{3})` \| (17\.\d+) \| (.*?) \| (.*?) \| (.*?) \|\n", policy
-    )
+    rows = re.findall(r"\| `(VAL-017-\d{3})` \| (17\.\d+) \| (.*?) \| (.*?) \| (.*?) \|\n", policy)
     assert len(rows) == 30
 
     for code, clause, _compares, severity, _engine in rows:
@@ -134,12 +133,11 @@ def test_section_17s_four_severities_say_what_they_mean():
 
 # --- running them -----------------------------------------------------------
 
+
 def test_every_check_gets_an_answer(full, historical_only):
     for diagnostics in (full, historical_only):
         assert len(diagnostics.outcomes) == 30
-        assert {o.check.clause for o in diagnostics.outcomes} == {
-            f"17.{n}" for n in range(1, 31)
-        }
+        assert {o.check.clause for o in diagnostics.outcomes} == {f"17.{n}" for n in range(1, 31)}
 
 
 def test_a_check_that_could_not_run_is_never_reported_as_passing(historical_only):
@@ -161,9 +159,24 @@ def test_a_skipped_check_names_the_stage_that_stopped_it(historical_only):
 
 def test_the_fully_built_model_passes_the_checks_it_can(full):
     passing = {o.check.clause for o in full.passed}
-    for clause in ("17.1", "17.2", "17.3", "17.4", "17.8", "17.9", "17.10",
-                   "17.16", "17.17", "17.18", "17.20", "17.22", "17.24",
-                   "17.27", "17.29", "17.30"):
+    for clause in (
+        "17.1",
+        "17.2",
+        "17.3",
+        "17.4",
+        "17.8",
+        "17.9",
+        "17.10",
+        "17.16",
+        "17.17",
+        "17.18",
+        "17.20",
+        "17.22",
+        "17.24",
+        "17.27",
+        "17.29",
+        "17.30",
+    ):
         assert clause in passing, f"{clause} does not pass on a complete model"
 
 
@@ -203,6 +216,7 @@ def test_17_27_actually_looks_at_every_value(full):
 
 # --- items 136, 137: the gate -----------------------------------------------
 
+
 def test_the_checklist_covers_every_clause():
     """A check missing from the checklist is a check nobody looked at."""
     assert every_clause_is_on_the_checklist()
@@ -239,11 +253,14 @@ def test_a_model_with_every_actionable_check_clear_may_release(full, forecastabl
 
     from apps.api.app.diagnostics.run import Diagnostics
 
-    cleared = Diagnostics(tuple(
-        replace(o, status=Status.PASS, detail="cleared for this test")
-        if o.check.clause not in NOT_ACTIONABLE else o
-        for o in full.outcomes
-    ))
+    cleared = Diagnostics(
+        tuple(
+            replace(o, status=Status.PASS, detail="cleared for this test")
+            if o.check.clause not in NOT_ACTIONABLE
+            else o
+            for o in full.outcomes
+        )
+    )
     verdict = readiness(cleared)
     assert verdict.may_release
     assert "Every check a reviewer can act on has passed" in verdict.describe()
@@ -259,6 +276,7 @@ def test_the_checklist_groups_by_stage_so_a_reader_sees_where_work_stopped(
 
 
 # --- item 132: lineage ------------------------------------------------------
+
 
 def test_a_reported_line_traces_back_to_the_page_it_was_printed_on(forecastable):
     built = build_statements(forecastable, strict=True)
@@ -300,14 +318,13 @@ def test_every_cell_in_the_model_is_traceable(forecastable):
 
 # --- item 134: the audit log ------------------------------------------------
 
+
 def test_the_log_is_newest_first_and_stable(forecastable):
     log = filter_events(forecastable)
     assert log.total == len(log.events)
     stamps = [(e.at, e.id) for e in log.events]
     assert stamps == sorted(stamps, reverse=True)
-    assert [e.id for e in filter_events(forecastable).events] == [
-        e.id for e in log.events
-    ]
+    assert [e.id for e in filter_events(forecastable).events] == [e.id for e in log.events]
 
 
 def test_the_filters_compose(forecastable):
@@ -338,13 +355,12 @@ def test_every_entry_carries_the_reason_its_actor_typed(forecastable):
 
 # --- item 135: the benchmark report -----------------------------------------
 
+
 def test_the_report_covers_4_16s_list():
     report = Report()
     assert len(report.coverage) == 22
     assert len(report.compared) == 20
-    assert {c.output for c in report.not_compared} == {
-        "EBITDA", "implied value per share"
-    }
+    assert {c.output for c in report.not_compared} == {"EBITDA", "implied value per share"}
     for row in report.not_compared:
         assert row.reason, f"{row.output} is not compared and gives no reason"
 

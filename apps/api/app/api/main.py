@@ -70,7 +70,9 @@ def create_app(
     )
     templates = Jinja2Templates(directory=str(HERE / "templates"))
     templates.env.globals.update(
-        product_name=PRODUCT_NAME, owner=OWNER, footer=FOOTER,
+        product_name=PRODUCT_NAME,
+        owner=OWNER,
+        footer=FOOTER,
         # Section 25 requires this in the model, the release flow and the
         # exports. One global rather than one string per template, so the
         # three surfaces cannot drift apart.
@@ -87,9 +89,7 @@ def create_app(
     app.state.repository = JsonDocumentRepository(root)
     app.state.templates = templates
     app.state.actor = actor
-    app.state.credential = (
-        credential if credential is not None else Credential.load(environ)
-    )
+    app.state.credential = credential if credential is not None else Credential.load(environ)
     app.state.signing_key = key or signing_key(environ)
     app.state.limiters = Limiters.build()
     templates.env.globals.update(

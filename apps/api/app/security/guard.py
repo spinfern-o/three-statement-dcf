@@ -125,9 +125,7 @@ class Guard:
         session = None
         if state.credential is not None:
             try:
-                session = sessions.verify(
-                    key, request.cookies.get(sessions.COOKIE_NAME, "")
-                )
+                session = sessions.verify(key, request.cookies.get(sessions.COOKIE_NAME, ""))
             except sessions.SessionError:
                 session = None
 
@@ -151,9 +149,7 @@ class Guard:
                 try:
                     csrf.check(key, nonce, supplied)
                 except csrf.CsrfError as exc:
-                    await _send_html(
-                        send, 403, f"<h1>Refused</h1><p>{exc}</p>"
-                    )
+                    await _send_html(send, 403, f"<h1>Refused</h1><p>{exc}</p>")
                     return
             receive = _replay(body)
 
@@ -161,7 +157,9 @@ class Guard:
             await self.app(scope, receive, send)
         except RateLimited as exc:
             await _send_html(
-                send, 429, f"<h1>Too many requests</h1><p>{exc}</p>",
+                send,
+                429,
+                f"<h1>Too many requests</h1><p>{exc}</p>",
                 headers=[(b"retry-after", str(exc.retry_after).encode("ascii"))],
             )
 
@@ -176,7 +174,8 @@ class Guard:
         # would have to be re-submitted from: a stale tab must not silently
         # replay a mutation after the session it was opened under has ended.
         await _send_html(
-            send, 401,
+            send,
+            401,
             "<h1>Session expired</h1><p>Sign in again, then repeat the action. "
             "It was not performed.</p>",
         )

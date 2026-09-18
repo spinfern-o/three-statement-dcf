@@ -135,7 +135,9 @@ def _format(value: Decimal) -> str:
     return f"{value:,}"
 
 
-def _evaluate(node: Node, environment: Environment, inputs: dict[str, Decimal]) -> tuple[Decimal, Unit, str]:
+def _evaluate(
+    node: Node, environment: Environment, inputs: dict[str, Decimal]
+) -> tuple[Decimal, Unit, str]:
     """Returns the value, its unit, and the substituted text for this subtree."""
     if isinstance(node, Literal):
         return node.value, _literal_unit(node), node.raw
@@ -218,7 +220,7 @@ def _power(node: Binary, base, base_unit, base_text, environment, inputs):
     whole = int(exponent)
     if whole < 0 and base == ZERO:
         raise DivisionByZeroRefused(node.left.text(), D(1))
-    return base ** whole, power(base_unit, whole), f"({base_text} ^ {exponent_text})"
+    return base**whole, power(base_unit, whole), f"({base_text} ^ {exponent_text})"
 
 
 def _call(node: Call, environment: Environment, inputs) -> tuple[Decimal, Unit, str]:

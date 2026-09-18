@@ -66,9 +66,15 @@ INEXACT_COLOUR = "FF8A4B00"
 SHEET_NAME_LIMIT = 31
 
 LEGEND = (
-    ("Hardcode (blue)", "A figure somebody supplied: reported by the filing, or entered as an assumption."),
+    (
+        "Hardcode (blue)",
+        "A figure somebody supplied: reported by the filing, or entered as an assumption.",
+    ),
     ("Calculated (black)", "A figure this model computed from others."),
-    ("Inexact (brown, noted)", "The exact value needs more precision than a spreadsheet number holds. The cell note carries it in full."),
+    (
+        "Inexact (brown, noted)",
+        "The exact value needs more precision than a spreadsheet number holds. The cell note carries it in full.",
+    ),
     ("Empty with a note", "No value exists. Absent is not zero (rule 1.3), and the note says why."),
 )
 
@@ -209,7 +215,8 @@ def build_workbook(model: ExportModel) -> Workbook:
         cover.cell(row=row + offset, column=2, value=meaning)
     note_row = row + len(LEGEND) + 2
     cover.cell(
-        row=note_row, column=1,
+        row=note_row,
+        column=1,
         value=(
             f"{inexact} cell(s) hold a value a spreadsheet number cannot "
             "represent exactly. Each is styled Inexact and carries its exact "

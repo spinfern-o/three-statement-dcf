@@ -159,9 +159,13 @@ def build_forecast(
     wc.add(
         WorkingCapitalRow(
             year=last_actual,
-            accounts_receivable=historical_balance.require(A.ACCOUNTS_RECEIVABLE, last_actual, "STEP 17"),
+            accounts_receivable=historical_balance.require(
+                A.ACCOUNTS_RECEIVABLE, last_actual, "STEP 17"
+            ),
             inventory=historical_balance.require(A.INVENTORY, last_actual, "STEP 17"),
-            other_current_assets=historical_balance.require(A.OTHER_CURRENT_ASSETS, last_actual, "STEP 17"),
+            other_current_assets=historical_balance.require(
+                A.OTHER_CURRENT_ASSETS, last_actual, "STEP 17"
+            ),
             accounts_payable=historical_balance.require(A.ACCOUNTS_PAYABLE, last_actual, "STEP 17"),
             other_current_liabilities=historical_balance.require(
                 A.OTHER_CURRENT_LIABILITIES, last_actual, "STEP 17"
@@ -214,7 +218,9 @@ def build_forecast(
 
         # -- STEP 15: EBIT, kept clear of financing items ------------------
         ebit = revenue - cogs - opex
-        income.set_forecast(A.EBIT, year, ebit, "ebit = revenue - cogs - operating_expenses (STEP 15)")
+        income.set_forecast(
+            A.EBIT, year, ebit, "ebit = revenue - cogs - operating_expenses (STEP 15)"
+        )
 
         # -- STEP 18: depreciation and CapEx, forecast separately ----------
         dep_pct = assumptions.get("depreciation_pct_beginning_ppe", year)
@@ -261,10 +267,15 @@ def build_forecast(
 
         # -- STEP 16 / 20: taxes and net income ---------------------------
         other_inc = _optional(assumptions, "other_income_expense", year)
-        income.set_forecast(A.OTHER_INCOME_EXPENSE, year, other_inc, "other_income_expense assumption")
+        income.set_forecast(
+            A.OTHER_INCOME_EXPENSE, year, other_inc, "other_income_expense assumption"
+        )
         pretax = ebit - interest + other_inc
         income.set_forecast(
-            A.PRETAX_INCOME, year, pretax, "pretax = ebit - interest + other_income_expense (STEP 20)"
+            A.PRETAX_INCOME,
+            year,
+            pretax,
+            "pretax = ebit - interest + other_income_expense (STEP 20)",
         )
         tax_rate = taxes.rate(year)
         tax = pretax * tax_rate
@@ -289,7 +300,9 @@ def build_forecast(
         if has_amount:
             dividends = assumptions.get("dividends_amount", year)
         else:
-            dividends = _optional(assumptions, "dividend_payout_ratio", year) * max(net_income, ZERO)
+            dividends = _optional(assumptions, "dividend_payout_ratio", year) * max(
+                net_income, ZERO
+            )
         retained.add_year(year, prev_re, {"Net Income": net_income}, {"Dividends": dividends})
         ending_re = retained.ending(year)
         ending_common = prev_common + sbc - buybacks
@@ -299,22 +312,37 @@ def build_forecast(
         other_inv = _optional(assumptions, "other_investing", year)
         other_fin = _optional(assumptions, "other_financing", year)
 
-        cashflow.set_forecast(A.NET_INCOME, year, net_income, "from projected income statement (STEP 22)")
+        cashflow.set_forecast(
+            A.NET_INCOME, year, net_income, "from projected income statement (STEP 22)"
+        )
         cashflow.set_forecast(
             A.DEPRECIATION_AMORTIZATION, year, depreciation, "non-cash add-back, from PP&E schedule"
         )
         cashflow.set_forecast(A.STOCK_BASED_COMP, year, sbc, "non-cash add-back, sbc_pct_revenue")
         cashflow.set_forecast(
-            A.CHANGE_IN_NWC, year, -change_in_nwc, "-(NWC_t - NWC_t-1); an NWC build consumes cash (STEP 17)"
+            A.CHANGE_IN_NWC,
+            year,
+            -change_in_nwc,
+            "-(NWC_t - NWC_t-1); an NWC build consumes cash (STEP 17)",
         )
-        cashflow.set_forecast(A.OTHER_OPERATING, year, other_op, "other_operating -> other_noncurrent_liabilities")
+        cashflow.set_forecast(
+            A.OTHER_OPERATING, year, other_op, "other_operating -> other_noncurrent_liabilities"
+        )
         cfo = net_income + depreciation + sbc - change_in_nwc + other_op
         cashflow.set_derived(A.CFO, year, cfo, "sum of operating items (STEP 22)")
 
         cashflow.set_forecast(A.CAPEX, year, -capex, capex_basis + " (cash outflow)")
-        cashflow.set_forecast(A.ACQUISITIONS, year, -_optional(assumptions, "acquisitions", year), "acquisitions assumption")
         cashflow.set_forecast(
-            A.OTHER_INVESTING, year, disposals + other_inv, "disposal proceeds at book value + other_investing"
+            A.ACQUISITIONS,
+            year,
+            -_optional(assumptions, "acquisitions", year),
+            "acquisitions assumption",
+        )
+        cashflow.set_forecast(
+            A.OTHER_INVESTING,
+            year,
+            disposals + other_inv,
+            "disposal proceeds at book value + other_investing",
         )
         cfi = -capex - _optional(assumptions, "acquisitions", year) + disposals + other_inv
         cashflow.set_derived(A.CFI, year, cfi, "sum of investing items (STEP 22)")
@@ -322,8 +350,12 @@ def build_forecast(
         cashflow.set_forecast(A.DEBT_ISSUANCE, year, issuance, "from debt schedule (STEP 19)")
         cashflow.set_forecast(A.DEBT_REPAYMENT, year, -repayment, "from debt schedule (STEP 19)")
         cashflow.set_forecast(A.SHARE_REPURCHASES, year, -buybacks, "share_repurchases assumption")
-        cashflow.set_forecast(A.DIVIDENDS, year, -dividends, "from retained earnings schedule (STEP 8)")
-        cashflow.set_forecast(A.OTHER_FINANCING, year, other_fin, "other_financing -> other_noncurrent_liabilities")
+        cashflow.set_forecast(
+            A.DIVIDENDS, year, -dividends, "from retained earnings schedule (STEP 8)"
+        )
+        cashflow.set_forecast(
+            A.OTHER_FINANCING, year, other_fin, "other_financing -> other_noncurrent_liabilities"
+        )
         cff = issuance - repayment - buybacks - dividends + other_fin
         cashflow.set_derived(A.CFF, year, cff, "sum of financing items (STEP 22)")
 
@@ -333,22 +365,42 @@ def build_forecast(
         ending_other_nca = prev_other_nca - other_inv
         ending_other_ncl = prev_other_ncl + other_op + other_fin
 
-        balance.set_forecast(A.CASH, year, ending_cash, "beginning cash + CFO + CFI + CFF (STEP 22)")
-        balance.set_forecast(A.ACCOUNTS_RECEIVABLE, year, ar, f"dso = {assumptions.get('dso', year):.1f} days (STEP 17)")
-        balance.set_forecast(A.INVENTORY, year, inventory, "inventory_days on COGS (STEP 17)")
-        balance.set_forecast(A.OTHER_CURRENT_ASSETS, year, other_ca, "other_current_assets_pct_revenue")
-        balance.set_forecast(A.PPE_NET, year, ending_ppe, "from PP&E schedule (STEP 18)")
-        balance.set_forecast(A.OTHER_NONCURRENT_ASSETS, year, ending_other_nca, "prior balance less other_investing")
-
-        balance.set_forecast(A.ACCOUNTS_PAYABLE, year, ap, "dpo on COGS (STEP 17)")
-        balance.set_forecast(A.OTHER_CURRENT_LIABILITIES, year, other_cl, "other_current_liabilities_pct_revenue")
-        balance.set_forecast(A.DEBT, year, ending_debt, "from debt schedule (STEP 19)")
         balance.set_forecast(
-            A.OTHER_NONCURRENT_LIABILITIES, year, ending_other_ncl, "prior balance plus other_operating/other_financing"
+            A.CASH, year, ending_cash, "beginning cash + CFO + CFI + CFF (STEP 22)"
+        )
+        balance.set_forecast(
+            A.ACCOUNTS_RECEIVABLE,
+            year,
+            ar,
+            f"dso = {assumptions.get('dso', year):.1f} days (STEP 17)",
+        )
+        balance.set_forecast(A.INVENTORY, year, inventory, "inventory_days on COGS (STEP 17)")
+        balance.set_forecast(
+            A.OTHER_CURRENT_ASSETS, year, other_ca, "other_current_assets_pct_revenue"
+        )
+        balance.set_forecast(A.PPE_NET, year, ending_ppe, "from PP&E schedule (STEP 18)")
+        balance.set_forecast(
+            A.OTHER_NONCURRENT_ASSETS, year, ending_other_nca, "prior balance less other_investing"
         )
 
-        balance.set_forecast(A.COMMON_EQUITY, year, ending_common, "prior balance + SBC - share repurchases")
-        balance.set_forecast(A.RETAINED_EARNINGS, year, ending_re, "from retained earnings schedule (STEP 8)")
+        balance.set_forecast(A.ACCOUNTS_PAYABLE, year, ap, "dpo on COGS (STEP 17)")
+        balance.set_forecast(
+            A.OTHER_CURRENT_LIABILITIES, year, other_cl, "other_current_liabilities_pct_revenue"
+        )
+        balance.set_forecast(A.DEBT, year, ending_debt, "from debt schedule (STEP 19)")
+        balance.set_forecast(
+            A.OTHER_NONCURRENT_LIABILITIES,
+            year,
+            ending_other_ncl,
+            "prior balance plus other_operating/other_financing",
+        )
+
+        balance.set_forecast(
+            A.COMMON_EQUITY, year, ending_common, "prior balance + SBC - share repurchases"
+        )
+        balance.set_forecast(
+            A.RETAINED_EARNINGS, year, ending_re, "from retained earnings schedule (STEP 8)"
+        )
 
         assets = ending_cash + ar + inventory + other_ca + ending_ppe + ending_other_nca
         liabilities = ap + other_cl + ending_debt + ending_other_ncl

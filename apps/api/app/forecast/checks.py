@@ -49,17 +49,19 @@ from .build import ScenarioForecast
 #: They are named rather than detected, and a test asserts this set is exactly
 #: the set that skips when no valuation is supplied. If the engine adds a third
 #: valuation check, that test fails rather than this gate silently miscounting.
-VALUATION_CHECKS = frozenset({
-    "WACC > terminal growth rate",
-    "FCFF matches three-statement forecast",
-})
+VALUATION_CHECKS = frozenset(
+    {
+        "WACC > terminal growth rate",
+        "FCFF matches three-statement forecast",
+    }
+)
 
 #: F-4. Stated on the panel rather than buried, because a reader has to know
 #: that "critical" is being read as "all".
 SEVERITY_NOTE = (
     "Specification 17 assigns a severity to none of its thirty checks, and "
     "validation-policy.md's proposals are proposals (finding F-4). Until an "
-    "owner assigns them, 15.21's \"every critical check\" is read as EVERY "
+    'owner assigns them, 15.21\'s "every critical check" is read as EVERY '
     "check: any failure, and any check that could not run, withholds the "
     "Forecast Ready label. That is stricter than any severity assignment "
     "would be, so it cannot wrongly pass a model."
@@ -81,8 +83,7 @@ class ScenarioChecks:
     def skipped(self) -> tuple[CheckResult, ...]:
         """Forecast checks that could not run. Rule 1.14: reported, not passed."""
         return tuple(
-            r for r in self.results
-            if r.status is Status.SKIP and r.name not in VALUATION_CHECKS
+            r for r in self.results if r.status is Status.SKIP and r.name not in VALUATION_CHECKS
         )
 
     @property
@@ -95,8 +96,7 @@ class ScenarioChecks:
         construction. They are still shown, with their reason.
         """
         return tuple(
-            r for r in self.results
-            if r.status is Status.SKIP and r.name in VALUATION_CHECKS
+            r for r in self.results if r.status is Status.SKIP and r.name in VALUATION_CHECKS
         )
 
     @property
@@ -109,10 +109,7 @@ class ScenarioChecks:
         return not self.failed and not self.skipped
 
     def summarize(self) -> str:
-        text = (
-            f"{len(self.passed)} passed, {len(self.failed)} failed, "
-            f"{len(self.skipped)} skipped"
-        )
+        text = f"{len(self.passed)} passed, {len(self.failed)} failed, {len(self.skipped)} skipped"
         if self.deferred:
             text += f", {len(self.deferred)} awaiting a valuation"
         return text
@@ -164,19 +161,11 @@ class ForecastReadiness:
     def describe(self) -> str:
         if self.not_built:
             unbuilt = ", ".join(sorted(self.not_built))
-            return (
-                f"Not Forecast Ready: {unbuilt} could not be forecast at all."
-            )
+            return f"Not Forecast Ready: {unbuilt} could not be forecast at all."
         if self.is_forecast_ready:
-            return (
-                f"Forecast Ready across {len(self.by_scenario)} scenario(s). "
-                + SEVERITY_NOTE
-            )
-        return (
-            "Not Forecast Ready. "
-            + " ".join(
-                item.describe() for item in self.by_scenario if not item.is_forecast_ready
-            )
+            return f"Forecast Ready across {len(self.by_scenario)} scenario(s). " + SEVERITY_NOTE
+        return "Not Forecast Ready. " + " ".join(
+            item.describe() for item in self.by_scenario if not item.is_forecast_ready
         )
 
 

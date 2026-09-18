@@ -29,20 +29,33 @@ SERIES = (
 
 # --- item 126: charts (6.5.f, 6.6.h, 6.2.e) ---------------------------------
 
+
 def test_a_chart_cannot_be_built_without_a_text_summary():
     """6.5.f and 6.6.h. A summary added later is a summary that shipped late."""
     with pytest.raises(ValueError, match="no text summary"):
         LineChart(
-            title="Revenue", unit="thousands", points=(), actual_path="",
-            estimate_path="", y_ticks=(), summary="  ", csv="period,revenue\n",
+            title="Revenue",
+            unit="thousands",
+            points=(),
+            actual_path="",
+            estimate_path="",
+            y_ticks=(),
+            summary="  ",
+            csv="period,revenue\n",
         )
 
 
 def test_a_chart_cannot_be_built_without_downloadable_data():
     with pytest.raises(ValueError, match="no downloadable data"):
         LineChart(
-            title="Revenue", unit="thousands", points=(), actual_path="",
-            estimate_path="", y_ticks=(), summary="a summary", csv="",
+            title="Revenue",
+            unit="thousands",
+            points=(),
+            actual_path="",
+            estimate_path="",
+            y_ticks=(),
+            summary="a summary",
+            csv="",
         )
 
 
@@ -67,9 +80,7 @@ def test_the_projected_half_is_dashed_as_well_as_coloured():
     chart = line_chart("Revenue", SERIES, "thousands")
     assert chart.actual_path and chart.estimate_path
     # The dashed segment starts at the last actual, so the halves join.
-    assert chart.estimate_path.startswith(
-        "M " + chart.actual_path.rsplit("L ", 1)[-1].strip()
-    )
+    assert chart.estimate_path.startswith("M " + chart.actual_path.rsplit("L ", 1)[-1].strip())
 
 
 def test_the_csv_carries_the_stored_value_not_the_displayed_one():
@@ -108,6 +119,7 @@ def test_a_float_value_is_refused():
 
 # --- item 123: the navigation shell -----------------------------------------
 
+
 def test_the_portfolio_alone_has_no_document_sections():
     items = nav_items(None)
     assert [item.label for item in items] == ["Portfolio"]
@@ -115,9 +127,7 @@ def test_the_portfolio_alone_has_no_document_sections():
 
 def test_every_section_is_present_for_a_document():
     items = nav_items("doc-1")
-    assert [item.label for item in items] == ["Portfolio"] + [
-        label for label, _, _ in SECTIONS
-    ]
+    assert [item.label for item in items] == ["Portfolio"] + [label for label, _, _ in SECTIONS]
 
 
 def test_a_section_with_nothing_behind_it_is_dimmed_and_still_reachable():
@@ -154,10 +164,16 @@ def test_every_gated_section_has_a_reason():
 
 # --- items 125, 7.1.b: statuses and cards -----------------------------------
 
+
 def test_the_seven_statuses_are_exactly_7_1_bs():
     assert [s.value for s in ModelStatus] == [
-        "Draft", "Extracting", "Needs Review", "Validated",
-        "Forecast Ready", "Valuation Ready", "Archived",
+        "Draft",
+        "Extracting",
+        "Needs Review",
+        "Validated",
+        "Forecast Ready",
+        "Valuation Ready",
+        "Archived",
     ]
 
 
@@ -178,9 +194,13 @@ def test_archived_is_never_inferred():
 def test_every_card_carries_period_scenario_source_and_status():
     """Item 125 lists four labels, and the reason is 1.19."""
     standing = Standing(
-        status=ModelStatus.VALIDATED, source_date="2025-12-31",
-        valuation_date="2025-12-31", owner="larry", unresolved=("one thing",),
-        blocked_by="something", gates=(),
+        status=ModelStatus.VALIDATED,
+        source_date="2025-12-31",
+        valuation_date="2025-12-31",
+        owner="larry",
+        unresolved=("one thing",),
+        blocked_by="something",
+        gates=(),
     )
     cards = portfolio_cards((("doc", standing),))
     assert len(cards) == 4
@@ -194,17 +214,24 @@ def test_every_card_carries_period_scenario_source_and_status():
 def test_the_cards_count_what_the_standings_say():
     def standing(status, unresolved=()):
         return Standing(
-            status=status, source_date="", valuation_date="", owner="",
-            unresolved=unresolved, blocked_by="", gates=(),
+            status=status,
+            source_date="",
+            valuation_date="",
+            owner="",
+            unresolved=unresolved,
+            blocked_by="",
+            gates=(),
         )
 
     cards = {
         card.label: card.value
-        for card in portfolio_cards((
-            ("a", standing(ModelStatus.VALUATION_READY)),
-            ("b", standing(ModelStatus.NEEDS_REVIEW, ("x", "y"))),
-            ("c", standing(ModelStatus.VALIDATED, ("z",))),
-        ))
+        for card in portfolio_cards(
+            (
+                ("a", standing(ModelStatus.VALUATION_READY)),
+                ("b", standing(ModelStatus.NEEDS_REVIEW, ("x", "y"))),
+                ("c", standing(ModelStatus.VALIDATED, ("z",))),
+            )
+        )
     }
     assert cards["Models"] == "3"
     assert cards["Valuation ready"] == "1"

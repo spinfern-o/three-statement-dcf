@@ -156,8 +156,8 @@ class _Shell:
         # that has to be passed it is a template somebody will forget. The
         # guard put it on the request before any route ran.
         context.setdefault(
-            "csrf_token", (getattr(request.state, "guard", None)
-            and request.state.guard.csrf_token) or ""
+            "csrf_token",
+            (getattr(request.state, "guard", None) and request.state.guard.csrf_token) or "",
         )
         return self.templates.TemplateResponse(
             request=request, name=name, context=context, **kwargs
@@ -286,7 +286,8 @@ def index(request: Request):
 
     chart, chart_document_id = _portfolio_chart(models)
     return _templates(request).TemplateResponse(
-        request=request, name="index.html",
+        request=request,
+        name="index.html",
         context={
             "models": models,
             "cards": portfolio_cards(tuple((m.document, m.standing) for m in models)),
@@ -348,8 +349,7 @@ def _revenue_series(result, scenarios=None):
             points += [
                 (year, value)
                 for year, value in (
-                    (y, projected.get("revenue", y))
-                    for y in forecast.periods.forecast
+                    (y, projected.get("revenue", y)) for y in forecast.periods.forecast
                 )
                 if value is not None
             ]
@@ -385,9 +385,7 @@ def chart_csv(request: Request, document_id: str):
     return Response(
         content=series.csv,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="{document_id}-revenue.csv"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{document_id}-revenue.csv"'},
     )
 
 
@@ -420,9 +418,7 @@ def source_room(request: Request, document_id: str, page: int, error: str = "", 
         for fact in result.facts
         if (loc := result.location(fact.source_location_id)) and loc.page_number == page
     ]
-    geometry = next(
-        (p.geometry for p in result.document.pages if p.page_number == page), None
-    )
+    geometry = next((p.geometry for p in result.document.pages if p.page_number == page), None)
     profile = next((p for p in result.document.pages if p.page_number == page), None)
 
     return _templates(request).TemplateResponse(
@@ -495,9 +491,7 @@ def confirm(
             }
             if not detected:
                 raise ReviewError("every detected field is already confirmed")
-            updated = confirm_metadata(
-                result, detected, actor=_actor(request), reason=reason
-            )
+            updated = confirm_metadata(result, detected, actor=_actor(request), reason=reason)
     except (ReviewError, ValueError, KeyError) as exc:
         return _back(document_id, page, error=str(exc))
 
@@ -633,8 +627,12 @@ def decide_mapping(
             updated = map_fact(result, fact_id, canonical_code, actor=actor, note=note)
         elif action == "split":
             updated = split_fact(
-                result, fact_id, _parse_allocation(allocation),
-                basis=basis, actor=actor, note=note,
+                result,
+                fact_id,
+                _parse_allocation(allocation),
+                basis=basis,
+                actor=actor,
+                note=note,
             )
         elif action == "reject":
             updated = reject_mapping(result, fact_id, actor=actor, note=note)
@@ -684,9 +682,7 @@ def combine(
     except (MappingError, KeyError) as exc:
         return _mapping_back(document_id, error=str(exc))
     _repository(request).save(apply_findings(updated))
-    return _mapping_back(
-        document_id, ok=f"Combined {len(fact_ids)} line(s) into {canonical_code}."
-    )
+    return _mapping_back(document_id, ok=f"Combined {len(fact_ids)} line(s) into {canonical_code}.")
 
 
 @router.post("/documents/{document_id}/mapping/approve-all")
@@ -738,10 +734,15 @@ def statements(request: Request, document_id: str, error: str = "", ok: str = ""
         built = build_statements(result, strict=False)
     except BuildError as exc:
         return _templates(request).TemplateResponse(
-            request=request, name="statements.html",
+            request=request,
+            name="statements.html",
             context={
-                "document": result.document, "result": result, "built": None,
-                "blocked": str(exc), "error": error, "ok": ok,
+                "document": result.document,
+                "result": result,
+                "built": None,
+                "blocked": str(exc),
+                "error": error,
+                "ok": ok,
                 "equity_note": equity_statement_status(),
             },
         )
@@ -766,7 +767,8 @@ def statements(request: Request, document_id: str, error: str = "", ok: str = ""
         export_error = str(exc)
 
     return _templates(request).TemplateResponse(
-        request=request, name="statements.html",
+        request=request,
+        name="statements.html",
         context={
             "document": result.document,
             "result": result,
@@ -809,10 +811,15 @@ def schedules(request: Request, document_id: str, error: str = "", ok: str = "")
         built = build_statements(result, strict=False)
     except BuildError as exc:
         return _templates(request).TemplateResponse(
-            request=request, name="schedules.html",
+            request=request,
+            name="schedules.html",
             context={
-                "document": result.document, "result": result, "schedules": None,
-                "blocked": str(exc), "error": error, "ok": ok,
+                "document": result.document,
+                "result": result,
+                "schedules": None,
+                "blocked": str(exc),
+                "error": error,
+                "ok": ok,
             },
         )
 
@@ -820,7 +827,8 @@ def schedules(request: Request, document_id: str, error: str = "", ok: str = "")
     checks = run_schedule_checks(schedule_set)
 
     return _templates(request).TemplateResponse(
-        request=request, name="schedules.html",
+        request=request,
+        name="schedules.html",
         context={
             "document": result.document,
             "result": result,
@@ -839,6 +847,7 @@ def schedules(request: Request, document_id: str, error: str = "", ok: str = "")
 
 # --- items 78-88: the formula engine screen (18.10, 18.11) ------------------
 
+
 @router.get("/documents/{document_id}/formulas", response_class=HTMLResponse)
 def formulas(request: Request, document_id: str, error: str = ""):
     """Section 18's two "provide" clauses, provided.
@@ -853,15 +862,20 @@ def formulas(request: Request, document_id: str, error: str = ""):
         built = build_statements(result, strict=False)
     except BuildError as exc:
         return _templates(request).TemplateResponse(
-            request=request, name="formulas.html",
+            request=request,
+            name="formulas.html",
             context={
-                "document": result.document, "result": result, "report": None,
-                "blocked": str(exc), "error": error,
+                "document": result.document,
+                "result": result,
+                "report": None,
+                "blocked": str(exc),
+                "error": error,
             },
         )
 
     return _templates(request).TemplateResponse(
-        request=request, name="formulas.html",
+        request=request,
+        name="formulas.html",
         context={
             "document": result.document,
             "result": result,
@@ -873,6 +887,7 @@ def formulas(request: Request, document_id: str, error: str = ""):
 
 
 # --- items 89-96: the assumptions screen (7.7) ------------------------------
+
 
 #: The forecast periods this system plans for. `export.py` already fixes five
 #: (FORECAST_YEARS), and the gate has to ask about each one separately: a
@@ -890,9 +905,7 @@ def _scenario_store(request: Request) -> ScenarioStore:
 
 def _assumptions_back(document_id: str, scenario_id: str, **flash) -> RedirectResponse:
     query = urlencode({"scenario_id": scenario_id, **{k: v for k, v in flash.items() if v}})
-    return RedirectResponse(
-        f"/documents/{document_id}/assumptions?{query}", status_code=303
-    )
+    return RedirectResponse(f"/documents/{document_id}/assumptions?{query}", status_code=303)
 
 
 def _assumptions_context(request: Request, document_id: str, scenario_id: str):
@@ -917,10 +930,15 @@ def assumptions(
     result, built, blocked = _assumptions_context(request, document_id, scenario_id)
     if blocked:
         return _templates(request).TemplateResponse(
-            request=request, name="assumptions.html",
+            request=request,
+            name="assumptions.html",
             context={
-                "document": result.document, "result": result, "blocked": blocked,
-                "error": error, "ok": ok, "scenario_id": scenario_id,
+                "document": result.document,
+                "result": result,
+                "blocked": blocked,
+                "error": error,
+                "ok": ok,
+                "scenario_id": scenario_id,
             },
         )
 
@@ -928,13 +946,12 @@ def assumptions(
     periods = _forecast_periods(built)
     rows = required_rows(scenarios, scenario_id)
     # The status form needs the legal moves for each row's own assumption.
-    rows = tuple(
-        _with_statuses(row) for row in rows
-    )
+    rows = tuple(_with_statuses(row) for row in rows)
     schedules = build_schedules(built)
 
     return _templates(request).TemplateResponse(
-        request=request, name="assumptions.html",
+        request=request,
+        name="assumptions.html",
         context={
             "document": result.document,
             "result": result,
@@ -950,7 +967,8 @@ def assumptions(
             "periods": periods,
             "editable_codes": sorted(scenarios.resolve(scenario_id)),
             "impact": request.app.state.last_impact.pop(document_id, None)
-            if hasattr(request.app.state, "last_impact") else None,
+            if hasattr(request.app.state, "last_impact")
+            else None,
             "error": error,
             "ok": ok,
         },
@@ -986,13 +1004,12 @@ def accept_proposal(
     if blocked:
         return _assumptions_back(document_id, scenario_id, error=blocked)
 
-    proposals = propose_from_schedules(
-        build_schedules(built), owner=_actor(request)
-    )
+    proposals = propose_from_schedules(build_schedules(built), owner=_actor(request))
     match = next((p for p in proposals if p.assumption.code == code), None)
     if match is None:
         return _assumptions_back(
-            document_id, scenario_id,
+            document_id,
+            scenario_id,
             error=f"{code!r} is not a driver the schedules measured.",
         )
 
@@ -1001,14 +1018,13 @@ def accept_proposal(
     try:
         from dataclasses import replace
 
-        scenarios = scenarios.with_assumption(
-            replace(match.assumption, scenario_id=scenario_id)
-        )
+        scenarios = scenarios.with_assumption(replace(match.assumption, scenario_id=scenario_id))
     except (AssumptionError, ScenarioError) as exc:
         return _assumptions_back(document_id, scenario_id, error=str(exc))
     store.save(document_id, scenarios)
     return _assumptions_back(
-        document_id, scenario_id,
+        document_id,
+        scenario_id,
         ok=f"{code} added as a Draft. It cannot be forecast on until reviewed (14.1).",
     )
 
@@ -1029,21 +1045,23 @@ def change_status(
     resolved = scenarios.resolve(scenario_id).get(code)
     if resolved is None or resolved.from_scenario != scenario_id:
         return _assumptions_back(
-            document_id, scenario_id,
+            document_id,
+            scenario_id,
             error=f"{code!r} is not an assumption {scenario_id!r} holds of its own.",
         )
     try:
         moved, _change = transition(
-            resolved.assumption, Status(to),
-            actor=_actor(request), reason=reason, reviewer=reviewer,
+            resolved.assumption,
+            Status(to),
+            actor=_actor(request),
+            reason=reason,
+            reviewer=reviewer,
         )
     except (WorkflowError, ValueError) as exc:
         return _assumptions_back(document_id, scenario_id, error=str(exc))
 
     store.save(document_id, scenarios.with_assumption(moved))
-    return _assumptions_back(
-        document_id, scenario_id, ok=f"{code} is now {moved.status.value}."
-    )
+    return _assumptions_back(document_id, scenario_id, ok=f"{code} is now {moved.status.value}.")
 
 
 @router.post("/documents/{document_id}/assumptions/preview")
@@ -1120,14 +1138,13 @@ def forecast(request: Request, document_id: str, scenario_id: str = BASE, error:
 
     chosen = next((f for f in forecasts if f.scenario_id == scenario_id), None)
     if chosen is None:
-        reason = not_built.get(
-            scenario_id, f"scenario {scenario_id!r} has no forecast yet"
-        )
+        reason = not_built.get(scenario_id, f"scenario {scenario_id!r} has no forecast yet")
         return _forecast_blocked(request, result, reason, scenario_id, error)
 
     readiness = check_every_scenario(tuple(forecasts), not_built)
     return _templates(request).TemplateResponse(
-        request=request, name="forecast.html",
+        request=request,
+        name="forecast.html",
         context={
             "document": result.document,
             "result": result,
@@ -1148,8 +1165,11 @@ def forecast(request: Request, document_id: str, scenario_id: str = BASE, error:
             "readiness": readiness,
             "comparison_code": COMPARISON_CODE,
             "comparison_rows": comparison(
-                tuple(forecasts), Statement.INCOME, COMPARISON_CODE,
-                readiness=readiness, scenarios=scenarios,
+                tuple(forecasts),
+                Statement.INCOME,
+                COMPARISON_CODE,
+                readiness=readiness,
+                scenarios=scenarios,
             )
             if len(forecasts) > 1
             else (),
@@ -1160,15 +1180,20 @@ def forecast(request: Request, document_id: str, scenario_id: str = BASE, error:
 
 def _forecast_blocked(request, result, reason: str, scenario_id: str, error: str):
     return _templates(request).TemplateResponse(
-        request=request, name="forecast.html",
+        request=request,
+        name="forecast.html",
         context={
-            "document": result.document, "result": result, "blocked": reason,
-            "scenario_id": scenario_id, "error": error,
+            "document": result.document,
+            "result": result,
+            "blocked": reason,
+            "scenario_id": scenario_id,
+            "error": error,
         },
     )
 
 
 # --- items 109-120: the DCF valuation screen (7.9) --------------------------
+
 
 @router.get("/documents/{document_id}/valuation", response_class=HTMLResponse)
 def valuation(request: Request, document_id: str, scenario_id: str = BASE, error: str = ""):
@@ -1182,10 +1207,14 @@ def valuation(request: Request, document_id: str, scenario_id: str = BASE, error
 
     def blocked(reason: str):
         return _templates(request).TemplateResponse(
-            request=request, name="valuation.html",
+            request=request,
+            name="valuation.html",
             context={
-                "document": result.document, "result": result, "blocked": reason,
-                "scenario_id": scenario_id, "error": error,
+                "document": result.document,
+                "result": result,
+                "blocked": reason,
+                "scenario_id": scenario_id,
+                "error": error,
             },
         )
 
@@ -1202,7 +1231,8 @@ def valuation(request: Request, document_id: str, scenario_id: str = BASE, error
         return blocked(str(exc))
 
     return _templates(request).TemplateResponse(
-        request=request, name="valuation.html",
+        request=request,
+        name="valuation.html",
         context={
             "document": result.document,
             "result": result,
@@ -1221,6 +1251,7 @@ def valuation(request: Request, document_id: str, scenario_id: str = BASE, error
 
 
 # --- items 131-137: the diagnostics screen (7.10) ---------------------------
+
 
 @router.get("/documents/{document_id}/diagnostics", response_class=HTMLResponse)
 def diagnostics(
@@ -1254,9 +1285,7 @@ def diagnostics(
     traceable = traceable_lines(built)
     trace_code, trace_period = _trace_target(code, traceable)
     lineage = (
-        trace(result, built, trace_code, trace_period)
-        if trace_code and built is not None
-        else None
+        trace(result, built, trace_code, trace_period) if trace_code and built is not None else None
     )
 
     log = filter_events(
@@ -1269,7 +1298,8 @@ def diagnostics(
     dependents = graph.dependents()
 
     return _templates(request).TemplateResponse(
-        request=request, name="diagnostics.html",
+        request=request,
+        name="diagnostics.html",
         context={
             "document": result.document,
             "result": result,
@@ -1325,25 +1355,33 @@ def _trace_target(raw: str, traceable) -> tuple[str, str]:
 #: that already exist elsewhere rather than being built twice.
 DOWNLOADS = (
     (
-        "workbook", "Full model workbook (.xlsx)", "7.11.a",
+        "workbook",
+        "Full model workbook (.xlsx)",
+        "7.11.a",
         "All sixteen tabs 21.1 lists. Hardcodes and calculated figures are "
         "distinguishable by named style as well as by colour (21.2), and any "
         "value a spreadsheet number cannot hold exactly carries its exact "
         "value in a cell note.",
     ),
     (
-        "report", "PDF valuation report (.pdf)", "7.11.b",
+        "report",
+        "PDF valuation report (.pdf)",
+        "7.11.b",
         "21.6's nine sections: valuation date, source coverage, assumptions, "
         "forecast, DCF, sensitivities, checks, limitations and model version.",
     ),
     (
-        "json", "Normalized data (.json)", "7.11.c",
+        "json",
+        "Normalized data (.json)",
+        "7.11.c",
         "Every table, validated against a published versioned schema on the "
         "way out (21.5). Numbers are decimal strings, because a JSON number is "
         "a float to most parsers and would lose the exact value.",
     ),
     (
-        "csv", "Normalized data (.csv, one file per table)", "7.11.c",
+        "csv",
+        "Normalized data (.csv, one file per table)",
+        "7.11.c",
         "Each table as its own CSV, with the data-dictionary reference in its "
         "header (21.4). A text cell a spreadsheet would run as a formula is "
         "neutralized; a negative number is not.",
@@ -1366,7 +1404,7 @@ def _download_name(model, extension: str) -> str:
     """
     stem = (model.company or model.document_id).replace(" ", "-")
     safe = "".join(c for c in stem if c.isalnum() or c in "-_")[:48] or "model"
-    return f"{safe}-{model.scenario_id}-{model.version_id[5:5 + 12]}.{extension}"
+    return f"{safe}-{model.scenario_id}-{model.version_id[5 : 5 + 12]}.{extension}"
 
 
 @router.get("/documents/{document_id}/exports", response_class=HTMLResponse)
@@ -1375,7 +1413,8 @@ def exports(request: Request, document_id: str, scenario_id: str = BASE):
     model = _export_model(request, document_id, scenario_id)
     result = _load(request, document_id)
     return _templates(request).TemplateResponse(
-        request=request, name="exports.html",
+        request=request,
+        name="exports.html",
         context={
             "document": result.document,
             "result": result,
@@ -1396,10 +1435,7 @@ def export_json_download(request: Request, document_id: str, scenario_id: str = 
     return Response(
         content=to_json(model),
         media_type="application/json",
-        headers={
-            "Content-Disposition":
-                f'attachment; filename="{_download_name(model, "json")}"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{_download_name(model, "json")}"'},
     )
 
 
@@ -1411,23 +1447,18 @@ def export_schema(request: Request, document_id: str):
 
 
 @router.get("/documents/{document_id}/exports/{table_name}.csv")
-def export_table_csv(
-    request: Request, document_id: str, table_name: str, scenario_id: str = BASE
-):
+def export_table_csv(request: Request, document_id: str, table_name: str, scenario_id: str = BASE):
     model = _export_model(request, document_id, scenario_id)
     try:
         table = model.table(table_name)
     except KeyError:
-        raise HTTPException(
-            status_code=404, detail=f"no table {table_name!r}"
-        ) from None
+        raise HTTPException(status_code=404, detail=f"no table {table_name!r}") from None
     return Response(
         content=table_to_csv(model, table),
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition":
-                f'attachment; filename="{table_name}-'
-                f'{model.version_id[5:5 + 12]}.csv"'
+            "Content-Disposition": f'attachment; filename="{table_name}-'
+            f'{model.version_id[5 : 5 + 12]}.csv"'
         },
     )
 
@@ -1437,13 +1468,8 @@ def export_workbook(request: Request, document_id: str, scenario_id: str = BASE)
     model = _export_model(request, document_id, scenario_id)
     return Response(
         content=xlsx_bytes(model),
-        media_type=(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
-        headers={
-            "Content-Disposition":
-                f'attachment; filename="{_download_name(model, "xlsx")}"'
-        },
+        media_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        headers={"Content-Disposition": f'attachment; filename="{_download_name(model, "xlsx")}"'},
     )
 
 
@@ -1453,14 +1479,12 @@ def export_report(request: Request, document_id: str, scenario_id: str = BASE):
     return Response(
         content=pdf_bytes(model),
         media_type="application/pdf",
-        headers={
-            "Content-Disposition":
-                f'attachment; filename="{_download_name(model, "pdf")}"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{_download_name(model, "pdf")}"'},
     )
 
 
 # --- items 145, 146: the credential, the session, and the way out ----------
+
 
 @router.get("/login", response_class=HTMLResponse)
 def login_form(request: Request, next: str = "/", error: str = ""):
@@ -1475,7 +1499,8 @@ def login_form(request: Request, next: str = "/", error: str = ""):
     if request.state.guard.session is not None:
         return RedirectResponse(safe_next(next), status_code=303)
     return request.app.state.templates.TemplateResponse(
-        request=request, name="login.html",
+        request=request,
+        name="login.html",
         context={
             "next": safe_next(next),
             "error": error,
@@ -1516,7 +1541,8 @@ def sign_in(
 
     if not state.credential.verify(password):
         security_event(
-            "authentication.failed", actor=client,
+            "authentication.failed",
+            actor=client,
             detail="the supplied password did not verify",
         )
         return RedirectResponse(
@@ -1529,10 +1555,9 @@ def sign_in(
     cookie, _ = issue_session(state.signing_key)
     response = RedirectResponse(safe_next(next), status_code=303)
     set_session_cookie(
-        response, cookie,
-        secure=is_secure_request(
-            request.url.scheme, request.url.hostname
-        ),
+        response,
+        cookie,
+        secure=is_secure_request(request.url.scheme, request.url.hostname),
     )
     security_event("authentication.succeeded", actor=client, detail="session issued")
     return response
@@ -1549,12 +1574,14 @@ def sign_out(request: Request, csrf_token: str = Form("")):
 
 # --- items 150, 151: retention, permanent deletion, and the backup -----------
 
+
 @router.get("/documents/{document_id}/settings", response_class=HTMLResponse)
 def settings(request: Request, document_id: str, error: str = "", ok: str = ""):
     """7.12 Settings, for one model: policies, retention and deletion."""
     result = _load(request, document_id)
     return _templates(request).TemplateResponse(
-        request=request, name="settings.html",
+        request=request,
+        name="settings.html",
         context={
             "document": result.document,
             "result": result,
@@ -1583,7 +1610,8 @@ def delete_document(
     result = _load(request, document_id)
     try:
         stone = delete_permanently(
-            result, request.app.state.storage_root,
+            result,
+            request.app.state.storage_root,
             actor=_actor(request),
             reason=reason,
             typed_filename=confirm_filename,
@@ -1596,7 +1624,10 @@ def delete_document(
             status_code=303,
         )
     security_event(
-        "document.deleted", actor=_actor(request), outcome="deleted",
-        document_id=document_id, detail=stone.reason,
+        "document.deleted",
+        actor=_actor(request),
+        outcome="deleted",
+        document_id=document_id,
+        detail=stone.reason,
     )
     return RedirectResponse(f"/?ok={quote(stone.describe())}", status_code=303)

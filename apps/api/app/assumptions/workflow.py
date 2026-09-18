@@ -156,12 +156,11 @@ def _check_evidence_still_holds(assumption: Assumption) -> None:
     try:
         assumption._check_evidence()
     except AssumptionError as exc:
-        raise WorkflowError(
-            f"{assumption.code} cannot be approved: {exc}"
-        ) from None
+        raise WorkflowError(f"{assumption.code} cannot be approved: {exc}") from None
 
 
 # --- 14.1: the gate -------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class GateResult:
@@ -184,10 +183,7 @@ class GateResult:
         if self.may_calculate:
             note = ""
             if self.self_reviewed:
-                note = (
-                    f" {len(self.self_reviewed)} of them were approved by their "
-                    "own owner."
-                )
+                note = f" {len(self.self_reviewed)} of them were approved by their own owner."
             return "Every required assumption is Approved or Reviewed." + note
         lines = []
         if self.missing:

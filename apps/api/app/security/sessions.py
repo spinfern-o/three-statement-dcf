@@ -77,8 +77,9 @@ class Session:
         return max(0, self.expires - int(time.time()))
 
 
-def issue(key: bytes, *, now: int | None = None,
-          lifetime: int = LIFETIME_SECONDS) -> tuple[str, Session]:
+def issue(
+    key: bytes, *, now: int | None = None, lifetime: int = LIFETIME_SECONDS
+) -> tuple[str, Session]:
     """Mint a cookie value for a browser that has just proved the password."""
     moment = int(time.time() if now is None else now)
     session = Session(
@@ -136,8 +137,12 @@ def is_secure_request(url_scheme: str, hostname: str | None) -> bool:
 
 def set_cookie(response, value: str, *, secure: bool, lifetime: int = LIFETIME_SECONDS) -> None:
     response.set_cookie(
-        COOKIE_NAME, value,
-        max_age=lifetime, httponly=True, samesite="strict", secure=secure,
+        COOKIE_NAME,
+        value,
+        max_age=lifetime,
+        httponly=True,
+        samesite="strict",
+        secure=secure,
         path="/",
     )
 

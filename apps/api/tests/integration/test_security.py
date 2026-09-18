@@ -54,20 +54,17 @@ def credential():
 @pytest.fixture
 def guarded(tmp_path, stored, store_root, credential):
     """An application with 2.2.c's credential actually configured."""
-    with browser_client(
-        create_app(store_root, credential=credential, key=KEY)
-    ) as client:
+    with browser_client(create_app(store_root, credential=credential, key=KEY)) as client:
         client.document_id = stored.document.id
         yield client
 
 
 def sign_in(client, password: str = PASSWORD):
-    return client.post(
-        "/login", data={"password": password, "next": "/"}, follow_redirects=False
-    )
+    return client.post("/login", data={"password": password, "next": "/"}, follow_redirects=False)
 
 
 # --- item 145: the credential -----------------------------------------------
+
 
 def test_a_password_is_verified_against_a_hash_not_a_stored_password(credential):
     assert credential.verify(PASSWORD)
@@ -121,6 +118,7 @@ def test_an_unset_signing_key_is_generated_not_defaulted():
 
 # --- item 145: the session --------------------------------------------------
 
+
 def test_a_session_verifies_only_under_the_key_that_issued_it():
     cookie, session = sessions.issue(KEY)
     assert sessions.verify(KEY, cookie).nonce == session.nonce
@@ -148,9 +146,7 @@ def test_a_session_issued_in_the_future_is_not_evidence_of_a_login():
         sessions.verify(KEY, cookie)
 
 
-@pytest.mark.parametrize(
-    "cookie", ["", "no-dot", "not.base64!!", "YWJj.YWJj"]
-)
+@pytest.mark.parametrize("cookie", ["", "no-dot", "not.base64!!", "YWJj.YWJj"])
 def test_a_malformed_cookie_is_refused_without_raising_anything_else(cookie):
     with pytest.raises(sessions.SessionError):
         sessions.verify(KEY, cookie)
@@ -178,6 +174,7 @@ def test_the_session_cookie_is_httponly_and_samesite_strict(guarded):
 
 # --- item 145: the guard ----------------------------------------------------
 
+
 def test_an_unauthenticated_page_request_goes_to_the_login(guarded):
     guarded.cookies.clear()
     response = guarded.get("/", follow_redirects=False)
@@ -198,7 +195,8 @@ def test_an_unauthenticated_post_is_refused_rather_than_redirected(guarded):
     guarded.cookies.clear()
     response = guarded.post(
         f"/documents/{guarded.document_id}/metadata",
-        data={"reason": "x"}, follow_redirects=False,
+        data={"reason": "x"},
+        follow_redirects=False,
     )
     assert response.status_code == 401
     assert "was not performed" in response.text
@@ -263,6 +261,7 @@ def test_the_login_is_not_an_open_redirect(target, expected):
 
 # --- 20.12: CSRF ------------------------------------------------------------
 
+
 def test_a_post_without_a_token_is_refused(client):
     response = client.post(
         f"/documents/{client.document_id}/metadata",
@@ -308,7 +307,7 @@ def test_every_post_form_in_every_template_carries_the_token():
     for path in sorted(templates.glob("*.html")):
         body = path.read_text()
         for match in opening.finditer(body):
-            tail = body[match.end():match.end() + 400]
+            tail = body[match.end() : match.end() + 400]
             assert 'name="csrf_token"' in tail, f"{path.name}: {match.group(0)[:60]}"
 
 
@@ -326,6 +325,7 @@ def test_the_body_survives_the_guard(client):
 
 
 # --- item 146: 20.7's authorization ----------------------------------------
+
 
 def test_a_document_belonging_to_somebody_else_is_a_404_not_a_403(store_root, stored):
     """20.7: an unauthorized resource answers exactly as a nonexistent one, so
@@ -362,19 +362,17 @@ def test_every_document_route_goes_through_the_checked_loader():
     """Item 146 is one line in one place only if nothing bypasses it."""
     from pathlib import Path
 
-    source = (
-        Path(__file__).resolve().parents[2] / "app" / "api" / "routes.py"
-    ).read_text()
+    source = (Path(__file__).resolve().parents[2] / "app" / "api" / "routes.py").read_text()
     # `load_result` outside `_load` and the portfolio's own filtered listing
     # would be a read that skipped the check.
     calls = [
-        line for line in source.splitlines()
-        if "load_result(" in line and "def _load" not in line
+        line for line in source.splitlines() if "load_result(" in line and "def _load" not in line
     ]
     assert len(calls) == 2, calls  # one in _load, one in the filtered portfolio
 
 
 # --- item 148: rate limits --------------------------------------------------
+
 
 def test_the_login_is_rate_limited(guarded):
     guarded.cookies.clear()
@@ -427,6 +425,7 @@ def test_the_limiters_admit_they_are_per_process():
 
 
 # --- item 149: the log ------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "text, gone",

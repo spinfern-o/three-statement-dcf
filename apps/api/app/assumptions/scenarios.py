@@ -54,9 +54,20 @@ BASE = "base"
 #: containing "down", and a reviewer arguing with a guess stops reading the
 #: rule.
 PROBABILITY_WORDS = (
-    "likely", "unlikely", "probable", "probability", "improbable",
-    "expected", "certain", "uncertain", "guaranteed", "odds", "chance",
-    "median", "percentile", "confidence",
+    "likely",
+    "unlikely",
+    "probable",
+    "probability",
+    "improbable",
+    "expected",
+    "certain",
+    "uncertain",
+    "guaranteed",
+    "odds",
+    "chance",
+    "median",
+    "percentile",
+    "confidence",
 )
 #: `P50`, `P90`: percentile shorthand, which is the same claim in fewer letters.
 PERCENTILE = re.compile(r"\bp\s?\d{1,3}\b", re.IGNORECASE)
@@ -88,9 +99,7 @@ class Probability:
 
         object.__setattr__(self, "value", D(self.value, what="scenario probability"))
         if not 0 <= self.value <= 1:
-            raise ScenarioError(
-                f"a probability must be between 0 and 1, got {self.value}"
-            )
+            raise ScenarioError(f"a probability must be between 0 and 1, got {self.value}")
         if not self.source.strip() or not self.date.strip():
             raise ScenarioError(
                 "14.9 allows a probability-implying name only when the "
@@ -239,9 +248,7 @@ class ScenarioSet:
         for scenario in self.scenarios:
             if scenario.id == scenario_id:
                 return scenario
-        raise KeyError(
-            f"no scenario {scenario_id!r}; known: {[s.id for s in self.scenarios]}"
-        )
+        raise KeyError(f"no scenario {scenario_id!r}; known: {[s.id for s in self.scenarios]}")
 
     def lineage(self, scenario_id: str) -> tuple[str, ...]:
         """This scenario, then its parent, then its parent's parent."""
@@ -280,9 +287,7 @@ class ScenarioSet:
                 if period is not None and not assumption.applies_to(period):
                     continue
                 bucket = (
-                    general
-                    if period is not None and assumption.applies_to_every_period
-                    else out
+                    general if period is not None and assumption.applies_to_every_period else out
                 )
                 if assumption.code in bucket:
                     continue  # a nearer scenario already answered
@@ -291,9 +296,7 @@ class ScenarioSet:
             out.setdefault(code, resolved)
         return out
 
-    def differences(
-        self, scenario_id: str
-    ) -> tuple[tuple[str, Decimal | None, Decimal], ...]:
+    def differences(self, scenario_id: str) -> tuple[tuple[str, Decimal | None, Decimal], ...]:
         """14.6: what this scenario actually departs from its parent in.
 
         `(code, parent value, this scenario's value)` for every code where the
@@ -332,22 +335,19 @@ class ScenarioSet:
 
     # --- writing ------------------------------------------------------------
     def with_scenario(self, scenario: Scenario) -> ScenarioSet:
-        return replace(
-            self, scenarios=self.scenarios + (scenario,), version=self.version + 1
-        )
+        return replace(self, scenarios=self.scenarios + (scenario,), version=self.version + 1)
 
     def with_assumption(self, assumption: Assumption) -> ScenarioSet:
         kept = tuple(
-            a for a in self.assumptions
+            a
+            for a in self.assumptions
             if not (
                 a.scenario_id == assumption.scenario_id
                 and a.code == assumption.code
                 and a.periods == assumption.periods
             )
         )
-        return replace(
-            self, assumptions=kept + (assumption,), version=self.version + 1
-        )
+        return replace(self, assumptions=kept + (assumption,), version=self.version + 1)
 
     def override(
         self,

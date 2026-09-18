@@ -145,18 +145,18 @@ def _assumption_kind(unit: str) -> str:
 def _origin(origin: str) -> str:
     """The ledger's own origin word, mapped onto 21.2's distinction."""
     return {
-        "reported": REPORTED, "derived": DERIVED, "forecast": FORECAST,
+        "reported": REPORTED,
+        "derived": DERIVED,
+        "forecast": FORECAST,
     }.get(str(origin), REPORTED)
 
 
 # --- the tabs ---------------------------------------------------------------
 
+
 def _cover(model_bits: dict) -> Table:
     """21.3: currency, units, dates, scenario and model version, stated."""
-    rows = [
-        (Cell.text(label), Cell.text(value))
-        for label, value in model_bits["cover_rows"]
-    ]
+    rows = [(Cell.text(label), Cell.text(value)) for label, value in model_bits["cover_rows"]]
     return Table(
         name="cover",
         title="Cover",
@@ -216,8 +216,12 @@ def _raw_facts(result) -> Table:
                 if fact.value is not None
                 else Cell.missing("the parser refused this cell rather than guess"),
                 Cell.text(location.page_number if location else ""),
-                Cell.number(fact.confidence.score, origin=DERIVED, kind="ratio",
-                            note=fact.confidence.explain()),
+                Cell.number(
+                    fact.confidence.score,
+                    origin=DERIVED,
+                    kind="ratio",
+                    note=fact.confidence.explain(),
+                ),
                 Cell.text(fact.verification_status.value),
                 Cell.text(decision.action if decision else "(not reviewed)"),
                 Cell.text(decision.reason if decision else ""),
@@ -249,7 +253,8 @@ def _mapping(result) -> Table:
     mappings: MappingSet | None = result.mappings
     if mappings is None:
         return Table(
-            name="mapping", title="Mapping",
+            name="mapping",
+            title="Mapping",
             columns=(Column("fact", "Fact"), Column("code", "Canonical line")),
             note="Nobody has started mapping this filing.",
             unavailable=True,
@@ -273,7 +278,8 @@ def _mapping(result) -> Table:
             )
         )
     return Table(
-        name="mapping", title="Mapping",
+        name="mapping",
+        title="Mapping",
         columns=(
             Column("fact", "Printed label"),
             Column("code", "Canonical line"),
@@ -299,9 +305,11 @@ _HISTORICAL = (
 def _historical(built, statement: Statement, name: str, title: str, raw, note: str) -> Table:
     if built is None:
         return Table(
-            name=name, title=title,
+            name=name,
+            title=title,
             columns=(Column("line", "Line"),),
-            note=note, unavailable=True,
+            note=note,
+            unavailable=True,
         )
     columns = [Column("line", "Line")]
     for year in built.years:
@@ -322,8 +330,10 @@ def _historical(built, statement: Statement, name: str, title: str, raw, note: s
                 )
         rows.append(tuple(cells))
     return Table(
-        name=name, title=title,
-        columns=tuple(columns), rows=tuple(rows),
+        name=name,
+        title=title,
+        columns=tuple(columns),
+        rows=tuple(rows),
         note="Every figure carries the page it was printed on (10.31).",
     )
 
@@ -331,9 +341,11 @@ def _historical(built, statement: Statement, name: str, title: str, raw, note: s
 def _schedules(built, note: str) -> Table:
     if built is None:
         return Table(
-            name="schedules", title="Schedules",
+            name="schedules",
+            title="Schedules",
             columns=(Column("schedule", "Schedule"),),
-            note=note, unavailable=True,
+            note=note,
+            unavailable=True,
         )
     schedules = build_schedules(built)
     columns = [
@@ -348,8 +360,14 @@ def _schedules(built, note: str) -> Table:
 
     rows: list[tuple[Cell, ...]] = []
 
-    def add(schedule, label: str, values, note_text: str = "", origin: str = DERIVED,
-            kind: str = "currency"):
+    def add(
+        schedule,
+        label: str,
+        values,
+        note_text: str = "",
+        origin: str = DERIVED,
+        kind: str = "currency",
+    ):
         cells = [
             Cell.text(schedule.title),
             Cell.text(schedule.rule),
@@ -394,9 +412,9 @@ def _schedules(built, note: str) -> Table:
             # here would silently report one schedule's figures under another
             # schedule's name.
             return tuple(
-                pick(by_year[year]) if year in by_year else None
-                for year in schedules.years
+                pick(by_year[year]) if year in by_year else None for year in schedules.years
             )
+
         add(schedule, "Beginning balance", series(lambda y: y.beginning.value))
         labels: list[str] = []
         for period in schedule.years:
@@ -404,11 +422,13 @@ def _schedules(built, note: str) -> Table:
                 if line.label not in labels:
                     labels.append(line.label)
         for label in labels:
+
             def movement(y, label=label):
                 for line in y.movements:
                     if line.label == label:
                         return line.value
                 return None
+
             add(schedule, label, series(movement))
         add(schedule, "Computed ending", series(lambda y: y.computed_ending))
         add(schedule, "Reported ending", series(lambda y: y.reported_ending), origin=REPORTED)
@@ -430,8 +450,10 @@ def _schedules(built, note: str) -> Table:
         add(schedule, "(not built)", blank, schedule.reason)
 
     return Table(
-        name="schedules", title="Schedules",
-        columns=tuple(columns), rows=tuple(rows),
+        name="schedules",
+        title="Schedules",
+        columns=tuple(columns),
+        rows=tuple(rows),
         note=(
             "13.8: each schedule's own closing figure against the statement's. "
             "The difference is reported and never applied to anything."
@@ -456,7 +478,9 @@ def _assumptions(scenarios: ScenarioSet | None, scenario_id: str) -> Table:
     )
     if scenarios is None or not scenarios.assumptions:
         return Table(
-            name="assumptions", title="Assumptions", columns=columns,
+            name="assumptions",
+            title="Assumptions",
+            columns=columns,
             note="No assumption has been entered for this model.",
             unavailable=True,
         )
@@ -470,7 +494,8 @@ def _assumptions(scenarios: ScenarioSet | None, scenario_id: str) -> Table:
                 Cell.text(assumption.code),
                 Cell.text(assumption.name),
                 Cell.number(
-                    assumption.value, origin=REPORTED,
+                    assumption.value,
+                    origin=REPORTED,
                     kind=_assumption_kind(assumption.unit),
                 ),
                 Cell.text(assumption.unit),
@@ -485,7 +510,10 @@ def _assumptions(scenarios: ScenarioSet | None, scenario_id: str) -> Table:
             )
         )
     return Table(
-        name="assumptions", title="Assumptions", columns=columns, rows=tuple(rows),
+        name="assumptions",
+        title="Assumptions",
+        columns=columns,
+        rows=tuple(rows),
         note=(
             f"Scenario {scenario_id!r}, resolved: a scenario's own record "
             "shadows its parent's, and the parent's stays reachable (14.7)."
@@ -503,8 +531,11 @@ _FORECASTS = (
 def _forecast(forecast, statement: Statement, name: str, title: str, note: str) -> Table:
     if forecast is None:
         return Table(
-            name=name, title=title, columns=(Column("line", "Line"),),
-            note=note, unavailable=True,
+            name=name,
+            title=title,
+            columns=(Column("line", "Line"),),
+            note=note,
+            unavailable=True,
         )
     periods = forecast_columns(forecast)
     columns = [Column("line", "Line"), Column("code", "Code")]
@@ -517,12 +548,13 @@ def _forecast(forecast, statement: Statement, name: str, title: str, note: str) 
             if cell.value is None:
                 cells.append(Cell.missing(cell.basis or "no value for this period"))
             else:
-                cells.append(
-                    Cell.number(cell.value, origin=_origin(cell.origin), note=cell.basis)
-                )
+                cells.append(Cell.number(cell.value, origin=_origin(cell.origin), note=cell.basis))
         rows.append(tuple(cells))
     return Table(
-        name=name, title=title, columns=tuple(columns), rows=tuple(rows),
+        name=name,
+        title=title,
+        columns=tuple(columns),
+        rows=tuple(rows),
         note="7.8.d: every column says whether it is an actual or an estimate.",
     )
 
@@ -537,18 +569,22 @@ def _dcf(valuation, note: str) -> Table:
     )
     if valuation is None:
         return Table(
-            name="dcf", title="DCF", columns=columns, note=note, unavailable=True,
+            name="dcf",
+            title="DCF",
+            columns=columns,
+            note=note,
+            unavailable=True,
         )
     result = valuation.valuation
     capital = valuation.cost_of_capital
     rows: list[tuple[Cell, ...]] = []
 
-    def add(label: str, value, detail: str = "", origin: str = DERIVED,
-            kind: str = "currency"):
+    def add(label: str, value, detail: str = "", origin: str = DERIVED, kind: str = "currency"):
         rows.append(
             (
                 Cell.text(label),
-                Cell.number(value, origin=origin, kind=kind) if value is not None
+                Cell.number(value, origin=origin, kind=kind)
+                if value is not None
                 else Cell.missing(detail or "not available"),
                 Cell.text(detail),
             )
@@ -556,15 +592,18 @@ def _dcf(valuation, note: str) -> Table:
 
     for record in valuation.inputs:
         add(
-            record.name, record.value,
+            record.name,
+            record.value,
             f"{record.source_type} - {record.evidence} ({record.status})",
-            origin=REPORTED, kind=_assumption_kind(record.unit),
+            origin=REPORTED,
+            kind=_assumption_kind(record.unit),
         )
     add("Cost of equity", capital.cost_of_equity, "CAPM (16.7)", kind="ratio")
     add("WACC", result.wacc, f"16.9, timing {valuation.schedule.basis}", kind="ratio")
     for year in result.discounted:
         add(
-            f"FCFF {year.year}", year.fcff,
+            f"FCFF {year.year}",
+            year.fcff,
             f"period {year.period}, factor {year.discount_factor}",
         )
         add(f"PV of FCFF {year.year}", year.present_value, "16.14")
@@ -597,10 +636,16 @@ def _dcf(valuation, note: str) -> Table:
     share = terminal_share(valuation)
     add(
         "Terminal value share of enterprise value",
-        share.share, share.describe(), origin=DERIVED, kind="ratio",
+        share.share,
+        share.describe(),
+        origin=DERIVED,
+        kind="ratio",
     )
     return Table(
-        name="dcf", title="DCF", columns=columns, rows=tuple(rows),
+        name="dcf",
+        title="DCF",
+        columns=columns,
+        rows=tuple(rows),
         note="16.2-16.22, in the order the valuation was built.",
     )
 
@@ -608,8 +653,11 @@ def _dcf(valuation, note: str) -> Table:
 def _sensitivity(valuation, note: str) -> Table:
     if valuation is None:
         return Table(
-            name="sensitivity", title="Sensitivity",
-            columns=(Column("wacc", "WACC"),), note=note, unavailable=True,
+            name="sensitivity",
+            title="Sensitivity",
+            columns=(Column("wacc", "WACC"),),
+            note=note,
+            unavailable=True,
         )
     grid = build_grid(valuation)
     columns = [Column("wacc", "WACC \\ terminal growth")]
@@ -625,8 +673,10 @@ def _sensitivity(valuation, note: str) -> Table:
                 cells.append(Cell.number(cell.equity_value, origin=DERIVED))
         rows.append(tuple(cells))
     return Table(
-        name="sensitivity", title="Sensitivity",
-        columns=tuple(columns), rows=tuple(rows),
+        name="sensitivity",
+        title="Sensitivity",
+        columns=tuple(columns),
+        rows=tuple(rows),
         note=f"16.23. {grid.describe()}",
     )
 
@@ -646,7 +696,8 @@ def _checks(outcomes) -> Table:
             )
         )
     return Table(
-        name="checks", title="Checks",
+        name="checks",
+        title="Checks",
         columns=(
             Column("code", "Code"),
             Column("clause", "Clause"),
@@ -682,7 +733,8 @@ def _audit(result) -> Table:
         for (actor, action), count in sorted(counts.items())
     ]
     return Table(
-        name="audit_summary", title="Audit Summary",
+        name="audit_summary",
+        title="Audit Summary",
         columns=(
             Column("actor", "Actor"),
             Column("action", "Action"),
@@ -698,6 +750,7 @@ def _audit(result) -> Table:
 
 
 # --- the gather -------------------------------------------------------------
+
 
 def gather(
     result,

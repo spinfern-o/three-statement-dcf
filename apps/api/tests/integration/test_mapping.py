@@ -70,9 +70,7 @@ def reviewed(extracted):
             )
     for fact in list(result.facts):
         if fact.value is not None and fact.decision is None:
-            result = accept_fact(
-                result, fact.id, actor="owner", reason="matches the printed page"
-            )
+            result = accept_fact(result, fact.id, actor="owner", reason="matches the printed page")
     return result
 
 
@@ -87,11 +85,13 @@ def mapped(proposed):
     result = proposed
     for period in ("2025", "2024"):
         ids = [
-            f.id for f in result.facts
-            if f.raw_label in OPEX_LABELS and f.period_label == period
+            f.id for f in result.facts if f.raw_label in OPEX_LABELS and f.period_label == period
         ]
         result = combine_facts(
-            result, ids, accounts.OPERATING_EXPENSES, actor="owner",
+            result,
+            ids,
+            accounts.OPERATING_EXPENSES,
+            actor="owner",
             note="the filer presents three operating expense categories; the chart has one line",
         )
     result = approve_all(result, actor="owner", note="each label matches the canonical definition")
@@ -100,10 +100,9 @@ def mapped(proposed):
 
 # --- item 51: proposals -----------------------------------------------------
 
+
 def test_proposals_cover_the_statement_lines_and_skip_the_traps(proposed):
-    mapped_labels = {
-        _label(proposed, m.reported_fact_id) for m in proposed.mappings.mappings
-    }
+    mapped_labels = {_label(proposed, m.reported_fact_id) for m in proposed.mappings.mappings}
     assert "Revenue" in mapped_labels
     assert "Total assets" in mapped_labels
     assert "Total current assets" not in mapped_labels
@@ -126,6 +125,7 @@ def test_proposing_twice_does_not_duplicate(proposed):
 
 
 # --- item 54: 11.6 ----------------------------------------------------------
+
 
 def test_three_expense_lines_on_one_canonical_line_is_flagged(proposed):
     """Until it is declared an aggregate, it is two figures added where one
@@ -157,13 +157,15 @@ def test_mapping_one_fact_to_a_subtotal_and_its_component_is_refused(mapped):
     fact = _fact(mapped, "Revenue")
     broken = mapped.mappings.add(
         mapped.mappings.for_fact(fact.id)[0],
-        actor="owner", reason="deliberately duplicated for the test",
+        actor="owner",
+        reason="deliberately duplicated for the test",
     )
     findings = duplicate_counting(mapped, broken)
     assert any(f.code is ReasonCode.DOUBLE_COUNTED for f in findings)
 
 
 # --- item 55: 11.7 ----------------------------------------------------------
+
 
 def test_every_subtotal_reconciles_on_a_correctly_mapped_filing(mapped):
     assert subtotal_reconciliation(mapped) == ()
@@ -181,7 +183,10 @@ def _misaggregate(result):
     """
     ids = [_fact(result, "Cost of goods sold").id, _fact(result, "Interest expense").id]
     return combine_facts(
-        result, ids, accounts.COGS, actor="owner",
+        result,
+        ids,
+        accounts.COGS,
+        actor="owner",
         note="deliberately wrong, for the test",
     )
 
@@ -217,19 +222,24 @@ def test_an_absent_component_skips_the_check_rather_than_assuming_zero(mapped):
     `other_current_assets`, which this filing does not report."""
     ledger = normalize(mapped)
     assert lookup(ledger, accounts.OTHER_CURRENT_ASSETS, "2025") is None
-    assert not [f for f in subtotal_reconciliation(mapped)
-                if f.canonical_code == accounts.TOTAL_ASSETS]
+    assert not [
+        f for f in subtotal_reconciliation(mapped) if f.canonical_code == accounts.TOTAL_ASSETS
+    ]
 
 
 # --- item 53: split and combine --------------------------------------------
+
 
 def test_a_split_must_account_for_the_whole_value(mapped):
     fact = _fact(mapped, "Revenue")
     with pytest.raises(MappingError) as exc:
         split_fact(
-            mapped, fact.id,
+            mapped,
+            fact.id,
             [(accounts.REVENUE, "1000000"), (accounts.OTHER_INCOME_EXPENSE, "1")],
-            basis="note 3", actor="owner", note="test",
+            basis="note 3",
+            actor="owner",
+            note="test",
         )
     assert "account for the whole printed value" in str(exc.value)
 
@@ -239,9 +249,12 @@ def test_a_split_needs_the_disclosure_it_rests_on(mapped):
     fact = _fact(mapped, "Revenue")
     with pytest.raises(MappingError) as exc:
         split_fact(
-            mapped, fact.id,
+            mapped,
+            fact.id,
             [(accounts.REVENUE, "1250000"), (accounts.OTHER_INCOME_EXPENSE, "0")],
-            basis="  ", actor="owner", note="test",
+            basis="  ",
+            actor="owner",
+            note="test",
         )
     assert "11.4" in str(exc.value)
 
@@ -249,10 +262,12 @@ def test_a_split_needs_the_disclosure_it_rests_on(mapped):
 def test_a_valid_split_records_its_parts_and_its_basis(mapped):
     fact = _fact(mapped, "Revenue")
     after = split_fact(
-        mapped, fact.id,
+        mapped,
+        fact.id,
         [(accounts.REVENUE, "1200000"), (accounts.OTHER_INCOME_EXPENSE, "50000")],
         basis="note 3 separates 50,000 of royalty income from product revenue",
-        actor="owner", note="royalties are not revenue from contracts with customers",
+        actor="owner",
+        note="royalties are not revenue from contracts with customers",
     )
     mappings = after.mappings.for_fact(fact.id)
     assert len(mappings) == 2
@@ -266,8 +281,14 @@ def test_a_split_of_an_unparsed_fact_is_refused(reviewed, extracted):
     result = propose_all(extracted)
     fact = next(f for f in result.facts if f.value is None)
     with pytest.raises(MappingError) as exc:
-        split_fact(result, fact.id, [("revenue", "1"), ("cogs", "1")],
-                   basis="note", actor="owner", note="test")
+        split_fact(
+            result,
+            fact.id,
+            [("revenue", "1"), ("cogs", "1")],
+            basis="note",
+            actor="owner",
+            note="test",
+        )
     assert "nothing to divide" in str(exc.value)
 
 
@@ -284,6 +305,7 @@ def test_combining_across_periods_is_refused(proposed):
 
 # --- item 56: approval, and what it unlocks ---------------------------------
 
+
 def test_a_fully_mapped_document_produces_verified_facts(mapped):
     """The first VERIFIED facts in this system. All seven conditions of §9."""
     progress = review_progress(mapped)
@@ -296,16 +318,16 @@ def test_a_fully_mapped_document_produces_verified_facts(mapped):
 def test_the_unmapped_lines_are_the_ones_with_no_canonical_home(mapped):
     progress = review_progress(mapped)
     assert progress.unmapped == 4  # two labels, two periods
-    unmapped = {
-        f.raw_label for f in mapped.facts if not mapped.mappings.for_fact(f.id)
-    }
+    unmapped = {f.raw_label for f in mapped.facts if not mapped.mappings.for_fact(f.id)}
     assert unmapped == {"Total current assets", "Total liabilities and equity"}
 
 
 def test_an_excluded_line_is_reviewed_and_out_of_the_model(mapped):
     fact = _fact(mapped, "Total current assets")
     after = reject_mapping(
-        mapped, fact.id, actor="owner",
+        mapped,
+        fact.id,
+        actor="owner",
         note="the chart has no current-total line; this is a subtotal of part of the balance sheet",
     )
     after = approve_fact_mapping(after, fact.id, actor="owner", note="confirmed, not a chart line")
@@ -327,6 +349,7 @@ def test_mapping_a_fact_rejected_in_source_review_is_refused(reviewed):
 
 # --- item 58: invalidation --------------------------------------------------
 
+
 def test_changing_a_mapping_withdraws_its_approval(mapped):
     """11.12. The approval was of a different mapping."""
     fact = _fact(mapped, "Revenue")
@@ -338,8 +361,9 @@ def test_changing_a_mapping_withdraws_its_approval(mapped):
 
 def test_changing_a_mapping_makes_a_new_version_and_keeps_the_old(mapped):
     before = mapped.mappings.version
-    after = map_fact(mapped, _fact(mapped, "Revenue").id, accounts.COGS,
-                     actor="owner", note="changed my mind")
+    after = map_fact(
+        mapped, _fact(mapped, "Revenue").id, accounts.COGS, actor="owner", note="changed my mind"
+    )
     assert after.mappings.version == before + 1
     assert after.mappings.supersedes == before
 
@@ -350,8 +374,13 @@ def test_a_stale_finding_does_not_survive_the_fix(mapped):
     assert any(f.mapping_codes for f in broken.facts)
 
     fixed = apply_findings(
-        map_fact(broken, _fact(broken, "Interest expense").id, accounts.INTEREST_EXPENSE,
-                 actor="owner", note="put it back where it belongs")
+        map_fact(
+            broken,
+            _fact(broken, "Interest expense").id,
+            accounts.INTEREST_EXPENSE,
+            actor="owner",
+            note="put it back where it belongs",
+        )
     )
     assert not any(f.mapping_codes for f in fixed.facts)
     assert all_findings(fixed) == ()
@@ -362,6 +391,7 @@ def test_applying_findings_twice_changes_nothing(mapped):
 
 
 # --- persistence ------------------------------------------------------------
+
 
 def test_mappings_survive_a_round_trip(mapped, repository):
     repository.save(mapped)

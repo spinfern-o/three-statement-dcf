@@ -96,9 +96,7 @@ _SUBTOTALS = frozenset(accounts.DERIVED)
 
 
 def _growth(values: tuple[Cell, ...]) -> tuple[tuple[Decimal | None, str], ...]:
-    out: list[tuple[Decimal | None, str]] = [
-        (None, "no prior period in this model")
-    ]
+    out: list[tuple[Decimal | None, str]] = [(None, "no prior period in this model")]
     for index in range(1, len(values)):
         prior, current = values[index - 1].value, values[index].value
         if prior is None or current is None:
@@ -118,9 +116,7 @@ def _growth(values: tuple[Cell, ...]) -> tuple[tuple[Decimal | None, str], ...]:
     return tuple(out)
 
 
-def statement_rows(
-    forecast: ScenarioForecast, statement: Statement
-) -> tuple[Row, ...]:
+def statement_rows(forecast: ScenarioForecast, statement: Statement) -> tuple[Row, ...]:
     """7.8.a-c for one statement, across every period actual and estimate."""
     ledger = forecast_ledger(forecast, statement)
     years = forecast.periods.all_years
@@ -132,9 +128,7 @@ def statement_rows(
         for year in years:
             cell = ledger.cell(code, year)
             cells.append(
-                Cell(None, "", "")
-                if cell is None
-                else Cell(cell.value, cell.origin, cell.cite())
+                Cell(None, "", "") if cell is None else Cell(cell.value, cell.origin, cell.cite())
             )
         item = chart.get(code)
         row = Row(
@@ -187,12 +181,8 @@ def comparison(
         out.append(
             ComparisonRow(
                 scenario_id=forecast.scenario_id,
-                differences=(
-                    scenarios.differences(forecast.scenario_id) if scenarios else ()
-                ),
-                values=tuple(
-                    ledger.get(code, year) for year in forecast.periods.all_years
-                ),
+                differences=(scenarios.differences(forecast.scenario_id) if scenarios else ()),
+                values=tuple(ledger.get(code, year) for year in forecast.periods.all_years),
                 forecast_ready=bool(checks and checks.is_forecast_ready),
             )
         )

@@ -80,7 +80,11 @@ class Cell:
 
     @classmethod
     def number(
-        cls, value: Decimal | None, *, origin: str = REPORTED, note: str = "",
+        cls,
+        value: Decimal | None,
+        *,
+        origin: str = REPORTED,
+        note: str = "",
         kind: str = "currency",
     ) -> Cell:
         """One figure, displayed the way the website displays it.

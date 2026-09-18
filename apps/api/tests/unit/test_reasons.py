@@ -71,7 +71,7 @@ def test_confidence_explains_itself():
 
 
 def test_an_unstated_condition_is_an_error_not_a_default():
-    """"We did not record it" is not "it did not happen"."""
+    """ "We did not record it" is not "it did not happen"."""
     with pytest.raises(ValueError) as exc:
         score_confidence({EvidenceCheck.PARSED: True})
     assert "TEXT_LAYER" in str(exc.value)

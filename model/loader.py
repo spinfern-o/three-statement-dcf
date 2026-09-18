@@ -46,14 +46,18 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 def _req(data: dict[str, Any], key: str, where: str, step: str) -> Any:
     """Fetch a required key, treating an unfilled template blank as missing."""
-    if key not in data or data[key] is None or (isinstance(data[key], str) and not data[key].strip()):
-        raise InputError(f"{where}.{key} is required by {step} and is blank. Fill it in -- do not leave it to a default.")
+    if (
+        key not in data
+        or data[key] is None
+        or (isinstance(data[key], str) and not data[key].strip())
+    ):
+        raise InputError(
+            f"{where}.{key} is required by {step} and is blank. Fill it in -- do not leave it to a default."
+        )
     return data[key]
 
 
-def _section(
-    data: dict[str, Any], key: str, where: str, step: str
-) -> dict[str, Any]:
+def _section(data: dict[str, Any], key: str, where: str, step: str) -> dict[str, Any]:
     value = _req(data, key, where, step)
     if not isinstance(value, dict):
         raise InputError(f"{where}.{key} must be a mapping ({step})")
@@ -111,7 +115,9 @@ def load_profile(path: Path) -> tuple[CompanyProfile, SourceMap, Periods]:
     historical = _req(periods_block, "historical", "periods", "STEP 3")
     forecast = _req(periods_block, "forecast", "periods", "STEP 12")
     if not isinstance(historical, list) or not isinstance(forecast, list):
-        raise InputError("periods.historical and periods.forecast must be lists of years (STEP 3 / STEP 12)")
+        raise InputError(
+            "periods.historical and periods.forecast must be lists of years (STEP 3 / STEP 12)"
+        )
     periods = Periods(tuple(str(y) for y in historical), tuple(str(y) for y in forecast))
 
     return profile, source_map, periods
@@ -143,7 +149,9 @@ def load_historical(path: Path, periods: Periods) -> dict[Statement, Ledger]:
             A.validate_account(statement, account)
             where = f"{key}.{account}"
             if not isinstance(spec, dict):
-                raise InputError(f"{where} must be a mapping with line_item, page and values (STEP 4)")
+                raise InputError(
+                    f"{where} must be a mapping with line_item, page and values (STEP 4)"
+                )
             line_item = str(_req(spec, "line_item", where, "STEP 4"))
             default_page = spec.get("page")
             per_year_pages = spec.get("pages") or {}
@@ -178,7 +186,9 @@ def load_historical(path: Path, periods: Periods) -> dict[Statement, Ledger]:
 
 
 # --- STEP 10-11 / 16 ------------------------------------------------------
-def load_assumptions(path: Path, periods: Periods) -> tuple[Assumptions, TaxSchedule, dict[str, Decimal]]:
+def load_assumptions(
+    path: Path, periods: Periods
+) -> tuple[Assumptions, TaxSchedule, dict[str, Decimal]]:
     data = _load_yaml(path)
     assumptions = Assumptions()
 
@@ -241,7 +251,9 @@ def load_assumptions(path: Path, periods: Periods) -> tuple[Assumptions, TaxSche
 
     segments_block = data.get("segments") or {}
     if segments_block and not isinstance(segments_block, dict):
-        raise InputError("assumptions.segments must be a mapping of segment -> last actual revenue (STEP 13)")
+        raise InputError(
+            "assumptions.segments must be a mapping of segment -> last actual revenue (STEP 13)"
+        )
     segments = {str(k): _num(v, f"segments.{k}") for k, v in segments_block.items()}
 
     return assumptions, taxes, segments
@@ -254,17 +266,22 @@ def load_valuation(path: Path) -> dict[str, Any]:
     coc_block = _section(data, "cost_of_capital", str(path), "STEP 25-28")
     sources_block = _section(coc_block, "sources", "cost_of_capital", "STEP 25-27")
     cost_of_capital = CostOfCapital(
-        risk_free_rate=_num(_req(coc_block, "risk_free_rate", "cost_of_capital", "STEP 25"), "risk_free_rate"),
+        risk_free_rate=_num(
+            _req(coc_block, "risk_free_rate", "cost_of_capital", "STEP 25"), "risk_free_rate"
+        ),
         beta=_num(_req(coc_block, "beta", "cost_of_capital", "STEP 25"), "beta"),
         equity_risk_premium=_num(
-            _req(coc_block, "equity_risk_premium", "cost_of_capital", "STEP 25"), "equity_risk_premium"
+            _req(coc_block, "equity_risk_premium", "cost_of_capital", "STEP 25"),
+            "equity_risk_premium",
         ),
         pretax_cost_of_debt=_num(
-            _req(coc_block, "pretax_cost_of_debt", "cost_of_capital", "STEP 26"), "pretax_cost_of_debt"
+            _req(coc_block, "pretax_cost_of_debt", "cost_of_capital", "STEP 26"),
+            "pretax_cost_of_debt",
         ),
         tax_rate=_num(_req(coc_block, "tax_rate", "cost_of_capital", "STEP 26"), "tax_rate"),
         market_value_equity=_num(
-            _req(coc_block, "market_value_equity", "cost_of_capital", "STEP 27"), "market_value_equity"
+            _req(coc_block, "market_value_equity", "cost_of_capital", "STEP 27"),
+            "market_value_equity",
         ),
         market_value_debt=_num(
             _req(coc_block, "market_value_debt", "cost_of_capital", "STEP 27"), "market_value_debt"
@@ -274,16 +291,22 @@ def load_valuation(path: Path) -> dict[str, Any]:
 
     tg_block = _section(data, "terminal_growth", str(path), "STEP 30-31")
     _req(tg_block, "source", "terminal_growth", "STEP 10")
-    terminal_growth = _num(_req(tg_block, "value", "terminal_growth", "STEP 30"), "terminal_growth.value")
+    terminal_growth = _num(
+        _req(tg_block, "value", "terminal_growth", "STEP 30"), "terminal_growth.value"
+    )
 
     bridge_block = _section(data, "equity_bridge", str(path), "STEP 34")
     bridge = EquityBridge(
         cash=_num(_req(bridge_block, "cash", "equity_bridge", "STEP 34"), "equity_bridge.cash"),
         debt=_num(_req(bridge_block, "debt", "equity_bridge", "STEP 34"), "equity_bridge.debt"),
-        non_operating_investments=_num(bridge_block.get("non_operating_investments") or 0, "non_operating_investments"),
+        non_operating_investments=_num(
+            bridge_block.get("non_operating_investments") or 0, "non_operating_investments"
+        ),
         minority_interest=_num(bridge_block.get("minority_interest") or 0, "minority_interest"),
         preferred_stock=_num(bridge_block.get("preferred_stock") or 0, "preferred_stock"),
-        pension_obligations=_num(bridge_block.get("pension_obligations") or 0, "pension_obligations"),
+        pension_obligations=_num(
+            bridge_block.get("pension_obligations") or 0, "pension_obligations"
+        ),
         other_claims=_num(bridge_block.get("other_claims") or 0, "other_claims"),
     )
 
@@ -298,7 +321,9 @@ def load_valuation(path: Path) -> dict[str, Any]:
 
     sens_block = data.get("sensitivity") or {}
     wacc_values = [_num(v, "sensitivity.wacc") for v in (sens_block.get("wacc") or [])]
-    growth_values = [_num(v, "sensitivity.terminal_growth") for v in (sens_block.get("terminal_growth") or [])]
+    growth_values = [
+        _num(v, "sensitivity.terminal_growth") for v in (sens_block.get("terminal_growth") or [])
+    ]
 
     return {
         "cost_of_capital": cost_of_capital,

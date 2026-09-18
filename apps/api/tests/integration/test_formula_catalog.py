@@ -52,6 +52,7 @@ def formulas():
 
 # --- the catalogue and the chart cannot drift -------------------------------
 
+
 def test_every_derived_subtotal_has_a_catalogue_row(formulas):
     """The registry is generated from `accounts.DERIVED`, so this cannot fail
     by omission -- which is the point. It fails if someone hand-edits one."""
@@ -65,8 +66,7 @@ def test_the_expression_is_the_charts_own_components(formulas, account):
     definition = formulas.for_target(account)
     assert definition.inputs == frozenset(plus) | frozenset(minus)
     assert definition.rounding == "exact", (
-        "a sum of currency amounts contains no division, so it is exact under "
-        "4.12's second clause"
+        "a sum of currency amounts contains no division, so it is exact under 4.12's second clause"
     )
 
 
@@ -81,9 +81,15 @@ def test_every_formula_carries_a_written_definition(formulas):
 #: 4.16 names the outputs a benchmark must compare. These are the ones this
 #: file's subject -- the historical derivations -- is responsible for.
 SECTION_4_16_DERIVATIONS = (
-    "gross_profit", "ebit", "pretax_income", "net_income",
-    "total_assets", "total_liabilities", "total_equity",
-    "cash_flow_from_operations", "cash_flow_from_investing",
+    "gross_profit",
+    "ebit",
+    "pretax_income",
+    "net_income",
+    "total_assets",
+    "total_liabilities",
+    "total_equity",
+    "cash_flow_from_operations",
+    "cash_flow_from_investing",
     "cash_flow_from_financing",
 )
 
@@ -102,6 +108,7 @@ def test_the_4_16_list_is_covered_except_the_line_the_chart_lacks(formulas):
 
 
 # --- 4.15: two implementations, one answer, on a real filing ---------------
+
 
 def test_the_two_implementations_agree_on_the_golden_filing(built, formulas):
     """Exactly equal, not within tolerance: both are exact decimal sums (4.12)."""
@@ -153,6 +160,7 @@ def test_the_assumed_nil_residuals_are_named_rather_than_silent(built, formulas)
 
 # --- 4.17: extremes, on inputs no filing would produce ---------------------
 
+
 def _ledger_pair(values: dict[str, str]):
     """One income-statement ledger, and the matching formula environment."""
     year = "2025A"
@@ -192,13 +200,15 @@ EXTREMES = {
 def test_the_two_implementations_agree_on_extreme_inputs(case, formulas):
     """4.17. Both sides are exact sums, so the required answer is equality."""
     revenue, cogs, opex, interest, taxes = EXTREMES[case]
-    ledger, environment, year = _ledger_pair({
-        accounts.REVENUE: revenue,
-        accounts.COGS: cogs,
-        accounts.OPERATING_EXPENSES: opex,
-        accounts.INTEREST_EXPENSE: interest,
-        accounts.TAXES: taxes,
-    })
+    ledger, environment, year = _ledger_pair(
+        {
+            accounts.REVENUE: revenue,
+            accounts.COGS: cogs,
+            accounts.OPERATING_EXPENSES: opex,
+            accounts.INTEREST_EXPENSE: interest,
+            accounts.TAXES: taxes,
+        }
+    )
     ledger.fill_derivable()
 
     income_only = formulas.subset(frozenset(accounts.INCOME_ACCOUNTS))
@@ -208,8 +218,7 @@ def test_the_two_implementations_agree_on_extreme_inputs(case, formulas):
         engine = ledger.get(target, year)
         assert engine is not None, target
         assert model.value(target) == engine, (
-            f"{case}/{target}: formula engine {model.value(target)} vs "
-            f"Ledger._try_derive {engine}"
+            f"{case}/{target}: formula engine {model.value(target)} vs Ledger._try_derive {engine}"
         )
 
 
@@ -227,6 +236,7 @@ def test_a_repeating_decimal_rate_is_carried_at_context_precision():
 
 # --- 4.15 again, on inputs a filing could not produce ----------------------
 
+
 @pytest.mark.parametrize("scale", [0, 3, 6, 9, 12])
 def test_a_randomized_sweep_across_nine_orders_of_magnitude(scale, formulas):
     """The identities must survive reporting scales the fixture never uses."""
@@ -237,8 +247,11 @@ def test_a_randomized_sweep_across_nine_orders_of_magnitude(scale, formulas):
         values = {
             name: str(D(generator.randint(-500_000, 500_000)) * multiplier / D(100))
             for name in (
-                accounts.REVENUE, accounts.COGS, accounts.OPERATING_EXPENSES,
-                accounts.INTEREST_EXPENSE, accounts.TAXES,
+                accounts.REVENUE,
+                accounts.COGS,
+                accounts.OPERATING_EXPENSES,
+                accounts.INTEREST_EXPENSE,
+                accounts.TAXES,
                 accounts.OTHER_INCOME_EXPENSE,
             )
         }
@@ -255,6 +268,7 @@ def test_a_randomized_sweep_across_nine_orders_of_magnitude(scale, formulas):
 
 # --- the cross-check must be able to fail ----------------------------------
 
+
 def test_the_recomputation_catches_a_subtotal_that_does_not_follow(three_statements):
     """Every comparison above passes, which proves nothing on its own.
 
@@ -266,7 +280,8 @@ def test_the_recomputation_catches_a_subtotal_that_does_not_follow(three_stateme
     from apps.api.app.statements.build import build_statements
 
     fact = next(
-        f for f in three_statements.facts
+        f
+        for f in three_statements.facts
         if f.raw_label == "Gross profit" and f.period_label == "2025"
     )
     broken = correct_fact(
@@ -297,15 +312,15 @@ def test_a_corrupted_subtotal_does_not_contaminate_the_others(three_statements):
     from apps.api.app.statements.build import build_statements
 
     fact = next(
-        f for f in three_statements.facts
+        f
+        for f in three_statements.facts
         if f.raw_label == "Gross profit" and f.period_label == "2025"
     )
     broken = correct_fact(
         three_statements, fact.id, "499000", actor="owner", reason="deliberately wrong"
     )
     year = next(
-        y for y in formula_report(build_statements(broken, strict=False)).years
-        if y.year == "2025A"
+        y for y in formula_report(build_statements(broken, strict=False)).years if y.year == "2025A"
     )
     assert len(year.cells) >= 4
     failing = [cell.target for cell in year.cells if cell.agrees is False]

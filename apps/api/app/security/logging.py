@@ -50,10 +50,13 @@ PATTERNS = (
     # Anything that looks like a bearer token or key assignment.
     # The optional scheme word matters: "Authorization=Bearer <token>" without
     # it redacts the word "Bearer" and leaves the token.
-    (re.compile(
-        r"(?i)\b(password|secret|token|api[_-]?key|authorization)\b\s*[:=]\s*"
-        r"(?:(?:bearer|basic|token|digest)\s+)?\S+"
-    ), r"\1=[redacted]"),
+    (
+        re.compile(
+            r"(?i)\b(password|secret|token|api[_-]?key|authorization)\b\s*[:=]\s*"
+            r"(?:(?:bearer|basic|token|digest)\s+)?\S+"
+        ),
+        r"\1=[redacted]",
+    ),
     # An email address: the owner's, per the instruction that it is for
     # attribution and must not travel anywhere else.
     (re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"), "[redacted: email]"),

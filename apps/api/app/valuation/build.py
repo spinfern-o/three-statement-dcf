@@ -106,15 +106,24 @@ def _record(code: str, item, resolved, assumed_nil: bool = False) -> InputRecord
     definition = BY_CODE[code]
     if assumed_nil:
         return InputRecord(
-            code=code, name=definition.name, value=ZERO, unit=definition.unit,
-            rule=definition.rule, source_type="(not addressed)",
+            code=code,
+            name=definition.name,
+            value=ZERO,
+            unit=definition.unit,
+            rule=definition.rule,
+            source_type="(not addressed)",
             evidence="taken as nil because nobody entered it",
-            rationale=definition.why_sourced, status="-", assumed_nil=True,
+            rationale=definition.why_sourced,
+            status="-",
+            assumed_nil=True,
         )
     assumption = resolved.assumption
     return InputRecord(
-        code=code, name=definition.name, value=assumption.value,
-        unit=definition.unit, rule=definition.rule,
+        code=code,
+        name=definition.name,
+        value=assumption.value,
+        unit=definition.unit,
+        rule=definition.rule,
         source_type=assumption.source_type.value,
         evidence=assumption.evidence.describe(),
         rationale=assumption.rationale,
@@ -186,10 +195,7 @@ def build_scenario_valuation(
 
     # 16.6-16.10. The engine's `sources` map keeps its own requirement
     # satisfied; the real evidence is the Section 14 record behind each row.
-    sources = {
-        record.code: f"{record.source_type}: {record.evidence}"
-        for record in records
-    }
+    sources = {record.code: f"{record.source_type}: {record.evidence}" for record in records}
     tax_rate = forecast.result.taxes.rate(forecast.periods.forecast[-1])
     cost_of_capital = CostOfCapital(
         risk_free_rate=_value(records, "risk_free_rate"),
@@ -227,8 +233,10 @@ def build_scenario_valuation(
 
     # 16.11-16.14: the timing convention, stated.
     schedule = build_schedule(
-        forecast.periods.forecast, timing,
-        valuation_date=valuation_date, fiscal_year_end=fiscal_year_end,
+        forecast.periods.forecast,
+        timing,
+        valuation_date=valuation_date,
+        fiscal_year_end=fiscal_year_end,
     )
 
     # 16.20: a per-share value ONLY when diluted shares are verified.

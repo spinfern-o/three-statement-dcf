@@ -48,8 +48,11 @@ def ledgers(years, **values):
         Statement.BALANCE: Ledger(Statement.BALANCE, years),
         Statement.CASHFLOW: Ledger(Statement.CASHFLOW, years),
     }
-    names = {"income": Statement.INCOME, "balance": Statement.BALANCE,
-             "cashflow": Statement.CASHFLOW}
+    names = {
+        "income": Statement.INCOME,
+        "balance": Statement.BALANCE,
+        "cashflow": Statement.CASHFLOW,
+    }
     for key, cells in values.items():
         ledger = out[names[key]]
         for account, by_year in cells.items():
@@ -60,6 +63,7 @@ def ledgers(years, **values):
 
 # --- base types -------------------------------------------------------------
 
+
 def test_an_absent_line_must_say_what_is_missing():
     with pytest.raises(ValueError, match="no value and no reason"):
         ScheduleLine("Borrowing", None, "cash flow statement")
@@ -68,8 +72,11 @@ def test_an_absent_line_must_say_what_is_missing():
 def test_a_movement_must_declare_its_sign_explicitly():
     with pytest.raises(ValueError, match=r"multiplier must be \+1 or -1"):
         Movement(
-            account=accounts.CAPEX, statement=Statement.CASHFLOW, multiplier=0,
-            label="CapEx", basis="",
+            account=accounts.CAPEX,
+            statement=Statement.CASHFLOW,
+            multiplier=0,
+            label="CapEx",
+            basis="",
         )
 
 
@@ -94,9 +101,7 @@ ONE_YEAR = ("2025A",)
 
 def test_a_one_period_filing_has_no_roll_forward():
     """STEP 3: do not invent the missing historical year."""
-    schedule = ppe_schedule(
-        ledgers(ONE_YEAR, balance={"ppe_net": {"2025A": "1000"}}), ONE_YEAR
-    )
+    schedule = ppe_schedule(ledgers(ONE_YEAR, balance={"ppe_net": {"2025A": "1000"}}), ONE_YEAR)
     assert schedule.availability is Availability.UNAVAILABLE
     assert "two consecutive periods" in schedule.reason
     assert schedule.years == ()
@@ -147,13 +152,12 @@ def test_the_reconciliation_fails_and_names_the_absent_movements():
 
 def test_total_unexplained_refuses_to_sum_over_a_period_it_could_not_reconcile():
     years = ("2024A", "2025A")
-    schedule = debt_schedule(
-        ledgers(years, balance={"debt": {"2025A": "400"}}), years
-    )
+    schedule = debt_schedule(ledgers(years, balance={"debt": {"2025A": "400"}}), years)
     assert total_unexplained(schedule) is None
 
 
 # --- working capital --------------------------------------------------------
+
 
 def test_a_days_driver_against_zero_is_undefined_not_infinite():
     """4.12: relative measures against zero are reported as undefined."""
@@ -176,9 +180,7 @@ def test_a_days_driver_with_no_denominator_says_which_one():
     schedule = working_capital_schedule(
         ledgers(years, balance={"inventory": {"2025A": "100"}}), years
     )
-    inventory_days = next(
-        d for d in schedule.years[0].drivers if d.name == "Inventory days"
-    )
+    inventory_days = next(d for d in schedule.years[0].drivers if d.name == "Inventory days")
     assert inventory_days.days is None
     assert "cost of goods sold" in inventory_days.unavailable_reason
 
@@ -208,6 +210,7 @@ def test_the_change_in_working_capital_skips_rather_than_guessing():
 
 # --- tax --------------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "pretax,taxes,rate,usable,fragment",
     [
@@ -217,14 +220,11 @@ def test_the_change_in_working_capital_skips_rather_than_guessing():
         ("100", "140", "1.4", False, "outside the [0%, 100%) range"),
     ],
 )
-def test_the_effective_rate_reports_the_year_it_actually_had(
-    pretax, taxes, rate, usable, fragment
-):
+def test_the_effective_rate_reports_the_year_it_actually_had(pretax, taxes, rate, usable, fragment):
     """STEP 16 wants the basis stated, not a rate smoothed into range."""
     years = ("2025A",)
     schedule = tax_schedule(
-        ledgers(years, income={"pretax_income": {"2025A": pretax},
-                               "taxes": {"2025A": taxes}}),
+        ledgers(years, income={"pretax_income": {"2025A": pretax}, "taxes": {"2025A": taxes}}),
         years,
     )
     row = schedule.years[0]
@@ -236,14 +236,13 @@ def test_the_effective_rate_reports_the_year_it_actually_had(
 
 def test_an_absent_tax_line_names_which_one_is_missing():
     years = ("2025A",)
-    schedule = tax_schedule(
-        ledgers(years, income={"pretax_income": {"2025A": "100"}}), years
-    )
+    schedule = tax_schedule(ledgers(years, income={"pretax_income": {"2025A": "100"}}), years)
     assert schedule.years[0].effective_rate is None
     assert "tax expense" in schedule.years[0].reason
 
 
 # --- interest ---------------------------------------------------------------
+
 
 def test_a_rate_on_zero_debt_is_undefined_on_both_bases():
     years = ("2024A", "2025A")
@@ -279,17 +278,16 @@ def test_the_two_bases_differ_whenever_debt_moved():
         ),
         years,
     )
-    assert rows[0].on("beginning").rate == D("0.06")          # 60 / 1000
-    assert rows[0].on("average").rate == D("60") / D("750")   # 60 / 750
+    assert rows[0].on("beginning").rate == D("0.06")  # 60 / 1000
+    assert rows[0].on("average").rate == D("60") / D("750")  # 60 / 750
     assert rows[0].on("ending") is None, "13.4's third basis is not offered"
 
 
 # --- the checks themselves --------------------------------------------------
 
+
 def test_a_schedule_with_nothing_to_reconcile_skips():
-    schedule = Schedule(
-        key="x", title="X", rule="13.9", availability=Availability.AVAILABLE
-    )
+    schedule = Schedule(key="x", title="X", rule="13.9", availability=Availability.AVAILABLE)
     result = reconcile(schedule, Tolerance())
     assert result.status is Status.SKIP
     assert "covers no period" in result.detail
@@ -304,8 +302,7 @@ def test_a_tolerance_wide_enough_to_pass_still_reports_the_difference():
         ledgers(
             years,
             balance={"ppe_net": {"2024A": "1000", "2025A": "1100"}},
-            cashflow={"capex": {"2025A": "-100"},
-                      "depreciation_amortization": {"2025A": "0.001"}},
+            cashflow={"capex": {"2025A": "-100"}, "depreciation_amortization": {"2025A": "0.001"}},
         ),
         years,
     )

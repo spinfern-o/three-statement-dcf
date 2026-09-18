@@ -277,7 +277,9 @@ class AuditEvent:
     detail: str
 
     @classmethod
-    def create(cls, *, actor: str, action: str, entity_type: str, entity_id: str, detail: str) -> AuditEvent:
+    def create(
+        cls, *, actor: str, action: str, entity_type: str, entity_id: str, detail: str
+    ) -> AuditEvent:
         if not detail.strip():
             raise ValueError("an audit entry without a reason is not an audit entry (10.33)")
         return cls(
@@ -459,8 +461,7 @@ def confirm_metadata(
                 f"{len(facts)} fact(s) re-evaluated after the metadata change (10.35); "
                 f"{sum(1 for f in facts if f.blocking_codes)} still need review"
                 + (
-                    f"; {withdrawn} acceptance(s) withdrawn because the value they "
-                    f"accepted changed"
+                    f"; {withdrawn} acceptance(s) withdrawn because the value they accepted changed"
                     if withdrawn
                     else ""
                 )
@@ -474,9 +475,7 @@ def reparse_with_locale(
     result: ExtractionResult, locale: NumberLocale, *, actor: str, reason: str
 ) -> ExtractionResult:
     """Confirm the number locale alone. A thin wrapper over `confirm_metadata`."""
-    return confirm_metadata(
-        result, {"number_locale": locale.value}, actor=actor, reason=reason
-    )
+    return confirm_metadata(result, {"number_locale": locale.value}, actor=actor, reason=reason)
 
 
 def _confirmed_locale(metadata: DetectedMetadata) -> NumberLocale:
@@ -503,7 +502,8 @@ def _refresh_fact(
     # Codes that belong to the table and the page survive; the parse's own codes
     # and the document's codes are recomputed.
     intrinsic = tuple(
-        c for c in fact.reason_codes
+        c
+        for c in fact.reason_codes
         if c not in fact.parsed.reason_codes and c not in DOCUMENT_CODES
     )
     intrinsic = tuple(c for c in intrinsic if c is not ReasonCode.LOW_CONFIDENCE)

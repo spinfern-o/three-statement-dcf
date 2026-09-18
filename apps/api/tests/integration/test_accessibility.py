@@ -131,6 +131,7 @@ def _navigating(page):
 
 # --- 22.7.a: a keyboard-only full workflow ---------------------------------
 
+
 def test_the_skip_link_is_the_first_thing_tab_reaches(page):
     page.keyboard.press("Tab")
     assert page.evaluate("document.activeElement.className") == "skip-link"
@@ -198,6 +199,7 @@ def test_a_refusal_is_announced_not_silent(page, served):
 
 # --- 22.7.b: screen-reader labels ------------------------------------------
 
+
 def test_every_interactive_control_has_an_accessible_name(page):
     """The accessibility tree is what a screen reader reads. Empty names fail."""
     unnamed = page.evaluate(
@@ -244,6 +246,7 @@ def test_the_progress_meter_reads_as_text(page):
 
 # --- 22.7.c: focus order ----------------------------------------------------
 
+
 def test_no_positive_tabindex_overrides_the_document_order(page):
     """A positive tabindex is how focus order stops matching reading order."""
     offenders = page.evaluate(
@@ -274,9 +277,7 @@ def test_focus_moves_down_the_page_not_around_it(page):
         }"""
     )
     assert positions, "nothing focusable in the main region"
-    backwards = [
-        (a, b) for a, b in itertools.pairwise(positions) if b < a - 60
-    ]
+    backwards = [(a, b) for a, b in itertools.pairwise(positions) if b < a - 60]
     assert not backwards, f"focus jumps back up the page at: {backwards[:3]}"
 
 
@@ -309,6 +310,7 @@ def test_focus_is_always_visible(page):
 
 # --- 22.7.e: zoom to 200% ---------------------------------------------------
 
+
 def test_the_layout_does_not_scroll_sideways_at_200_percent(browser, served):
     """Halving the viewport is equivalent to doubling the zoom."""
     context = browser.new_context(viewport={"width": 720, "height": 900})
@@ -322,6 +324,7 @@ def test_the_layout_does_not_scroll_sideways_at_200_percent(browser, served):
 
 
 # --- 22.7.f: reduced motion -------------------------------------------------
+
 
 def test_reduced_motion_is_honoured(browser, served):
     context = browser.new_context(reduced_motion="reduce")
@@ -338,6 +341,7 @@ def test_reduced_motion_is_honoured(browser, served):
 
 
 # --- 7.6: the supporting schedules screen ----------------------------------
+
 
 @pytest.fixture(scope="module")
 def served_forecast(tmp_path_factory, forecastable):
@@ -515,9 +519,19 @@ VIEWPORTS = (
 
 #: Every screen the application has. A layout test that covers one screen
 #: covers the one that happened to be easy.
-SCREENS = ("", "/mapping", "/statements", "/schedules", "/formulas",
-           "/assumptions", "/forecast", "/valuation", "/diagnostics",
-           "/exports", "/settings")
+SCREENS = (
+    "",
+    "/mapping",
+    "/statements",
+    "/schedules",
+    "/formulas",
+    "/assumptions",
+    "/forecast",
+    "/valuation",
+    "/diagnostics",
+    "/exports",
+    "/settings",
+)
 
 
 @pytest.mark.parametrize("name,width,height", VIEWPORTS, ids=lambda v: str(v))
@@ -558,9 +572,7 @@ def test_the_navigation_becomes_a_rail_on_tablet(browser, served_forecast):
         link = page.get_by_role("link", name="Schedules")
         assert link.count() >= 1, "the accessible name survives the collapse"
         # The rail is narrow, and the label is clipped rather than display:none.
-        width = page.evaluate(
-            "document.querySelector('.shell-nav').getBoundingClientRect().width"
-        )
+        width = page.evaluate("document.querySelector('.shell-nav').getBoundingClientRect().width")
         assert width < 100, f"the sidebar is {width}px wide on tablet"
     finally:
         context.close()
@@ -598,9 +610,7 @@ def test_the_portfolio_grid_collapses_to_one_column_on_mobile(browser, served_fo
         context.close()
 
 
-def test_the_statement_headers_stay_put_while_the_periods_scroll(
-    browser, served_forecast
-):
+def test_the_statement_headers_stay_put_while_the_periods_scroll(browser, served_forecast):
     """6.3.e / item 127. The property a frozen header actually has: it does
     not move when the region under it is scrolled."""
     served = served_forecast
@@ -630,9 +640,7 @@ def test_the_vendored_fonts_actually_load(browser, served_forecast):
     try:
         page.goto(f"{served['base']}/documents/{served['document_id']}/statements")
         page.wait_for_function("document.fonts.status === 'loaded'", timeout=5000)
-        loaded = page.evaluate(
-            "Array.from(document.fonts).map(f => f.family + ' ' + f.status)"
-        )
+        loaded = page.evaluate("Array.from(document.fonts).map(f => f.family + ' ' + f.status)")
         assert any("Inter" in item and "loaded" in item for item in loaded), loaded
         assert any("Source Serif 4" in item for item in loaded), loaded
     finally:

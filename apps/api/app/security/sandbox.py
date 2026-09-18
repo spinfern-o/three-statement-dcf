@@ -96,9 +96,7 @@ def run_isolated(func, *args, limits: Limits | None = None, **kwargs):
     limits = limits or Limits()
     context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe(duplex=False)
-    process = context.Process(
-        target=_child, args=(child, limits, func, args, kwargs), daemon=True
-    )
+    process = context.Process(target=_child, args=(child, limits, func, args, kwargs), daemon=True)
     process.start()
     child.close()
 

@@ -54,13 +54,13 @@ def statement_block(
     return "\n".join(lines)
 
 
-def profile_block(
-    profile: CompanyProfile, source_map: SourceMap, periods: Periods
-) -> str:
+def profile_block(profile: CompanyProfile, source_map: SourceMap, periods: Periods) -> str:
     lines = [header("STEP 1-3 -- IDENTIFICATION"), profile.describe()]
     missing = source_map.missing()
     if missing:
-        lines.append(f"\nSTEP 2 source map INCOMPLETE -- no page recorded for: {', '.join(missing)}")
+        lines.append(
+            f"\nSTEP 2 source map INCOMPLETE -- no page recorded for: {', '.join(missing)}"
+        )
     else:
         lines.append("\nSTEP 2 source map: complete (all 12 sections located)")
     lines.append(f"Historical: {', '.join(periods.historical)}")
@@ -96,7 +96,9 @@ def schedules_block(forecast: ForecastResult) -> str:
         lines.append(f"\n{schedule.name}: {schedule.formula}")
         for year, explanation in schedule.table():
             lines.append(f"  {year}  {explanation}")
-    lines.append("\nWorking capital (STEP 17): NWC = operating current assets - operating current liabilities")
+    lines.append(
+        "\nWorking capital (STEP 17): NWC = operating current assets - operating current liabilities"
+    )
     wc = forecast.working_capital
     prior = None
     for year in wc.years:
@@ -111,15 +113,25 @@ def schedules_block(forecast: ForecastResult) -> str:
 
 
 def fcff_block(fcff_years: list[FCFFYear]) -> str:
-    lines = [header("STEP 23-24 -- FCFF"), "FCFF = EBIT x (1 - t) + D&A - CapEx - Change in NWC", ""]
+    lines = [
+        header("STEP 23-24 -- FCFF"),
+        "FCFF = EBIT x (1 - t) + D&A - CapEx - Change in NWC",
+        "",
+    ]
     lines.append(_row("", ["NOPAT", "D&A", "CapEx", "chg NWC", "FCFF"], 10, 12))
     for item in fcff_years:
         lines.append(
             _row(
                 item.year,
-                [f"{item.nopat:,.1f}", f"{item.d_and_a:,.1f}", f"{item.capex:,.1f}",
-                 f"{item.change_in_nwc:,.1f}", f"{item.fcff:,.1f}"],
-                10, 12,
+                [
+                    f"{item.nopat:,.1f}",
+                    f"{item.d_and_a:,.1f}",
+                    f"{item.capex:,.1f}",
+                    f"{item.change_in_nwc:,.1f}",
+                    f"{item.fcff:,.1f}",
+                ],
+                10,
+                12,
             )
         )
     return "\n".join(lines)
@@ -137,8 +149,17 @@ def valuation_block(valuation: Valuation) -> str:
     lines.append(_row("", ["FCFF", "period", "factor", "PV"], 10, 14))
     for item in valuation.discounted:
         lines.append(
-            _row(item.year, [f"{item.fcff:,.1f}", str(item.period),
-                             f"{item.discount_factor:.4f}", f"{item.present_value:,.1f}"], 10, 14)
+            _row(
+                item.year,
+                [
+                    f"{item.fcff:,.1f}",
+                    str(item.period),
+                    f"{item.discount_factor:.4f}",
+                    f"{item.present_value:,.1f}",
+                ],
+                10,
+                14,
+            )
         )
     lines += [
         "",
@@ -162,7 +183,9 @@ def valuation_block(valuation: Valuation) -> str:
     lines.append(f"EQUITY VALUE (STEP 34)            {valuation.equity_value:>16,.1f}")
     price = valuation.implied_share_price
     if price is None:
-        lines.append("Implied share price (STEP 35): not calculated -- no diluted share count supplied")
+        lines.append(
+            "Implied share price (STEP 35): not calculated -- no diluted share count supplied"
+        )
     else:
         lines.append(f"Diluted shares                    {valuation.diluted_shares:>16,.1f}")
         lines.append(f"IMPLIED SHARE PRICE (STEP 35)     {price:>16,.2f}")
@@ -170,12 +193,16 @@ def valuation_block(valuation: Valuation) -> str:
     return "\n".join(lines)
 
 
-def sensitivity_block(grid: list[list[SensitivityCell]], metric: str = "implied_share_price") -> str:
+def sensitivity_block(
+    grid: list[list[SensitivityCell]], metric: str = "implied_share_price"
+) -> str:
     if not grid:
         return ""
-    label = {"implied_share_price": "Implied share price",
-             "equity_value": "Equity value",
-             "enterprise_value": "Enterprise value"}[metric]
+    label = {
+        "implied_share_price": "Implied share price",
+        "equity_value": "Equity value",
+        "enterprise_value": "Enterprise value",
+    }[metric]
     lines = [header(f"STEP 36 -- SENSITIVITY: {label.upper()}")]
     growths = [c.terminal_growth for c in grid[0]]
     lines.append(_row("WACC \\ g", [f"{g:.2%}" for g in growths], 12, 14))
@@ -183,7 +210,11 @@ def sensitivity_block(grid: list[list[SensitivityCell]], metric: str = "implied_
         values = []
         for cell in row:
             value = getattr(cell, metric)
-            values.append("n/a" if value is None else (f"{value:,.2f}" if metric == "implied_share_price" else f"{value:,.0f}"))
+            values.append(
+                "n/a"
+                if value is None
+                else (f"{value:,.2f}" if metric == "implied_share_price" else f"{value:,.0f}")
+            )
         lines.append(_row(f"{row[0].wacc:.2%}", values, 12, 14))
     return "\n".join(lines)
 
@@ -203,7 +234,6 @@ def checks_block(results: list[CheckResult], tolerance: Tolerance | None = None)
         )
     if skipped:
         lines.append(
-            "A SKIP means the check could not run because its inputs were absent. "
-            "It is not a pass."
+            "A SKIP means the check could not run because its inputs were absent. It is not a pass."
         )
     return "\n".join(lines)

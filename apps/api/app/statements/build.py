@@ -152,8 +152,11 @@ def document_label(result: ExtractionResult) -> str:
         if period is not None and period.value:
             parts.append(f"FY{period.value[:4]}")
         if filing is not None and filing.value:
-            parts.append({"annual": "annual report", "quarterly": "quarterly report"}
-                         .get(filing.value, filing.value))
+            parts.append(
+                {"annual": "annual report", "quarterly": "quarterly report"}.get(
+                    filing.value, filing.value
+                )
+            )
         return " ".join(parts)
     title = fields.get("document_title")
     if title is not None and title.value:
@@ -161,9 +164,7 @@ def document_label(result: ExtractionResult) -> str:
     return result.document.sanitized_filename
 
 
-def build_statements(
-    result: ExtractionResult, *, strict: bool = True
-) -> BuiltStatements:
+def build_statements(result: ExtractionResult, *, strict: bool = True) -> BuiltStatements:
     """Fill the engine's ledgers from this document's approved mappings.
 
     `strict` refuses anything that has not reached VERIFIED. Turn it off to
@@ -185,9 +186,7 @@ def build_statements(
     if not years:
         raise BuildError("no mapped value carries a period, so there are no years to build")
 
-    ledgers = {
-        engine: Ledger(engine, years) for engine in ENGINE_STATEMENT.values()
-    }
+    ledgers = {engine: Ledger(engine, years) for engine in ENGINE_STATEMENT.values()}
 
     omitted: list[tuple[str, str, str]] = []
     unverified: list[tuple[str, str]] = []

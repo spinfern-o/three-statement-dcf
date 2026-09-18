@@ -27,18 +27,22 @@ def proposals(built):
 
 def test_every_driver_the_schedules_can_measure_is_proposed(proposals):
     assert {p.assumption.code for p in proposals} == {
-        "dso", "inventory_days", "dpo",
-        "interest_rate_on_debt", "tax_rate", "depreciation_pct_beginning_ppe",
+        "dso",
+        "inventory_days",
+        "dpo",
+        "interest_rate_on_debt",
+        "tax_rate",
+        "depreciation_pct_beginning_ppe",
     }
 
 
 #: Computed by hand from the fixture, and cross-checked against Phase 7's own
 #: golden values.
 GOLDEN = {
-    "dso": ("59.9", "days"),                       # 205,000 / 1,250,000 x 365
-    "inventory_days": ("77.9", "days"),            # 160,000 /   750,000 x 365
-    "dpo": ("63.3", "days"),                       # 130,000 /   750,000 x 365
-    "tax_rate": ("0.25", "ratio"),                 #  45,500 /   182,000
+    "dso": ("59.9", "days"),  # 205,000 / 1,250,000 x 365
+    "inventory_days": ("77.9", "days"),  # 160,000 /   750,000 x 365
+    "dpo": ("63.3", "days"),  # 130,000 /   750,000 x 365
+    "tax_rate": ("0.25", "ratio"),  #  45,500 /   182,000
 }
 
 
@@ -60,9 +64,7 @@ def test_the_interest_rate_is_on_the_basis_the_forecast_charges(proposals):
 
 def test_depreciation_is_a_rate_on_opening_ppe(proposals):
     """75,000 of depreciation against 588,000 of opening PP&E."""
-    proposal = next(
-        p for p in proposals if p.assumption.code == "depreciation_pct_beginning_ppe"
-    )
+    proposal = next(p for p in proposals if p.assumption.code == "depreciation_pct_beginning_ppe")
     assert proposal.assumption.value == D("75000") / D("588000")
     assert "amortizes nothing" in proposal.caution
 
@@ -72,9 +74,7 @@ def test_every_proposal_says_which_periods_it_measured(proposals):
     for proposal in proposals:
         assert proposal.assumption.source_type is SourceType.HISTORICAL_DRIVER
         assert proposal.assumption.evidence.measured_over, proposal.assumption.code
-        assert all(
-            year.endswith("A") for year in proposal.assumption.evidence.measured_over
-        )
+        assert all(year.endswith("A") for year in proposal.assumption.evidence.measured_over)
 
 
 def test_every_proposal_arrives_as_a_draft(proposals):
@@ -119,7 +119,8 @@ def test_together_the_proposals_and_the_gaps_cover_every_required_driver(built):
         explained |= {part.strip() for part in label.split("/")}
 
     uncovered = [
-        sorted(choice) for choice in REQUIRED
+        sorted(choice)
+        for choice in REQUIRED
         if not (choice & proposed) and not (choice & explained)
     ]
     assert not uncovered, f"no proposal and no explanation for {uncovered}"

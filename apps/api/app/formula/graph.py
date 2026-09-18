@@ -37,9 +37,7 @@ class CycleError(ValueError):
 
     def __init__(self, cycles: tuple[tuple[str, ...], ...]):
         self.cycles = cycles
-        drawn = "\n".join(
-            "    " + " -> ".join(cycle + (cycle[0],)) for cycle in cycles
-        )
+        drawn = "\n".join("    " + " -> ".join(cycle + (cycle[0],)) for cycle in cycles)
         super().__init__(
             f"{len(cycles)} circular dependenc"
             f"{'y' if len(cycles) == 1 else 'ies'} found before evaluation "
@@ -113,7 +111,7 @@ class DependencyGraph:
             # is reversed before reporting so a reader follows it forwards.
             for successor in sorted(edges.get(node, frozenset())):
                 if successor in on_path:
-                    cycle = tuple(reversed(path[path.index(successor):]))
+                    cycle = tuple(reversed(path[path.index(successor) :]))
                     key = frozenset(cycle)
                     if key not in seen:
                         seen.add(key)
@@ -145,10 +143,7 @@ class DependencyGraph:
         done: list[str] = []
         satisfied: set[str] = set()
         while remaining:
-            ready = sorted(
-                target for target, inputs in remaining.items()
-                if inputs <= satisfied
-            )
+            ready = sorted(target for target, inputs in remaining.items() if inputs <= satisfied)
             if not ready:  # pragma: no cover - cycles() has already refused
                 raise CycleError((tuple(sorted(remaining)),))
             for target in ready:
@@ -187,9 +182,7 @@ class DependencyGraph:
             f"{len(self.required_inputs)} required input(s)"
         ]
         cycles = self.cycles()
-        lines.append(
-            "  no cycles" if not cycles else f"  {len(cycles)} CYCLE(S)"
-        )
+        lines.append("  no cycles" if not cycles else f"  {len(cycles)} CYCLE(S)")
         return "\n".join(lines)
 
 

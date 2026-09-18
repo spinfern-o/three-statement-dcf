@@ -66,9 +66,7 @@ class Grid:
 
 
 def _axis(centre: Decimal, step: Decimal, each_way: int) -> tuple[Decimal, ...]:
-    return tuple(
-        centre + step * D(offset) for offset in range(-each_way, each_way + 1)
-    )
+    return tuple(centre + step * D(offset) for offset in range(-each_way, each_way + 1))
 
 
 def build_grid(

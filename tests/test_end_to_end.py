@@ -14,7 +14,9 @@ from tests.conftest import FIXTURES, INPUTS, ROOT
 def run_cli(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, "run_model.py", *args],
-        cwd=ROOT, capture_output=True, text=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
     )
 
 
@@ -22,7 +24,15 @@ def test_cli_runs_the_fixture_clean():
     result = run_cli("--inputs", str(FIXTURES))
     assert result.returncode == 0, result.stderr
     assert "13 PASS   0 FAIL   0 SKIP" in result.stdout
-    for step in ("STEP 1-3", "STEP 10", "STEP 23-24", "STEP 25-28", "STEP 29-35", "STEP 36", "STEP 37"):
+    for step in (
+        "STEP 1-3",
+        "STEP 10",
+        "STEP 23-24",
+        "STEP 25-28",
+        "STEP 29-35",
+        "STEP 36",
+        "STEP 37",
+    ):
         assert step in result.stdout, f"{step} section missing from the report"
 
 
@@ -52,9 +62,15 @@ def test_cli_exit_code_signals_check_failure(tmp_path):
     assert "do not plug it" in result.stdout
 
 
-@pytest.mark.parametrize("name", [
-    "company_profile.yaml", "raw_historical.yaml", "assumptions.yaml", "valuation.yaml",
-])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "company_profile.yaml",
+        "raw_historical.yaml",
+        "assumptions.yaml",
+        "valuation.yaml",
+    ],
+)
 def test_shipped_templates_contain_no_company_data(name):
     """The repo must not ship invented figures anyone could mistake for real.
 
@@ -76,7 +92,8 @@ def test_shipped_templates_contain_no_company_data(name):
             yield path, node
 
     offenders = [
-        (path, value) for path, value in walk(data)
+        (path, value)
+        for path, value in walk(data)
         # The optional STEP 34 bridge lines are explicitly 0 so the report can
         # print them; a zero is not a company figure.
         if isinstance(value, (int, float)) and not isinstance(value, bool) and value != 0
@@ -84,9 +101,15 @@ def test_shipped_templates_contain_no_company_data(name):
     assert offenders == [], f"{name} ships non-zero data: {offenders}"
 
 
-@pytest.mark.parametrize("name", [
-    "company_profile.yaml", "raw_historical.yaml", "assumptions.yaml", "valuation.yaml",
-])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "company_profile.yaml",
+        "raw_historical.yaml",
+        "assumptions.yaml",
+        "valuation.yaml",
+    ],
+)
 def test_fixture_files_are_labeled_fictional(name):
     """Anyone opening a fixture should see immediately that it is not real."""
     text = (FIXTURES / name).read_text()
@@ -98,9 +121,10 @@ def test_every_workflow_step_is_referenced_somewhere_in_the_package():
     import re
     from pathlib import Path
 
-    corpus = "\n".join(
-        p.read_text() for p in sorted(Path(ROOT / "model").glob("*.py"))
-    ) + (ROOT / "run_model.py").read_text()
+    corpus = (
+        "\n".join(p.read_text() for p in sorted(Path(ROOT / "model").glob("*.py")))
+        + (ROOT / "run_model.py").read_text()
+    )
 
     referenced = set()
     for match in re.finditer(r"STEP\s+(\d+)(?:\s*-\s*(\d+))?", corpus):

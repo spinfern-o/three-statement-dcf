@@ -58,9 +58,7 @@ class JobState(str, Enum):
     FAILED = "failed"
 
 
-TERMINAL: frozenset[JobState] = frozenset(
-    {JobState.EXTRACTED, JobState.REFUSED, JobState.FAILED}
-)
+TERMINAL: frozenset[JobState] = frozenset({JobState.EXTRACTED, JobState.REFUSED, JobState.FAILED})
 
 #: The legal transition graph. Every non-terminal state may refuse or fail,
 #: because a rule can say no at any point and a parser can raise at any point.

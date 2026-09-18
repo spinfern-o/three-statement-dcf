@@ -91,8 +91,15 @@ class CostOfCapital:
     )
 
     def __post_init__(self) -> None:
-        for name in ("risk_free_rate", "beta", "equity_risk_premium", "pretax_cost_of_debt",
-                     "tax_rate", "market_value_equity", "market_value_debt"):
+        for name in (
+            "risk_free_rate",
+            "beta",
+            "equity_risk_premium",
+            "pretax_cost_of_debt",
+            "tax_rate",
+            "market_value_equity",
+            "market_value_debt",
+        ):
             object.__setattr__(self, name, D(getattr(self, name), what=f"CostOfCapital.{name}"))
         if self.market_value_equity <= 0:
             raise ProvenanceError(
@@ -136,7 +143,10 @@ class CostOfCapital:
     @property
     def wacc(self) -> Decimal:
         """STEP 28: E/(D+E) x Ke + D/(D+E) x Kd x (1 - t)."""
-        return self.weight_equity * self.cost_of_equity + self.weight_debt * self.after_tax_cost_of_debt
+        return (
+            self.weight_equity * self.cost_of_equity
+            + self.weight_debt * self.after_tax_cost_of_debt
+        )
 
     def explain(self) -> str:
         return (
@@ -180,8 +190,15 @@ class EquityBridge:
     other_claims: Decimal = ZERO
 
     def __post_init__(self) -> None:
-        for name in ("cash", "debt", "non_operating_investments", "minority_interest",
-                     "preferred_stock", "pension_obligations", "other_claims"):
+        for name in (
+            "cash",
+            "debt",
+            "non_operating_investments",
+            "minority_interest",
+            "preferred_stock",
+            "pension_obligations",
+            "other_claims",
+        ):
             object.__setattr__(self, name, D(getattr(self, name), what=f"EquityBridge.{name}"))
 
     def apply(self, enterprise_value: Decimal) -> Decimal:

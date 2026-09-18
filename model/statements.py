@@ -97,12 +97,16 @@ class Ledger:
                 f"Forecast {account} {year} needs a stated basis. "
                 "STEP 10: never hide assumptions inside formulas."
             )
-        self._cells[(account, year)] = Cell(D(value, what=f"{account} {year}"), "forecast", None, basis)
+        self._cells[(account, year)] = Cell(
+            D(value, what=f"{account} {year}"), "forecast", None, basis
+        )
 
     def set_derived(self, account: str, year: str, value: Decimal, basis: str) -> None:
         validate_account(self.statement, account)
         self._check_year(year)
-        self._cells[(account, year)] = Cell(D(value, what=f"{account} {year}"), "derived", None, basis)
+        self._cells[(account, year)] = Cell(
+            D(value, what=f"{account} {year}"), "derived", None, basis
+        )
 
     # -- reading ----------------------------------------------------------
     def cell(self, account: str, year: str) -> Cell | None:
@@ -183,7 +187,9 @@ class Ledger:
                         changed = True
         return filled
 
-    def cross_check(self, rel_tol: Decimal | str = "1e-6", abs_tol: Decimal | str = "0") -> list[Discrepancy]:
+    def cross_check(
+        self, rel_tol: Decimal | str = "1e-6", abs_tol: Decimal | str = "0"
+    ) -> list[Discrepancy]:
         """STEP 9: where a subtotal is BOTH reported and derivable, compare.
 
         A mismatch means an extraction or mapping error. It is surfaced, not
@@ -206,16 +212,16 @@ class Ledger:
                 derived = self._try_derive(account, year)
                 if derived is None:
                     continue
-                if abs(cell.value - derived) > max(rel * max(abs(cell.value), abs(derived)), absolute):
+                if abs(cell.value - derived) > max(
+                    rel * max(abs(cell.value), abs(derived)), absolute
+                ):
                     out.append(Discrepancy(account, year, cell.value, derived))
         return out
 
     def hardcodes_in(self, years: tuple[str, ...]) -> list[str]:
         """STEP 37: forecast cells that were pasted in rather than driven."""
         return sorted(
-            f"{a} {y}"
-            for (a, y), c in self._cells.items()
-            if y in years and c.origin == "reported"
+            f"{a} {y}" for (a, y), c in self._cells.items() if y in years and c.origin == "reported"
         )
 
     def extended_to(self, years: tuple[str, ...]) -> Ledger:

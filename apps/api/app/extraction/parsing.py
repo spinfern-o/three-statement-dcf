@@ -86,9 +86,18 @@ SPACES = "              　"
 GROUP_CHARS = " '’"
 
 _NOT_APPLICABLE = {
-    "n/a", "na", "n.a.", "n.a", "not applicable",
-    "n/m", "nm", "n.m.", "n.m", "not meaningful",
-    "not disclosed", "not reported",
+    "n/a",
+    "na",
+    "n.a.",
+    "n.a",
+    "not applicable",
+    "n/m",
+    "nm",
+    "n.m.",
+    "n.m",
+    "not meaningful",
+    "not disclosed",
+    "not reported",
 }
 
 #: source-policy.md: "A written zero is a zero." These spell it in words; the
@@ -309,7 +318,9 @@ def parse_reported_value(
         unit = UnitMarker.PERCENT
 
     stripped = body.strip()
-    inner = stripped[1:-1].strip() if stripped.startswith("(") and stripped.endswith(")") else stripped
+    inner = (
+        stripped[1:-1].strip() if stripped.startswith("(") and stripped.endswith(")") else stripped
+    )
 
     if inner and all(ch in DASHES + " " for ch in inner):
         return ParsedValue(
@@ -456,9 +467,7 @@ def parse_reported_value(
                     f"rather than picking one."
                 ),
             )
-        used = (
-            next(iter(candidates)) if len(candidates) == 1 else NumberLocale.UNKNOWN
-        )
+        used = next(iter(candidates)) if len(candidates) == 1 else NumberLocale.UNKNOWN
         chosen, decimals = next(iter(candidates.values()))
 
     value = D(("-" if negative else "") + chosen, what=f"the cell {raw!r}")

@@ -81,20 +81,21 @@ def header_lines(model: ExportModel, table: Table) -> list[str]:
     skip, and `csv.reader` does not strip it, so the lines are counted here and
     the count is part of the contract.
     """
-    return [
-        f"# {table.title} -- {model.company or model.document_id}",
-        f"# Model version: {model.version_id}",
-        f"# Generated at: {model.generated_at}",
-        f"# Scenario: {model.scenario_id}",
-        f"# Currency: {model.currency or '(unconfirmed)'}; "
-        f"displayed scale: {model.units or '(unconfirmed)'}",
-        f"# Column definitions: {DICTIONARY} (21.4); "
-        f"JSON schema version {SCHEMA_VERSION}",
-        f"# A cell beginning {PREFIX} was prefixed to stop a spreadsheet "
-        f"evaluating it as a formula (20.13). Numeric cells are never "
-        f"prefixed.",
-    ] + ([f"# NOTE: {table.note}"] if table.note else []) + (
-        [f"# THIS TABLE IS EMPTY: {table.note}"] if table.unavailable else []
+    return (
+        [
+            f"# {table.title} -- {model.company or model.document_id}",
+            f"# Model version: {model.version_id}",
+            f"# Generated at: {model.generated_at}",
+            f"# Scenario: {model.scenario_id}",
+            f"# Currency: {model.currency or '(unconfirmed)'}; "
+            f"displayed scale: {model.units or '(unconfirmed)'}",
+            f"# Column definitions: {DICTIONARY} (21.4); JSON schema version {SCHEMA_VERSION}",
+            f"# A cell beginning {PREFIX} was prefixed to stop a spreadsheet "
+            f"evaluating it as a formula (20.13). Numeric cells are never "
+            f"prefixed.",
+        ]
+        + ([f"# NOTE: {table.note}"] if table.note else [])
+        + ([f"# THIS TABLE IS EMPTY: {table.note}"] if table.unavailable else [])
     )
 
 

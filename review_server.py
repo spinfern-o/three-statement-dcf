@@ -34,11 +34,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--store", type=Path, default=DEFAULT_STORE,
-                        help=f"the immutable source store to review (default {DEFAULT_STORE})")
-    parser.add_argument("--host", default="127.0.0.1",
-                        help="bind address. Anything but loopback requires "
-                             "REVIEW_PASSWORD_HASH to be set (2.2.c)")
+    parser.add_argument(
+        "--store",
+        type=Path,
+        default=DEFAULT_STORE,
+        help=f"the immutable source store to review (default {DEFAULT_STORE})",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="bind address. Anything but loopback requires REVIEW_PASSWORD_HASH to be set (2.2.c)",
+    )
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)
 

@@ -83,7 +83,8 @@ class Readiness:
             text += (
                 f" {len(self.unevaluable)} check(s) cannot be evaluated by this "
                 "system at all and are excluded from the verdict: "
-                + ", ".join(o.check.clause for o in self.unevaluable) + "."
+                + ", ".join(o.check.clause for o in self.unevaluable)
+                + "."
             )
         return text + " " + SEVERITY_NOTE
 
@@ -136,8 +137,10 @@ class ChecklistItem:
 #: Section 17's own grouping, which is also the order of the work.
 STAGES = (
     ("Source and mapping", ("17.1", "17.2", "17.3", "17.4", "17.5", "17.6", "17.7")),
-    ("Historical statements and schedules",
-     ("17.8", "17.9", "17.10", "17.11", "17.12", "17.13", "17.14", "17.15")),
+    (
+        "Historical statements and schedules",
+        ("17.8", "17.9", "17.10", "17.11", "17.12", "17.13", "17.14", "17.15"),
+    ),
     ("Forecast", ("17.16", "17.17", "17.18", "17.19", "17.20", "17.21", "17.22")),
     ("Valuation", ("17.23", "17.24", "17.25", "17.26")),
     ("Numbers and lineage", ("17.27", "17.28", "17.29", "17.30")),

@@ -37,7 +37,7 @@ from dataclasses import dataclass
 #: parallelism; memory used is roughly 128 * N * r bytes, so these ask for
 #: 32 MiB per verification. That is a fraction of a second for the one person
 #: logging in, and 32 MiB per guess for somebody working through a stolen hash.
-SCRYPT_N = 2 ** 15
+SCRYPT_N = 2**15
 SCRYPT_R = 8
 SCRYPT_P = 1
 SALT_BYTES = 16
@@ -73,14 +73,20 @@ def hash_password(password: str, *, salt: bytes | None = None) -> str:
         )
     salt = salt or secrets.token_bytes(SALT_BYTES)
     key = hashlib.scrypt(
-        password.encode("utf-8"), salt=salt,
-        n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P, dklen=KEY_BYTES,
+        password.encode("utf-8"),
+        salt=salt,
+        n=SCRYPT_N,
+        r=SCRYPT_R,
+        p=SCRYPT_P,
+        dklen=KEY_BYTES,
         maxmem=132 * SCRYPT_N * SCRYPT_R,
     )
     return "$".join(
         (
             SCHEME,
-            str(SCRYPT_N), str(SCRYPT_R), str(SCRYPT_P),
+            str(SCRYPT_N),
+            str(SCRYPT_R),
+            str(SCRYPT_P),
             base64.b64encode(salt).decode("ascii"),
             base64.b64encode(key).decode("ascii"),
         )
@@ -109,7 +115,9 @@ class Credential:
             )
         try:
             return cls(
-                n=int(parts[1]), r=int(parts[2]), p=int(parts[3]),
+                n=int(parts[1]),
+                r=int(parts[2]),
+                p=int(parts[3]),
                 salt=base64.b64decode(parts[4], validate=True),
                 key=base64.b64decode(parts[5], validate=True),
             )
@@ -130,8 +138,12 @@ class Credential:
         is the one place an attacker can ask that question repeatedly.
         """
         candidate = hashlib.scrypt(
-            password.encode("utf-8"), salt=self.salt,
-            n=self.n, r=self.r, p=self.p, dklen=len(self.key),
+            password.encode("utf-8"),
+            salt=self.salt,
+            n=self.n,
+            r=self.r,
+            p=self.p,
+            dklen=len(self.key),
             maxmem=132 * self.n * self.r,
         )
         return hmac.compare_digest(candidate, self.key)
@@ -162,11 +174,12 @@ def _main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(
         description="Produce the values REVIEW_PASSWORD_HASH and "
-                    "REVIEW_SECRET_KEY are set to. Neither is ever written to "
-                    "a file by this program.",
+        "REVIEW_SECRET_KEY are set to. Neither is ever written to "
+        "a file by this program.",
     )
-    parser.add_argument("--key", action="store_true",
-                        help="print a new signing key instead of hashing a password")
+    parser.add_argument(
+        "--key", action="store_true", help="print a new signing key instead of hashing a password"
+    )
     args = parser.parse_args(argv)
 
     if args.key:

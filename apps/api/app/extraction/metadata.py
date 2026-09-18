@@ -99,7 +99,9 @@ class DetectedField:
     def describe(self) -> str:
         shown = self.value if self.value is not None else "(not detected)"
         flag = "required" if self.required else "optional"
-        where = f" [p{self.evidence.page_number} via {self.evidence.detector}]" if self.evidence else ""
+        where = (
+            f" [p{self.evidence.page_number} via {self.evidence.detector}]" if self.evidence else ""
+        )
         return f"{self.name:22} {self.state.value:12} {flag:8} {shown}{where}"
 
 
@@ -115,9 +117,7 @@ class DetectedMetadata:
     @property
     def unconfirmed_required(self) -> tuple[str, ...]:
         """What check `VAL-017-002` blocks on (10.13)."""
-        return tuple(
-            name for name, f in self.fields.items() if f.required and not f.confirmed
-        )
+        return tuple(name for name, f in self.fields.items() if f.required and not f.confirmed)
 
     @property
     def all_required_confirmed(self) -> bool:
@@ -134,11 +134,17 @@ _SCALE = re.compile(
     r"(thousands?|millions?|billions?|tausend|milliarden|millionen|miles|millones)\b"
 )
 _SCALE_WORDS = {
-    "thousand": "thousands", "thousands": "thousands", "tausend": "thousands",
+    "thousand": "thousands",
+    "thousands": "thousands",
+    "tausend": "thousands",
     "miles": "thousands",
-    "million": "millions", "millions": "millions", "millionen": "millions",
+    "million": "millions",
+    "millions": "millions",
+    "millionen": "millions",
     "millones": "millions",
-    "billion": "billions", "billions": "billions", "milliarden": "billions",
+    "billion": "billions",
+    "billions": "billions",
+    "milliarden": "billions",
 }
 
 _CURRENCY_WORDS = [
@@ -163,7 +169,10 @@ _AUDITED = re.compile(
 _UNAUDITED = re.compile(r"(?i)\bunaudited\b")
 
 _STANDARD = [
-    (re.compile(r"(?i)\bu\.?s\.?\s*gaap\b|generally\s+accepted\s+accounting\s+principles"), "US_GAAP"),
+    (
+        re.compile(r"(?i)\bu\.?s\.?\s*gaap\b|generally\s+accepted\s+accounting\s+principles"),
+        "US_GAAP",
+    ),
     (re.compile(r"(?i)\bifrs\b|international\s+financial\s+reporting\s+standards"), "IFRS"),
 ]
 
@@ -173,10 +182,30 @@ _FILING_TYPE = [
 ]
 
 _MONTHS = {
-    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11,
-    "december": 12, "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7,
-    "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "sept": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
 }
 _MONTH_ALT = "|".join(sorted(_MONTHS, key=len, reverse=True))
 
@@ -220,7 +249,9 @@ def _first_match(pages, pattern, transform, detector, name, *, required=True) ->
                 name=name,
                 value=value,
                 required=required,
-                evidence=Evidence(number, match.group(0).strip(), _locate(page, match.group(0)), detector),
+                evidence=Evidence(
+                    number, match.group(0).strip(), _locate(page, match.group(0)), detector
+                ),
             )
     return DetectedField(name=name, value=None, required=required)
 
@@ -273,9 +304,11 @@ def detect_metadata(doc: pymupdf.Document) -> DetectedMetadata:
 
     # --- the four load-bearing fields --------------------------------------
     fields["displayed_scale"] = _first_match(
-        pages, _SCALE,
+        pages,
+        _SCALE,
         lambda m: _SCALE_WORDS.get(m.group(1).lower()),
-        "a scale statement such as 'in thousands'", "displayed_scale",
+        "a scale statement such as 'in thousands'",
+        "displayed_scale",
     )
 
     def _currency(text: str, number: int, page) -> DetectedField | None:
@@ -283,9 +316,15 @@ def detect_metadata(doc: pymupdf.Document) -> DetectedMetadata:
             match = pattern.search(text)
             if match:
                 return DetectedField(
-                    "reporting_currency", code, required=True,
-                    evidence=Evidence(number, match.group(0), _locate(page, match.group(0)),
-                                      "a currency named in the text"),
+                    "reporting_currency",
+                    code,
+                    required=True,
+                    evidence=Evidence(
+                        number,
+                        match.group(0),
+                        _locate(page, match.group(0)),
+                        "a currency named in the text",
+                    ),
                 )
         return None
 
@@ -299,7 +338,10 @@ def detect_metadata(doc: pymupdf.Document) -> DetectedMetadata:
     )
 
     period = _first_match(
-        pages, _PERIOD_END, _period_end_iso, "a 'year ended ...' statement",
+        pages,
+        _PERIOD_END,
+        _period_end_iso,
+        "a 'year ended ...' statement",
         "reporting_period_end",
     )
     fields["reporting_period_end"] = period
@@ -307,20 +349,30 @@ def detect_metadata(doc: pymupdf.Document) -> DetectedMetadata:
         end = date.fromisoformat(period.value)
         start = _same_day_previous_year(end) + timedelta(days=1)
         fields["reporting_period_start"] = DetectedField(
-            "reporting_period_start", start.isoformat(), required=True,
+            "reporting_period_start",
+            start.isoformat(),
+            required=True,
             evidence=period.evidence,
             derived_from="reporting_period_end, assuming the annual cadence 2.3.b fixes",
         )
         fields["fiscal_year_end"] = DetectedField(
-            "fiscal_year_end", f"{end.month:02d}-{end.day:02d}", required=True,
-            evidence=period.evidence, derived_from="reporting_period_end",
+            "fiscal_year_end",
+            f"{end.month:02d}-{end.day:02d}",
+            required=True,
+            evidence=period.evidence,
+            derived_from="reporting_period_end",
         )
     else:
-        fields["reporting_period_start"] = DetectedField("reporting_period_start", None, required=True)
+        fields["reporting_period_start"] = DetectedField(
+            "reporting_period_start", None, required=True
+        )
         fields["fiscal_year_end"] = DetectedField("fiscal_year_end", None, required=True)
 
     audited = _first_match(
-        pages, _AUDITED, lambda m: "audited", "an auditor's report or audit statement",
+        pages,
+        _AUDITED,
+        lambda m: "audited",
+        "an auditor's report or audit statement",
         "audited_status",
     )
     if audited.value is None:
@@ -332,8 +384,13 @@ def detect_metadata(doc: pymupdf.Document) -> DetectedMetadata:
     # --- the two beyond 10.10 ----------------------------------------------
     standard = DetectedField("accounting_standard", None, required=True)
     for pattern, code in _STANDARD:
-        found = _first_match(pages, pattern, lambda m, c=code: c, "an accounting-standard reference",
-                             "accounting_standard")
+        found = _first_match(
+            pages,
+            pattern,
+            lambda m, c=code: c,
+            "an accounting-standard reference",
+            "accounting_standard",
+        )
         if found.value:
             standard = found
             break
@@ -341,7 +398,9 @@ def detect_metadata(doc: pymupdf.Document) -> DetectedMetadata:
 
     filing = DetectedField("filing_type", None, required=True)
     for pattern, kind in _FILING_TYPE:
-        found = _first_match(pages, pattern, lambda m, k=kind: k, "a filing-type phrase", "filing_type")
+        found = _first_match(
+            pages, pattern, lambda m, k=kind: k, "a filing-type phrase", "filing_type"
+        )
         if found.value:
             filing = found
             break
@@ -388,19 +447,28 @@ def _detect_locale(pages) -> DetectedField:
     if dot and not comma:
         value, detector = "dot_decimal", f"{dot} number(s) only the 1,234.56 convention can read"
     elif comma and not dot:
-        value, detector = "comma_decimal", f"{comma} number(s) only the 1.234,56 convention can read"
+        value, detector = (
+            "comma_decimal",
+            f"{comma} number(s) only the 1.234,56 convention can read",
+        )
     else:
         return DetectedField(
-            "number_locale", None, required=True,
+            "number_locale",
+            None,
+            required=True,
             evidence=Evidence(
                 example_page or 0,
                 example_text,
                 None,
                 f"inconclusive: {dot} dot-decimal and {comma} comma-decimal indicators",
-            ) if example_page else None,
+            )
+            if example_page
+            else None,
         )
 
     return DetectedField(
-        "number_locale", value, required=True,
+        "number_locale",
+        value,
+        required=True,
         evidence=Evidence(example_page or 0, example_text, None, detector),
     )

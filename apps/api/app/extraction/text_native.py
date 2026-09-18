@@ -69,7 +69,9 @@ _DATE_LABEL = re.compile(
     r"(?i)((?:19|20)\d{2})\s*$"  # any label ending in a year: "December 31, 2025"
 )
 #: Labels that name a basis rule 1.7 forbids mixing with an annual column.
-_OTHER_BASIS = re.compile(r"(?i)\b(?:Q[1-4]|quarter|three\s+months|six\s+months|nine\s+months|YTD|TTM|LTM|interim)\b")
+_OTHER_BASIS = re.compile(
+    r"(?i)\b(?:Q[1-4]|quarter|three\s+months|six\s+months|nine\s+months|YTD|TTM|LTM|interim)\b"
+)
 
 _SCOPE_WORDS = (
     (re.compile(r"(?i)\bconsolidated\b|\bkonzern"), Scope.CONSOLIDATED),
@@ -205,8 +207,10 @@ def _read_row_labels(page, table, rows, header_row) -> tuple[str, ...]:
             labels.append("")
             continue
         rect = pymupdf.Rect(
-            min(b[0] for b in boxes), min(b[1] for b in boxes),
-            max(b[2] for b in boxes), max(b[3] for b in boxes),
+            min(b[0] for b in boxes),
+            min(b[1] for b in boxes),
+            max(b[2] for b in boxes),
+            max(b[3] for b in boxes),
         )
         labels.append(" ".join(page.get_textbox(rect).split()))
     return tuple(labels)
@@ -239,7 +243,8 @@ def _repeated_headers(rows, header_row: int | None) -> tuple[int, ...]:
         return ()
     header = [(c or "").strip() for c in rows[header_row]]
     return tuple(
-        i for i, row in enumerate(rows)
+        i
+        for i, row in enumerate(rows)
         if i != header_row and [(c or "").strip() for c in row] == header
     )
 
@@ -334,8 +339,10 @@ def _row_label(table: RawTable, row: int, headers: dict) -> tuple[str, BoundingB
     if not boxes:
         return label, None
     box = BoundingBox(
-        x0=min(b.x0 for b in boxes), y0=min(b.y0 for b in boxes),
-        x1=max(b.x1 for b in boxes), y1=max(b.y1 for b in boxes),
+        x0=min(b.x0 for b in boxes),
+        y0=min(b.y0 for b in boxes),
+        x1=max(b.x1 for b in boxes),
+        y1=max(b.y1 for b in boxes),
     )
     return label, box
 
@@ -385,10 +392,7 @@ def _fact_from_cell(
     locale: NumberLocale,
     review_threshold,
 ) -> tuple[SourceLocation, ReportedFact]:
-    header_cell = (
-        None if table.header_row is None
-        else table.cell(table.header_row, cell.column)
-    )
+    header_cell = None if table.header_row is None else table.cell(table.header_row, cell.column)
     location = SourceLocation.create(
         document_id=document_id,
         page_number=table.page_number,

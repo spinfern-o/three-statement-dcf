@@ -63,7 +63,9 @@ def trace(result, built, code: str, period: str) -> Trace:
 
     if cell is None:
         return Trace(
-            code=code, period=period, statement=statement.value,
+            code=code,
+            period=period,
+            statement=statement.value,
             incomplete=(
                 f"{code} has no value for {period}. An absent line has no "
                 "lineage, and inventing one would be the failure 17.30 exists "
@@ -73,7 +75,9 @@ def trace(result, built, code: str, period: str) -> Trace:
 
     steps = [
         Step(
-            "value", f"{code} {period}", f"{cell.value:,}",
+            "value",
+            f"{code} {period}",
+            f"{cell.value:,}",
             rule="9.12 CalculatedValue",
         ),
         Step("origin", cell.origin, cell.cite(), rule="17.30"),
@@ -82,7 +86,8 @@ def trace(result, built, code: str, period: str) -> Trace:
     if cell.origin != "reported":
         steps.append(
             Step(
-                "derivation", "computed, not transcribed",
+                "derivation",
+                "computed, not transcribed",
                 cell.basis or "no basis recorded",
                 rule="18.10",
             )
@@ -93,7 +98,9 @@ def trace(result, built, code: str, period: str) -> Trace:
     contributors = _contributors(result, code, period, statement)
     if not contributors:
         return Trace(
-            code=code, period=period, statement=statement.value,
+            code=code,
+            period=period,
+            statement=statement.value,
             steps=tuple(steps),
             incomplete=(
                 "this cell is marked reported and no approved mapping points at "
@@ -106,7 +113,8 @@ def trace(result, built, code: str, period: str) -> Trace:
         location = result.location(fact.source_location_id)
         steps.append(
             Step(
-                "fact", fact.raw_label or "(no printed label)",
+                "fact",
+                fact.raw_label or "(no printed label)",
                 f"printed as {fact.raw_value!r}"
                 + (f" on page {location.page_number}" if location else ""),
                 rule="10.x, STEP 4",
@@ -117,8 +125,9 @@ def trace(result, built, code: str, period: str) -> Trace:
             Step(
                 "decision",
                 decision.action if decision else "undecided",
-                f"{decision.actor}: {decision.reason}" if decision else
-                "nobody has decided this fact",
+                f"{decision.actor}: {decision.reason}"
+                if decision
+                else "nobody has decided this fact",
                 rule="10.32",
             )
         )

@@ -39,16 +39,27 @@ class Filters:
     @property
     def is_empty(self) -> bool:
         return not any(
-            (self.actor, self.action, self.entity_type, self.entity_id,
-             self.since, self.until, self.text)
+            (
+                self.actor,
+                self.action,
+                self.entity_type,
+                self.entity_id,
+                self.since,
+                self.until,
+                self.text,
+            )
         )
 
     def describe(self) -> str:
         parts = []
         for label, value in (
-            ("actor", self.actor), ("action", self.action),
-            ("entity type", self.entity_type), ("entity", self.entity_id),
-            ("since", self.since), ("until", self.until), ("text", self.text),
+            ("actor", self.actor),
+            ("action", self.action),
+            ("entity type", self.entity_type),
+            ("entity", self.entity_id),
+            ("since", self.since),
+            ("until", self.until),
+            ("text", self.text),
         ):
             if value:
                 parts.append(f"{label} {value!r}")

@@ -120,8 +120,7 @@ def _files_under(root: Path) -> list[Path]:
     return sorted(
         path
         for path in root.rglob("*")
-        if path.is_file()
-        and not any(part in EXCLUDED for part in path.relative_to(root).parts)
+        if path.is_file() and not any(part in EXCLUDED for part in path.relative_to(root).parts)
     )
 
 
@@ -211,8 +210,7 @@ def verify(archive: str | Path, *, scratch: str | Path | None = None) -> Manifes
         extra = sorted(
             str(path.relative_to(target))
             for path in _files_under(target)
-            if str(path.relative_to(target)) not in manifest.files
-            and path.name != MANIFEST_NAME
+            if str(path.relative_to(target)) not in manifest.files and path.name != MANIFEST_NAME
         )
 
         if missing or changed or extra:
@@ -230,7 +228,7 @@ def _main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(
         description="Snapshot a source store, or verify an existing snapshot. "
-                    "2.6.d: an untested backup is not a backup.",
+        "2.6.d: an untested backup is not a backup.",
     )
     parser.add_argument("--store", type=Path, help="the source store to snapshot")
     parser.add_argument("--out", type=Path, help="where to write the archive")

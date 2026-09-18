@@ -40,18 +40,31 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("pdf", type=Path, help="the filing to ingest")
-    parser.add_argument("--store", type=Path, default=DEFAULT_STORE,
-                        help=f"immutable source store (default {DEFAULT_STORE})")
-    parser.add_argument("--company", default="default",
-                        help="company identifier; duplicate detection is scoped to it (10.3)")
-    parser.add_argument("--facts", type=int, default=None,
-                        help="show only the first N facts")
-    parser.add_argument("--confirm-metadata", action="store_true",
-                        help="accept every detected metadata field and re-run what depends "
-                             "on it (10.13, 10.35). Demonstration only -- a real "
-                             "confirmation is a reviewer decision per field")
-    parser.add_argument("--linked-duplicate", metavar="REASON", default=None,
-                        help="record an explicit linked duplicate of an existing upload (10.3)")
+    parser.add_argument(
+        "--store",
+        type=Path,
+        default=DEFAULT_STORE,
+        help=f"immutable source store (default {DEFAULT_STORE})",
+    )
+    parser.add_argument(
+        "--company",
+        default="default",
+        help="company identifier; duplicate detection is scoped to it (10.3)",
+    )
+    parser.add_argument("--facts", type=int, default=None, help="show only the first N facts")
+    parser.add_argument(
+        "--confirm-metadata",
+        action="store_true",
+        help="accept every detected metadata field and re-run what depends "
+        "on it (10.13, 10.35). Demonstration only -- a real "
+        "confirmation is a reviewer decision per field",
+    )
+    parser.add_argument(
+        "--linked-duplicate",
+        metavar="REASON",
+        default=None,
+        help="record an explicit linked duplicate of an existing upload (10.3)",
+    )
     parser.add_argument("--no-save", action="store_true", help="do not write records to disk")
     args = parser.parse_args(argv)
 
@@ -72,12 +85,15 @@ def main(argv: list[str] | None = None) -> int:
         scan_result = quarantine(args.pdf, args.store, scan_result)
         print(f"\n{report.rule('=')}")
         print("UPLOAD REFUSED BY THE SCANNER (20.9)")
-        print(report.rule('='))
+        print(report.rule("="))
         print(f"  {scan_result.describe()}")
         print(f"  quarantined at: {scan_result.quarantined_at}")
         security_event(
-            "upload.refused", actor=args.company, outcome="refused",
-            detail=scan_result.describe(), document_id=args.pdf.name,
+            "upload.refused",
+            actor=args.company,
+            outcome="refused",
+            detail=scan_result.describe(),
+            document_id=args.pdf.name,
         )
         return 2
     if not scan_result.outcome.is_known:
@@ -100,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         refusal = outcome.refusal
         print(f"\n{report.rule('=')}")
         print("UPLOAD REFUSED")
-        print(report.rule('='))
+        print(report.rule("="))
         print(f"\n  {refusal.reason.code}  (specification {refusal.reason.rule})")
         print(f"  {refusal.reason.summary}\n")
         print(f"  {refusal.detail}\n")
@@ -116,12 +132,16 @@ def main(argv: list[str] | None = None) -> int:
         }
         before = len(result.facts_needing_review)
         result = confirm_metadata(
-            result, detected, actor="owner",
+            result,
+            detected,
+            actor="owner",
             reason="--confirm-metadata: every detected value accepted as printed",
         )
         after = len(result.facts_needing_review)
-        print(f"\n  [--confirm-metadata] {len(detected)} field(s) confirmed; "
-              f"facts needing review {before} -> {after} (10.35)")
+        print(
+            f"\n  [--confirm-metadata] {len(detected)} field(s) confirmed; "
+            f"facts needing review {before} -> {after} (10.35)"
+        )
 
     print(report.document_block(result))
     print(report.pages_block(result.document.pages))

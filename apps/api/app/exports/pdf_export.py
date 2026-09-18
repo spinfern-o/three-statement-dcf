@@ -27,7 +27,7 @@ import pymupdf
 from .gather import gather
 from .tables import ExportModel, Table
 
-PAGE_WIDTH, PAGE_HEIGHT = 595.0, 842.0   # A4 portrait, in points
+PAGE_WIDTH, PAGE_HEIGHT = 595.0, 842.0  # A4 portrait, in points
 MARGIN = 54.0
 BODY = "helv"
 BOLD = "hebo"
@@ -92,8 +92,15 @@ def _wrap(text: str, width: float, font: str, size: float) -> list[str]:
     return lines
 
 
-def _text(cursor: Cursor, text: str, *, font: str = BODY, size: float = BODY_SIZE,
-          indent: float = 0.0, gap: float = 0.0) -> None:
+def _text(
+    cursor: Cursor,
+    text: str,
+    *,
+    font: str = BODY,
+    size: float = BODY_SIZE,
+    indent: float = 0.0,
+    gap: float = 0.0,
+) -> None:
     width = PAGE_WIDTH - 2 * MARGIN - indent
     for line in _wrap(text, width, font, size):
         cursor.space(size * LEADING)
@@ -125,7 +132,9 @@ def _table(cursor: Cursor, table: Table, *, limit: int = ROW_LIMIT) -> None:
         _text(
             cursor,
             table.note or "This table could not be built, and no reason was recorded.",
-            font=BODY, size=BODY_SIZE, gap=4,
+            font=BODY,
+            size=BODY_SIZE,
+            gap=4,
         )
         return
 
@@ -139,8 +148,7 @@ def _table(cursor: Cursor, table: Table, *, limit: int = ROW_LIMIT) -> None:
 
     def row(values, font: str, size: float) -> None:
         cells = [
-            _wrap(str(value), widths[index] - 4, font, size)
-            for index, value in enumerate(values)
+            _wrap(str(value), widths[index] - 4, font, size) for index, value in enumerate(values)
         ]
         height = max(len(lines) for lines in cells) * size * LEADING
         cursor.space(height + 2)
@@ -149,14 +157,17 @@ def _table(cursor: Cursor, table: Table, *, limit: int = ROW_LIMIT) -> None:
             for offset, line in enumerate(lines):
                 cursor.page.insert_text(
                     (x, cursor.y + size + offset * size * LEADING),
-                    line, fontname=font, fontsize=size,
+                    line,
+                    fontname=font,
+                    fontsize=size,
                 )
             x += widths[index]
         cursor.y += height + 2
 
     row([column.title for column in table.columns], BOLD, SMALL_SIZE)
     cursor.page.draw_line(
-        pymupdf.Point(MARGIN, cursor.y), pymupdf.Point(PAGE_WIDTH - MARGIN, cursor.y),
+        pymupdf.Point(MARGIN, cursor.y),
+        pymupdf.Point(PAGE_WIDTH - MARGIN, cursor.y),
         width=0.3,
     )
     cursor.y += 2
@@ -164,22 +175,26 @@ def _table(cursor: Cursor, table: Table, *, limit: int = ROW_LIMIT) -> None:
     for data_row in table.rows[:limit]:
         row(
             [cell.display if not cell.absent else "(absent)" for cell in data_row],
-            BODY, SMALL_SIZE,
+            BODY,
+            SMALL_SIZE,
         )
     if len(table.rows) > limit:
         _text(
             cursor,
             f"{len(table.rows) - limit} further row(s) are in the workbook and "
             "the JSON export, which carry every row at full precision.",
-            size=SMALL_SIZE, gap=4,
+            size=SMALL_SIZE,
+            gap=4,
         )
     cursor.y += 4
 
 
 def _cover(cursor: Cursor, model: ExportModel) -> None:
     cursor.page.insert_text(
-        (MARGIN, cursor.y + TITLE_SIZE), "DCF valuation report",
-        fontname=BOLD, fontsize=TITLE_SIZE,
+        (MARGIN, cursor.y + TITLE_SIZE),
+        "DCF valuation report",
+        fontname=BOLD,
+        fontsize=TITLE_SIZE,
     )
     cursor.y += TITLE_SIZE * LEADING + 6
     _text(cursor, model.company or model.document_id, font=BOLD, size=HEADING_SIZE, gap=6)
@@ -196,7 +211,8 @@ def _cover(cursor: Cursor, model: ExportModel) -> None:
         cursor,
         "Private model - not for distribution. This is not investment advice "
         "and not a fairness opinion.",
-        font=BOLD, gap=4,
+        font=BOLD,
+        gap=4,
     )
 
 
@@ -270,7 +286,8 @@ def _footers(document: pymupdf.Document, model: ExportModel) -> None:
             (MARGIN, PAGE_HEIGHT - MARGIN + 12),
             f"Three-Statement DCF - {model.version_id[:26]}... - "
             f"page {index} of {total} - private, not for distribution",
-            fontname=BODY, fontsize=SMALL_SIZE,
+            fontname=BODY,
+            fontsize=SMALL_SIZE,
         )
 
 

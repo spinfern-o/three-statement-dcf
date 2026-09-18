@@ -104,9 +104,14 @@ def required_rows(
         if not supplied:
             rows.append(
                 Row(
-                    choice=describe_choice(choice), codes=codes, assumption=None,
-                    standing=None, from_scenario="",
-                    problem="not supplied", step=first.step, unit=first.unit,
+                    choice=describe_choice(choice),
+                    codes=codes,
+                    assumption=None,
+                    standing=None,
+                    from_scenario="",
+                    problem="not supplied",
+                    step=first.step,
+                    unit=first.unit,
                     note=first.note,
                 )
             )
@@ -114,13 +119,18 @@ def required_rows(
         if len(supplied) > 1:
             rows.append(
                 Row(
-                    choice=describe_choice(choice), codes=codes, assumption=None,
-                    standing=None, from_scenario="",
+                    choice=describe_choice(choice),
+                    codes=codes,
+                    assumption=None,
+                    standing=None,
+                    from_scenario="",
                     problem=(
                         f"{' and '.join(supplied)} are both declared; STEP 14/18 "
                         "require one stated methodology per line"
                     ),
-                    step=first.step, unit=first.unit, note=first.note,
+                    step=first.step,
+                    unit=first.unit,
+                    note=first.note,
                 )
             )
             continue
@@ -170,9 +180,15 @@ def optional_rows(
         driver = BY_CODE[code]
         rows.append(
             Row(
-                choice=code, codes=(code,), assumption=item.assumption,
-                standing=_standing(item), from_scenario=item.from_scenario,
-                problem="", step=driver.step, unit=driver.unit, note=driver.note,
+                choice=code,
+                codes=(code,),
+                assumption=item.assumption,
+                standing=_standing(item),
+                from_scenario=item.from_scenario,
+                problem="",
+                step=driver.step,
+                unit=driver.unit,
+                note=driver.note,
             )
         )
     return tuple(rows)
@@ -208,7 +224,7 @@ def scenario_rows(scenarios: ScenarioSet) -> tuple[ScenarioRow, ...]:
                 ""
                 if scenario.probability is None
                 else f"{scenario.probability.value} ({scenario.probability.source}, "
-                     f"{scenario.probability.date})"
+                f"{scenario.probability.date})"
             ),
         )
         for scenario in scenarios.scenarios

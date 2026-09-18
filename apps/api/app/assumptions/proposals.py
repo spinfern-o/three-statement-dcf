@@ -45,8 +45,13 @@ class Proposal:
 
 
 def _driver(
-    code: str, name: str, value: Decimal, unit: str, periods: tuple[str, ...],
-    rationale: str, owner: str,
+    code: str,
+    name: str,
+    value: Decimal,
+    unit: str,
+    periods: tuple[str, ...],
+    rationale: str,
+    owner: str,
 ) -> Assumption:
     return Assumption(
         code=code,
@@ -93,10 +98,13 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> tuple[Proposal
         out.append(
             Proposal(
                 assumption=_driver(
-                    code, name, driver.days, "days", measured,
+                    code,
+                    name,
+                    driver.days,
+                    "days",
+                    measured,
                     f"{name} was {driver.days} days at {latest.year} year end, on a "
-                    f"365-day convention over the full-year flow (13.1.e). "
-                    + HOLDING_CONSTANT,
+                    f"365-day convention over the full-year flow (13.1.e). " + HOLDING_CONSTANT,
                     owner,
                 ),
                 schedule="13.1",
@@ -116,8 +124,11 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> tuple[Proposal
         out.append(
             Proposal(
                 assumption=_driver(
-                    "interest_rate_on_debt", "Interest rate on beginning debt",
-                    rate.rate, "ratio", (interest_year.year,),
+                    "interest_rate_on_debt",
+                    "Interest rate on beginning debt",
+                    rate.rate,
+                    "ratio",
+                    (interest_year.year,),
                     f"Interest expense for {interest_year.year} over BEGINNING debt -- the "
                     f"balance at {interest_year.prior_year} year end -- giving {rate.rate}. "
                     "Beginning debt is the basis model/forecast.py charges "
@@ -142,7 +153,10 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> tuple[Proposal
         out.append(
             Proposal(
                 assumption=_driver(
-                    "tax_rate", "Effective tax rate", usable[latest_year], "ratio",
+                    "tax_rate",
+                    "Effective tax rate",
+                    usable[latest_year],
+                    "ratio",
                     tuple(sorted(usable)),
                     f"The effective rate for {latest_year} was {usable[latest_year]}, "
                     "measured as tax expense over pretax income. STEP 16 requires "
@@ -176,8 +190,11 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> tuple[Proposal
         out.append(
             Proposal(
                 assumption=_driver(
-                    "depreciation_pct_beginning_ppe", "Depreciation on opening PP&E",
-                    depreciation / opening, "ratio", (ppe_year.year,),
+                    "depreciation_pct_beginning_ppe",
+                    "Depreciation on opening PP&E",
+                    depreciation / opening,
+                    "ratio",
+                    (ppe_year.year,),
                     f"Depreciation of {depreciation:,} in {ppe_year.year} against "
                     f"opening PP&E of {opening:,}. STEP 18 forecasts depreciation "
                     "and CapEx separately, and neither may default to the other. "
@@ -217,9 +234,7 @@ def unproposable(schedules: ScheduleSet) -> dict[str, str]:
             "constant share of revenue, and a proposal is the fastest way to "
             "make that assumption without noticing."
         ),
-        "opex_pct_revenue / opex_amount": (
-            "The same as COGS, and for the same reason."
-        ),
+        "opex_pct_revenue / opex_amount": ("The same as COGS, and for the same reason."),
         "capex_pct_revenue / capex_amount": (
             "The PP&E schedule reports CapEx as an amount, not as a policy. "
             "Whether next year's CapEx follows revenue, follows a stated "

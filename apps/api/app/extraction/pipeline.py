@@ -104,8 +104,7 @@ def ingest(
         except Exception as exc:
             raise IngestionRefusal(
                 UNREADABLE_PDF,
-                f"the file carries a PDF signature but its structure could not "
-                f"be parsed: {exc}",
+                f"the file carries a PDF signature but its structure could not be parsed: {exc}",
             ) from exc
 
         scan = scan_document(doc)

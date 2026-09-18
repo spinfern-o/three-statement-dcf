@@ -158,9 +158,7 @@ def _common_size(
     return quantize_for_display(value / base * D(100), PERCENT_PLACES), ""
 
 
-def _growth(
-    value: Decimal | None, prior: Decimal | None, index: int
-) -> tuple[Decimal | None, str]:
+def _growth(value: Decimal | None, prior: Decimal | None, index: int) -> tuple[Decimal | None, str]:
     """Item 64. Period-on-period change, or a reason it is undefined."""
     if index == 0:
         return None, "no prior year in this filing"
@@ -172,6 +170,7 @@ def _growth(
 
 
 # --- item 62 ----------------------------------------------------------------
+
 
 def equity_statement_status() -> str:
     """12.2.l and 7.5.d ask for a statement of equity "when available".

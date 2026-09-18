@@ -91,8 +91,7 @@ def tombstones(storage_root: str | Path) -> tuple[Tombstone, ...]:
     if not directory.exists():
         return ()
     return tuple(
-        Tombstone(**json.loads(path.read_text()))
-        for path in sorted(directory.glob("*.json"))
+        Tombstone(**json.loads(path.read_text())) for path in sorted(directory.glob("*.json"))
     )
 
 
@@ -112,8 +111,7 @@ def check_confirmation(result, typed: str, reason: str) -> None:
         )
     if not reason.strip():
         raise DeletionRefused(
-            "A permanent deletion needs a written reason (9.14, 10.33). "
-            "Nothing was deleted."
+            "A permanent deletion needs a written reason (9.14, 10.33). Nothing was deleted."
         )
 
 

@@ -105,11 +105,20 @@ def test_interactive_boundaries_meet_non_text_contrast(foreground, background):
 def test_every_token_section_6_4_names_is_defined():
     """6.4 lists the tokens by name. All of them, or the list is decoration."""
     required = [
-        "--color-canvas", "--color-surface", "--color-surface-muted",
-        "--color-text-primary", "--color-text-secondary",
-        "--color-accent-primary", "--color-accent-financial",
-        "--color-success", "--color-warning", "--color-danger",
-        "--color-border", "--radius-card", "--radius-control", "--shadow-card",
+        "--color-canvas",
+        "--color-surface",
+        "--color-surface-muted",
+        "--color-text-primary",
+        "--color-text-secondary",
+        "--color-accent-primary",
+        "--color-accent-financial",
+        "--color-success",
+        "--color-warning",
+        "--color-danger",
+        "--color-border",
+        "--radius-card",
+        "--radius-control",
+        "--shadow-card",
         *[f"--space-{n}" for n in range(1, 13)],
     ]
     text = TOKENS.read_text()

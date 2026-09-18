@@ -54,7 +54,10 @@ class Finding:
 
 # --- item 54: 11.6 ----------------------------------------------------------
 
-def duplicate_counting(result: ExtractionResult, mappings: MappingSet | None = None) -> tuple[Finding, ...]:
+
+def duplicate_counting(
+    result: ExtractionResult, mappings: MappingSet | None = None
+) -> tuple[Finding, ...]:
     """Find every way the mappings would count one figure twice."""
     mapping_set = mappings if mappings is not None else result.mappings
     if mapping_set is None:
@@ -91,7 +94,9 @@ def duplicate_counting(result: ExtractionResult, mappings: MappingSet | None = N
                         )
                     )
                 elif in_sum_relationship(first, second):
-                    inner, outer = (first, second) if second in _ancestors(first) else (second, first)
+                    inner, outer = (
+                        (first, second) if second in _ancestors(first) else (second, first)
+                    )
                     findings.append(
                         Finding(
                             code=ReasonCode.DOUBLE_COUNTED,
@@ -112,9 +117,7 @@ def duplicate_counting(result: ExtractionResult, mappings: MappingSet | None = N
         fact = facts.get(mapping.reported_fact_id)
         if fact is None or not mapping.contributes:
             continue
-        grouped.setdefault((mapping.canonical_code, fact.period_label), []).append(
-            (fact, mapping)
-        )
+        grouped.setdefault((mapping.canonical_code, fact.period_label), []).append((fact, mapping))
 
     for (code, period), pairs in grouped.items():
         if len(pairs) < 2:
@@ -158,6 +161,7 @@ def _is_cross_statement_duplicate(result, code: str, pairs) -> bool:
 
 
 # --- item 55: 11.7, 12.4.i --------------------------------------------------
+
 
 def subtotal_reconciliation(
     result: ExtractionResult,
@@ -312,10 +316,9 @@ def cross_statement_reconciliation(
                     f"means a flow is mapped to the wrong side, or a flow is "
                     f"missing entirely."
                 ),
-                fact_ids=opening.contributors + closing.contributors
-                + tuple(
-                    fid for flow in (cfo, cfi, cff) for fid in flow.contributors
-                ),
+                fact_ids=opening.contributors
+                + closing.contributors
+                + tuple(fid for flow in (cfo, cfi, cff) for fid in flow.contributors),
                 expected=expected,
                 actual=closing_value,
             )
@@ -374,6 +377,7 @@ def all_findings(
 
 
 # --- applying the findings to the facts -------------------------------------
+
 
 def apply_findings(
     result: ExtractionResult, tolerance: Tolerance | None = None

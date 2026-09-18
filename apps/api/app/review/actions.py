@@ -130,7 +130,7 @@ def _apply(
     if previous is not None:
         detail += f" (replacing an earlier decision: {previous.describe()})"
     if resolutions != fact.resolutions:
-        cleared = ", ".join(r.code.value for r in resolutions[len(fact.resolutions):])
+        cleared = ", ".join(r.code.value for r in resolutions[len(fact.resolutions) :])
         detail += f" [resolved: {cleared}]"
 
     event = AuditEvent.create(

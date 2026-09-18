@@ -86,10 +86,7 @@ class Diagnostics:
         return tuple(o for o in self.outcomes if o.status is Status.PASS)
 
     def outstanding_at(self, severity: Severity) -> tuple[Outcome, ...]:
-        return tuple(
-            o for o in self.outcomes
-            if o.is_outstanding and o.check.severity is severity
-        )
+        return tuple(o for o in self.outcomes if o.is_outstanding and o.check.severity is severity)
 
     def summarize(self) -> str:
         return (
@@ -171,7 +168,7 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
         "every required metadata field is confirmed"
         if progress.metadata_confirmed
         else f"{len(progress.unconfirmed_required)} required field(s) unconfirmed: "
-             + ", ".join(progress.unconfirmed_required),
+        + ", ".join(progress.unconfirmed_required),
     )
 
     built = None
@@ -182,16 +179,21 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
         build_error = str(exc)
 
     if built is not None and built.years:
-        record("17.3", Status.PASS,
-               f"{len(built.years)} period(s), each labelled actual or estimate: "
-               + ", ".join(built.years))
+        record(
+            "17.3",
+            Status.PASS,
+            f"{len(built.years)} period(s), each labelled actual or estimate: "
+            + ", ".join(built.years),
+        )
     else:
-        record("17.3", Status.SKIP,
-               "no period survived to the statements", blocked_by=build_error or "the build")
+        record(
+            "17.3",
+            Status.SKIP,
+            "no period survived to the statements",
+            blocked_by=build_error or "the build",
+        )
 
-    confirmed = {
-        name for name, field in document.metadata.fields.items() if field.confirmed
-    }
+    confirmed = {name for name, field in document.metadata.fields.items() if field.confirmed}
     needed = {"reporting_currency", "displayed_scale"}
     record(
         "17.4",
@@ -219,14 +221,18 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
         "no fact contributes to a subtotal both directly and through a component"
         if not duplicates
         else f"{len(duplicates)} double-count finding(s): "
-             + "; ".join(f.message for f in duplicates[:3]),
+        + "; ".join(f.message for f in duplicates[:3]),
     )
 
     # --- 17.8-17.15: historical statements and schedules --------------------
     if built is None:
         for clause in ("17.8", "17.9", "17.10", "17.11", "17.13", "17.14", "17.15"):
-            record(clause, Status.SKIP, "the historical statements did not build",
-                   blocked_by=build_error)
+            record(
+                clause,
+                Status.SKIP,
+                "the historical statements did not build",
+                blocked_by=build_error,
+            )
     else:
         historical = {c.name: c for c in run_historical_checks(built)}
         _carry(record, historical, "17.8", "Historical balance sheet balances (17.8)")
@@ -238,7 +244,8 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
         _schedule(record, "17.11", reconcile_schedule(schedules.ppe, tolerance))
         _schedule(record, "17.13", reconcile_schedule(schedules.debt, tolerance))
         _schedule(
-            record, "17.15",
+            record,
+            "17.15",
             reconcile_schedule(schedules.retained_earnings, tolerance),
         )
         usable = schedules.tax.usable_rates()
@@ -248,7 +255,7 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
             f"effective rate computed for {', '.join(sorted(usable))}"
             if usable
             else "no period yields a rate STEP 16 could use; 17.14 is scoped "
-                 "'where data permits' and the data does not",
+            "'where data permits' and the data does not",
         )
 
     record("17.12", Status.SKIP, UNEVALUABLE["17.12"])
@@ -266,7 +273,8 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
             gate.describe(),
         )
         rejected = [
-            code for code, item in scenarios.resolve(scenario_id).items()
+            code
+            for code, item in scenarios.resolve(scenario_id).items()
             if item.assumption.status is AssumptionStatus.REJECTED
         ]
         record(
@@ -288,8 +296,7 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
 
     if forecast is None:
         for clause in ("17.16", "17.17", "17.20", "17.22"):
-            record(clause, Status.SKIP, "the forecast did not build",
-                   blocked_by=forecast_error)
+            record(clause, Status.SKIP, "the forecast did not build", blocked_by=forecast_error)
     else:
         results = {c.name: c for c in check_scenario(forecast).results}
         _carry(record, results, "17.16", "Forecast balance sheet balances")
@@ -317,8 +324,9 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
     # quietly wrong when somebody adds a second way to build one.
     if valuation is None or forecast is None:
         for clause in ("17.22", "17.23", "17.24", "17.25", "17.26"):
-            record(clause, Status.SKIP, "there is no valuation to check",
-                   blocked_by=valuation_error)
+            record(
+                clause, Status.SKIP, "there is no valuation to check", blocked_by=valuation_error
+            )
     else:
         from model.checks import run_all_checks
 
@@ -333,7 +341,8 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
         _carry(record, with_valuation, "17.22", "FCFF matches three-statement forecast")
 
         undated = [
-            r.code for r in valuation.inputs
+            r.code
+            for r in valuation.inputs
             if not r.assumed_nil and "as at" not in r.evidence and "http" not in r.evidence
         ]
         record(
@@ -355,7 +364,7 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
             "every enterprise-to-equity adjustment is sourced"
             if not valuation.assumed_nil
             else "taken as nil with nobody having addressed them: "
-                 + ", ".join(valuation.assumed_nil),
+            + ", ".join(valuation.assumed_nil),
         )
         record(
             "17.26",
@@ -371,9 +380,7 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
     # --- 17.28: the benchmark, which is an attestation ----------------------
     record("17.28", *_benchmark_attestation())
 
-    ordered = tuple(
-        outcomes[check.clause] for check in REGISTRY if check.clause in outcomes
-    )
+    ordered = tuple(outcomes[check.clause] for check in REGISTRY if check.clause in outcomes)
     return Diagnostics(ordered)
 
 
@@ -397,8 +404,9 @@ def _finite(built, valuation) -> tuple[Status, str]:
         for statement, ledger in built.ledgers.items():
             for year in built.years:
                 for account in ledger.accounts_present(year):
-                    values.append((f"{statement.value}.{account} {year}",
-                                   ledger.get(account, year)))
+                    values.append(
+                        (f"{statement.value}.{account} {year}", ledger.get(account, year))
+                    )
     if valuation is not None:
         values.append(("enterprise_value", valuation.valuation.enterprise_value))
         values.append(("equity_value", valuation.valuation.equity_value))
@@ -450,7 +458,10 @@ def _lineage(built) -> tuple[Status, str]:
                     missing.append(f"{statement.value}.{account} {year}")
     if missing:
         return Status.FAIL, f"{len(missing)} cell(s) cite nothing: " + ", ".join(missing[:5])
-    return Status.PASS, "every cell cites either a page of the filing or the formula that produced it"
+    return (
+        Status.PASS,
+        "every cell cites either a page of the filing or the formula that produced it",
+    )
 
 
 def _benchmark_attestation() -> tuple[Status, str]:

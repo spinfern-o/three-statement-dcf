@@ -55,6 +55,7 @@ def valuation(forecast, scenarios):
 
 # --- item 120: the independent benchmark (4.15, 4.16) -----------------------
 
+
 def _benchmark(forecast, wacc_inputs, growth, cash, debt):
     """Every 4.16 valuation output, recomputed longhand.
 
@@ -86,8 +87,7 @@ def _benchmark(forecast, wacc_inputs, growth, cash, debt):
             for name in (ACCOUNTS_RECEIVABLE, INVENTORY, OTHER_CURRENT_ASSETS)
         )
         liabilities = sum(
-            balance.get(name, year)
-            for name in (ACCOUNTS_PAYABLE, OTHER_CURRENT_LIABILITIES)
+            balance.get(name, year) for name in (ACCOUNTS_PAYABLE, OTHER_CURRENT_LIABILITIES)
         )
         return assets - liabilities
 
@@ -180,6 +180,7 @@ def test_the_enterprise_to_equity_bridge_is_explicit(valuation):
 
 # --- item 111: the source panel ---------------------------------------------
 
+
 def test_every_market_input_carries_a_url_and_an_observation_date(valuation):
     """16.6-16.10 with Section 14's evidence rules doing the enforcing.
 
@@ -194,18 +195,20 @@ def test_every_market_input_carries_a_url_and_an_observation_date(valuation):
         assert record.status == "Approved"
 
 
-def test_a_market_input_without_an_observation_date_never_gets_this_far(
-    forecast_built, scenarios
-):
+def test_a_market_input_without_an_observation_date_never_gets_this_far(forecast_built, scenarios):
     """The refusal is Section 14's, at the point the number is entered."""
     from apps.api.app.assumptions.schema import AssumptionError
 
     with pytest.raises(AssumptionError, match="observation date"):
         Assumption(
-            code="beta", name="Beta", value=D("1.15"), unit="ratio",
+            code="beta",
+            name="Beta",
+            value=D("1.15"),
+            unit="ratio",
             source_type=SourceType.EXTERNAL_MARKET_DATA,
             evidence=Evidence(url="https://example.test/beta"),
-            rationale="a beta from somewhere", owner="larry",
+            rationale="a beta from somewhere",
+            owner="larry",
         )
 
 
@@ -250,10 +253,15 @@ def test_a_market_input_in_the_wrong_unit_is_refused(forecast, scenarios):
 
 # --- items 112, 113: the timing convention ----------------------------------
 
+
 def test_year_end_is_the_default_and_uses_whole_periods(valuation):
     assert valuation.schedule.timing is Timing.YEAR_END
     assert [item.period for item in valuation.valuation.discounted] == [
-        D(1), D(2), D(3), D(4), D(5)
+        D(1),
+        D(2),
+        D(3),
+        D(4),
+        D(5),
     ]
 
 
@@ -262,7 +270,11 @@ def test_mid_year_discounting_raises_the_valuation(forecast, scenarios, valuatio
     mid = build_scenario_valuation(forecast, scenarios, timing=Timing.MID_YEAR)
     assert mid.valuation.enterprise_value > valuation.valuation.enterprise_value
     assert [item.period for item in mid.valuation.discounted] == [
-        D("0.5"), D("1.5"), D("2.5"), D("3.5"), D("4.5")
+        D("0.5"),
+        D("1.5"),
+        D("2.5"),
+        D("3.5"),
+        D("4.5"),
     ]
     assert "RAISES every present value" in mid.schedule.basis
 
@@ -273,9 +285,7 @@ def test_the_terminal_value_is_discounted_on_the_same_convention(forecast, scena
     assert mid.schedule.terminal == D("4.5")
 
 
-def test_exact_dates_need_a_valuation_date_and_then_use_the_calendar(
-    forecast, scenarios
-):
+def test_exact_dates_need_a_valuation_date_and_then_use_the_calendar(forecast, scenarios):
     """16.12."""
     from model.provenance import ProvenanceError
 
@@ -283,14 +293,18 @@ def test_exact_dates_need_a_valuation_date_and_then_use_the_calendar(
         build_scenario_valuation(forecast, scenarios, timing=Timing.EXACT_DATE)
 
     exact = build_scenario_valuation(
-        forecast, scenarios, timing=Timing.EXACT_DATE,
-        valuation_date=date(2026, 6, 30), fiscal_year_end=date(2025, 12, 31),
+        forecast,
+        scenarios,
+        timing=Timing.EXACT_DATE,
+        valuation_date=date(2026, 6, 30),
+        fiscal_year_end=date(2025, 12, 31),
     )
     assert exact.valuation.discounted[0].period == D(184) / D(365)
     assert "2026-06-30" in exact.schedule.basis
 
 
 # --- items 115, 16.16, 16.21, 16.22 -----------------------------------------
+
 
 def test_the_terminal_share_is_reported(valuation):
     """16.21. Most of a DCF's answer usually lives here."""
@@ -337,11 +351,15 @@ def test_the_headroom_warns_when_the_spread_is_narrow(forecast, scenarios):
 
 # --- 16.19, 16.20, 16.24, 16.25 ---------------------------------------------
 
+
 def test_bridge_lines_nobody_addressed_are_reported_not_silently_zero(valuation):
     """16.19 lists them; taking one as nil without saying so is the failure."""
     assert set(valuation.assumed_nil) == {
-        "non_operating_investments", "minority_interest", "preferred_stock",
-        "pension_obligations", "other_claims",
+        "non_operating_investments",
+        "minority_interest",
+        "preferred_stock",
+        "pension_obligations",
+        "other_claims",
     }
     nil = {r.code: r for r in valuation.inputs if r.assumed_nil}
     assert "taken as nil because nobody entered it" in nil["minority_interest"].evidence
@@ -359,11 +377,16 @@ def test_a_sourced_share_count_gives_a_per_share_value_and_says_what_rests_on_it
 ):
     with_shares = scenarios.with_assumption(
         Assumption(
-            code="diluted_shares", name="Diluted shares", value=D("50000"),
-            unit="shares", source_type=SourceType.COMPANY_FILING,
+            code="diluted_shares",
+            name="Diluted shares",
+            value=D("50000"),
+            unit="shares",
+            source_type=SourceType.COMPANY_FILING,
             evidence=Evidence(document_id="doc-1", page=44, date="2026-02-14"),
             rationale="the diluted count under the EPS note",
-            owner="larry", reviewer="larry", status=Status.APPROVED,
+            owner="larry",
+            reviewer="larry",
+            status=Status.APPROVED,
         )
     )
     built = build_scenario_valuation(forecast, with_shares)
@@ -388,6 +411,7 @@ def test_lease_liabilities_are_reported_as_a_bridge_line_that_cannot_be_built():
 
 # --- item 119 / 16.23: the sensitivity grid ---------------------------------
 
+
 def test_the_grid_is_centred_on_the_valuation_it_is_a_sensitivity_of(valuation):
     """A grid centred somewhere else is a sensitivity of a model nobody built."""
     grid = build_grid(valuation)
@@ -404,9 +428,7 @@ def test_the_grid_states_its_step_sizes_and_its_discounting(valuation):
     assert "Year-end" in grid.describe()
 
 
-def test_the_grid_is_discounted_on_the_same_convention_as_its_valuation(
-    forecast, scenarios
-):
+def test_the_grid_is_discounted_on_the_same_convention_as_its_valuation(forecast, scenarios):
     """A grid on a different convention is a sensitivity of a different model."""
     mid = build_scenario_valuation(forecast, scenarios, timing=Timing.MID_YEAR)
     grid = build_grid(mid)

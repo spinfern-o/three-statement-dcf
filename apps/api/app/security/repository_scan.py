@@ -48,14 +48,18 @@ DOCUMENT_SUFFIXES = (".pdf",)
 #: Shapes that are values rather than names. `.env.example` may carry the
 #: names; it may not carry any of these.
 SECRET_SHAPES = (
-    (re.compile(r"scrypt\$\d+\$\d+\$\d+\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]{20,}"),
-     "a stored password hash"),
-    (re.compile(r"(?i)\b(?:aws|api|secret|private)[_-]?key\b\s*[:=]\s*['\"]?[A-Za-z0-9/+=_-]{16,}"),
-     "an API or private key"),
-    (re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----"),
-     "a private key block"),
-    (re.compile(r"(?i)\bpassword\b\s*[:=]\s*['\"][^'\"\s]{8,}['\"]"),
-     "a literal password"),
+    (
+        re.compile(r"scrypt\$\d+\$\d+\$\d+\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]{20,}"),
+        "a stored password hash",
+    ),
+    (
+        re.compile(
+            r"(?i)\b(?:aws|api|secret|private)[_-]?key\b\s*[:=]\s*['\"]?[A-Za-z0-9/+=_-]{16,}"
+        ),
+        "an API or private key",
+    ),
+    (re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----"), "a private key block"),
+    (re.compile(r"(?i)\bpassword\b\s*[:=]\s*['\"][^'\"\s]{8,}['\"]"), "a literal password"),
 )
 
 #: Files this check reads but does not scan for secret shapes, because their
@@ -81,7 +85,10 @@ class Finding:
 def tracked_files(root: Path = ROOT) -> list[str]:
     """Every file Git tracks. The working tree is not the question; the repository is."""
     result = subprocess.run(
-        ["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True,
+        ["git", "ls-files", "-z"],
+        cwd=root,
+        capture_output=True,
+        check=True,
     )
     return [name for name in result.stdout.decode().split("\0") if name]
 
@@ -110,7 +117,7 @@ def _accounted_for(root: Path) -> set[str]:
         return set()
     text = manifest.read_text()
     pinned = set(re.findall(r'"([\w.-]+\.pdf)":\s*"[0-9a-f]{64}"', text))
-    excused = set(re.findall(r'NOT_REPRODUCIBLE = \{([^}]*)\}', text))
+    excused = set(re.findall(r"NOT_REPRODUCIBLE = \{([^}]*)\}", text))
     for group in excused:
         pinned |= set(re.findall(r'"([\w.-]+\.pdf)"', group))
     built = set(re.findall(r'"([\w.-]+\.pdf)"', generator.read_text()))
@@ -125,9 +132,7 @@ def scan_documents(root: Path = ROOT) -> list[Finding]:
         if not name.lower().endswith(DOCUMENT_SUFFIXES):
             continue
         if not _is_fixture(name):
-            findings.append(
-                Finding(name, "a PDF outside the fixture directory", "20.4")
-            )
+            findings.append(Finding(name, "a PDF outside the fixture directory", "20.4"))
             continue
         if Path(name).name not in accounted:
             findings.append(

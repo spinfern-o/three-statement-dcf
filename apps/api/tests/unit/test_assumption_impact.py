@@ -32,28 +32,38 @@ D = Decimal
 
 def definition(code, target, expression, unit="currency"):
     return FormulaDefinition(
-        code=code, target=target, expression=expression, output_unit=unit,
+        code=code,
+        target=target,
+        expression=expression,
+        output_unit=unit,
         definition=f"{target} computed as {expression}",
     )
 
 
 #: A small forecast-shaped chain: growth drives revenue, revenue drives COGS,
 #: and both drive gross profit and the margin.
-FORMULAS = FormulaSet((
-    definition("F1", "revenue", "prior_revenue * (1 + revenue_growth)"),
-    definition("F2", "cogs", "revenue * cogs_pct_revenue"),
-    definition("F3", "gross_profit", "revenue - cogs"),
-    definition("F4", "gross_margin", "gross_profit / revenue", unit="ratio"),
-))
+FORMULAS = FormulaSet(
+    (
+        definition("F1", "revenue", "prior_revenue * (1 + revenue_growth)"),
+        definition("F2", "cogs", "revenue * cogs_pct_revenue"),
+        definition("F3", "gross_profit", "revenue - cogs"),
+        definition("F4", "gross_margin", "gross_profit / revenue", unit="ratio"),
+    )
+)
 
 
 def assumption(code, value, unit="ratio"):
     return Assumption(
-        code=code, name=code.replace("_", " "), value=D(value), unit=unit,
+        code=code,
+        name=code.replace("_", " "),
+        value=D(value),
+        unit=unit,
         source_type=SourceType.COMPANY_GUIDANCE,
         evidence=Evidence(document_id="doc-1", page=31, date="2026-02-14"),
         rationale="the midpoint of the guided range",
-        owner="larry", reviewer="larry", status=Status.APPROVED,
+        owner="larry",
+        reviewer="larry",
+        status=Status.APPROVED,
     )
 
 
@@ -72,12 +82,17 @@ def environment():
 
 def _preview(scenarios, environment, code, proposed):
     return preview(
-        formulas=FORMULAS, base_environment=environment, scenarios=scenarios,
-        scenario_id=BASE, code=code, proposed=D(proposed),
+        formulas=FORMULAS,
+        base_environment=environment,
+        scenarios=scenarios,
+        scenario_id=BASE,
+        code=code,
+        proposed=D(proposed),
     )
 
 
 # --- 14.8: "before saving" --------------------------------------------------
+
 
 def test_previewing_changes_nothing(scenarios, environment):
     """The requirement is not that a change can be undone. It is that it has
@@ -117,9 +132,7 @@ def test_a_change_that_moves_nothing_says_so(scenarios, environment):
     assert "is unchanged" in impact.describe()
 
 
-def test_previewing_an_assumption_the_scenario_does_not_carry_is_refused(
-    scenarios, environment
-):
+def test_previewing_an_assumption_the_scenario_does_not_carry_is_refused(scenarios, environment):
     with pytest.raises(KeyError, match="not an assumption"):
         _preview(scenarios, environment, "made_up", "1")
 
@@ -141,12 +154,11 @@ def test_the_preview_reports_what_would_become_uncomputable(environment):
 
 # --- item 94 on its own -----------------------------------------------------
 
+
 def test_the_dependency_answer_comes_from_the_phase_8_graph():
     """A second traversal here would be a second answer to the same question."""
     assert reaches(FORMULAS, "cogs_pct_revenue") == ("cogs", "gross_margin", "gross_profit")
-    assert reaches(FORMULAS, "prior_revenue") == (
-        "cogs", "gross_margin", "gross_profit", "revenue"
-    )
+    assert reaches(FORMULAS, "prior_revenue") == ("cogs", "gross_margin", "gross_profit", "revenue")
 
 
 def test_an_assumption_nothing_reads_is_reported(scenarios):
@@ -158,18 +170,24 @@ def test_an_assumption_nothing_reads_is_reported(scenarios):
 
 # --- previewing across a scenario ------------------------------------------
 
-def test_a_preview_in_a_child_scenario_starts_from_what_it_inherits(
-    scenarios, environment
-):
+
+def test_a_preview_in_a_child_scenario_starts_from_what_it_inherits(scenarios, environment):
     variant = scenarios.with_scenario(
         Scenario(id="upside", name="Upside", parent_id=BASE)
     ).override(
-        "upside", "revenue_growth", D("0.15"),
-        owner="larry", rationale="top of the guided range",
+        "upside",
+        "revenue_growth",
+        D("0.15"),
+        owner="larry",
+        rationale="top of the guided range",
     )
     impact = preview(
-        formulas=FORMULAS, base_environment=environment, scenarios=variant,
-        scenario_id="upside", code="revenue_growth", proposed=D("0.18"),
+        formulas=FORMULAS,
+        base_environment=environment,
+        scenarios=variant,
+        scenario_id="upside",
+        code="revenue_growth",
+        proposed=D("0.18"),
     )
     assert impact.before == D("0.15"), "the child's own value, not the base's"
     moved = {item.target: item.after for item in impact.moved}
@@ -180,7 +198,11 @@ def test_the_two_scenarios_calculate_to_different_models(scenarios, environment)
     variant = scenarios.with_scenario(
         Scenario(id="upside", name="Upside", parent_id=BASE)
     ).override(
-        "upside", "revenue_growth", D("0.15"), owner="larry", rationale="top of range",
+        "upside",
+        "revenue_growth",
+        D("0.15"),
+        owner="larry",
+        rationale="top of range",
     )
     base_model = model_for(FORMULAS, environment, variant, BASE)
     upside_model = model_for(FORMULAS, environment, variant, "upside")
@@ -204,10 +226,14 @@ def test_a_units_mismatch_between_an_assumption_and_its_formula_is_caught(enviro
         (base_scenario("larry"),),
         (
             Assumption(
-                code="revenue_growth", name="Revenue growth", value=D("10"),
-                unit="percent", source_type=SourceType.COMPANY_GUIDANCE,
+                code="revenue_growth",
+                name="Revenue growth",
+                value=D("10"),
+                unit="percent",
+                source_type=SourceType.COMPANY_GUIDANCE,
                 evidence=Evidence(document_id="doc-1", page=31, date="2026-02-14"),
-                rationale="ten percent, as guided", owner="larry",
+                rationale="ten percent, as guided",
+                owner="larry",
             ),
             assumption("cogs_pct_revenue", "0.60"),
         ),

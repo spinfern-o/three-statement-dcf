@@ -37,7 +37,7 @@ TWO = D(2)
 
 @dataclass(frozen=True)
 class ImpliedRate:
-    basis: str          # "beginning" | "average"
+    basis: str  # "beginning" | "average"
     rate: Decimal | None
     denominator: Decimal | None
     explanation: str
@@ -75,20 +75,27 @@ def _implied(
 ) -> ImpliedRate:
     if expense is None:
         return ImpliedRate(
-            basis, None, denominator, explanation,
+            basis,
+            None,
+            denominator,
+            explanation,
             unavailable_reason="the filing reports no interest expense for this period",
         )
     if denominator is None:
         return ImpliedRate(
-            basis, None, None, explanation,
+            basis,
+            None,
+            None,
+            explanation,
             unavailable_reason=f"the {basis} debt balance is not reported",
         )
     if denominator == ZERO:
         return ImpliedRate(
-            basis, None, denominator, explanation,
-            unavailable_reason=(
-                f"{basis} debt is zero, so a rate against it is undefined (4.12)"
-            ),
+            basis,
+            None,
+            denominator,
+            explanation,
+            unavailable_reason=(f"{basis} debt is zero, so a rate against it is undefined (4.12)"),
         )
     return ImpliedRate(basis, expense / denominator, denominator, explanation)
 
@@ -116,14 +123,18 @@ def implied_interest_rates(ledgers: dict, years: tuple[str, ...]) -> tuple[Inter
                 ending_debt=closing,
                 rates=(
                     _implied(
-                        "beginning", expense, opening,
+                        "beginning",
+                        expense,
+                        opening,
                         f"interest expense for {year} over debt at {prior} year end. "
                         "This is the basis model/forecast.py charges interest on "
                         "(STEP 19), so it is the rate that carries forward without "
                         "changing the convention mid-model.",
                     ),
                     _implied(
-                        "average", expense, average,
+                        "average",
+                        expense,
+                        average,
                         f"interest expense for {year} over the mean of debt at {prior} "
                         f"and {year} year end. A better description of a year with a "
                         "large mid-year drawdown or repayment, and NOT the basis the "

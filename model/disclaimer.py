@@ -46,16 +46,12 @@ SHORT = (
 )
 
 #: Four sentences, each of which a surface must not drop.
-SENTENCES = tuple(
-    sentence.strip() + "." for sentence in DISCLAIMER.split(". ") if sentence.strip()
-)
+SENTENCES = tuple(sentence.strip() + "." for sentence in DISCLAIMER.split(". ") if sentence.strip())
 
 
 def wrapped(width: int = 78, indent: str = "") -> str:
     """The full text, wrapped for a terminal report."""
-    return textwrap.fill(
-        DISCLAIMER, width=width, initial_indent=indent, subsequent_indent=indent
-    )
+    return textwrap.fill(DISCLAIMER, width=width, initial_indent=indent, subsequent_indent=indent)
 
 
 def block(width: int = 78) -> str:

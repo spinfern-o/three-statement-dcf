@@ -75,9 +75,7 @@ class LineChart:
                 "chart that shipped without it."
             )
         if not self.csv.strip():
-            raise ValueError(
-                f"chart {self.title!r} has no downloadable data (6.5.f)."
-            )
+            raise ValueError(f"chart {self.title!r} has no downloadable data (6.5.f).")
 
 
 def _scale(value, low, high, lo_px, hi_px) -> Decimal:
@@ -96,10 +94,7 @@ def _summary(title: str, points: tuple[Point, ...], unit: str) -> str:
     actuals = [p for p in points if not p.is_estimate]
     estimates = [p for p in points if p.is_estimate]
 
-    parts = [
-        f"{title}, {len(points)} periods from {first.label} to {last.label}, "
-        f"in {unit}."
-    ]
+    parts = [f"{title}, {len(points)} periods from {first.label} to {last.label}, in {unit}."]
     if actuals:
         parts.append(
             f"Reported: {actuals[0].label} {_format(actuals[0].value)} to "

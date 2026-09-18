@@ -55,7 +55,12 @@ def render_page(
     """
     cache = None
     if cache_root is not None:
-        cache = cache_root / "renders" / immutable_hash[:2] / f"{immutable_hash}-p{page_number}-{dpi}.png"
+        cache = (
+            cache_root
+            / "renders"
+            / immutable_hash[:2]
+            / f"{immutable_hash}-p{page_number}-{dpi}.png"
+        )
         if cache.exists():
             return cache.read_bytes()
 
@@ -83,8 +88,6 @@ def _render(data: bytes, page_number: int, dpi: int) -> bytes:
     """The part that touches the PDF. Module-level so `spawn` can import it."""
     with pymupdf.open(stream=data, filetype="pdf") as doc:
         if not 1 <= page_number <= doc.page_count:
-            raise IndexError(
-                f"page {page_number} is outside this document's 1-{doc.page_count}"
-            )
+            raise IndexError(f"page {page_number} is outside this document's 1-{doc.page_count}")
         pixmap = doc[page_number - 1].get_pixmap(dpi=dpi)
         return pixmap.tobytes("png")

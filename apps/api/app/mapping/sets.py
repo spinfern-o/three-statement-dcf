@@ -213,9 +213,7 @@ class MappingSet:
     def add(self, *new: FactMapping, actor: str, reason: str) -> MappingSet:
         return self._next(self.mappings + new, actor=actor, reason=reason)
 
-    def replace_fact(
-        self, fact_id: str, *new: FactMapping, actor: str, reason: str
-    ) -> MappingSet:
+    def replace_fact(self, fact_id: str, *new: FactMapping, actor: str, reason: str) -> MappingSet:
         """Replace every mapping of one fact. The edit path, and the split path."""
         kept = tuple(m for m in self.mappings if m.reported_fact_id != fact_id)
         return self._next(kept + new, actor=actor, reason=reason)

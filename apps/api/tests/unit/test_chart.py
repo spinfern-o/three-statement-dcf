@@ -23,9 +23,7 @@ from apps.api.app.mapping.chart import (
 from model import accounts
 
 ENGINE_CODES = (
-    set(accounts.INCOME_ACCOUNTS)
-    | set(accounts.BALANCE_ACCOUNTS)
-    | set(accounts.CASHFLOW_ACCOUNTS)
+    set(accounts.INCOME_ACCOUNTS) | set(accounts.BALANCE_ACCOUNTS) | set(accounts.CASHFLOW_ACCOUNTS)
 )
 
 
@@ -83,9 +81,7 @@ def test_operating_tags_match_the_engines_working_capital_membership():
         if i.operating_or_financing is FlowTag.OPERATING
         and StatementType.BALANCE in i.statement_types
     }
-    expected = set(accounts.OPERATING_CURRENT_ASSETS) | set(
-        accounts.OPERATING_CURRENT_LIABILITIES
-    )
+    expected = set(accounts.OPERATING_CURRENT_ASSETS) | set(accounts.OPERATING_CURRENT_LIABILITIES)
     assert operating == expected
 
 

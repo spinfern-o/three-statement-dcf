@@ -88,7 +88,9 @@ class BoundingBox:
     @classmethod
     def from_parser(cls, rect: tuple[object, object, object, object]) -> BoundingBox:
         """Build from the 4-tuple the parser reports, normalizing the corners."""
-        x0, y0, x1, y1 = (from_parser_number(v, what=n) for v, n in zip(rect, ["x0", "y0", "x1", "y1"]))
+        x0, y0, x1, y1 = (
+            from_parser_number(v, what=n) for v, n in zip(rect, ["x0", "y0", "x1", "y1"])
+        )
         # A PDF rectangle may be given with its corners in either order.
         return cls(x0=min(x0, x1), y0=min(y0, y1), x1=max(x0, x1), y1=max(y0, y1))
 

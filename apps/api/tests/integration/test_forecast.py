@@ -47,8 +47,13 @@ D = Decimal
 def assumption(code, value, status=Status.APPROVED):
     unit = BY_CODE[code].unit
     fields = dict(
-        code=code, name=code.replace("_", " "), value=D(value), unit=unit,
-        owner="larry", reviewer="larry", status=status,
+        code=code,
+        name=code.replace("_", " "),
+        value=D(value),
+        unit=unit,
+        owner="larry",
+        reviewer="larry",
+        status=status,
         rationale="entered for this test, with a stated source",
     )
     if unit == "days":
@@ -67,17 +72,17 @@ def assumption(code, value, status=Status.APPROVED):
 #: Every required driver, at the rates the filing itself implies.
 DRIVERS = {
     "revenue_growth": "0.08",
-    "cogs_pct_revenue": "0.60",                        # 1,200,000 / 2,000,000
-    "opex_pct_revenue": "0.24",                        #   480,000 / 2,000,000
-    "depreciation_pct_beginning_ppe": "0.1412",        #   120,000 /   850,000
-    "capex_pct_revenue": "0.085",                      #   170,000 / 2,000,000
-    "dso": "58.4",                                     #   320,000 / 2,000,000 x 365
-    "inventory_days": "73",                            #   240,000 / 1,200,000 x 365
-    "dpo": "60.8",                                     #   200,000 / 1,200,000 x 365
-    "other_current_assets_pct_revenue": "0.02",        #    40,000 / 2,000,000
+    "cogs_pct_revenue": "0.60",  # 1,200,000 / 2,000,000
+    "opex_pct_revenue": "0.24",  #   480,000 / 2,000,000
+    "depreciation_pct_beginning_ppe": "0.1412",  #   120,000 /   850,000
+    "capex_pct_revenue": "0.085",  #   170,000 / 2,000,000
+    "dso": "58.4",  #   320,000 / 2,000,000 x 365
+    "inventory_days": "73",  #   240,000 / 1,200,000 x 365
+    "dpo": "60.8",  #   200,000 / 1,200,000 x 365
+    "other_current_assets_pct_revenue": "0.02",  #    40,000 / 2,000,000
     "other_current_liabilities_pct_revenue": "0.045",  #    90,000 / 2,000,000
-    "interest_rate_on_debt": "0.04",                   #    24,000 /   600,000
-    "tax_rate": "0.25",                                #    74,000 /   296,000
+    "interest_rate_on_debt": "0.04",  #    24,000 /   600,000
+    "tax_rate": "0.25",  #    74,000 /   296,000
 }
 
 
@@ -96,6 +101,7 @@ def forecast(forecast_built, approved):
 
 # --- items 97: the periods (15.1, 15.2) -------------------------------------
 
+
 def test_the_forecast_begins_the_year_after_the_last_actual(forecast_built):
     periods = forecast_periods(forecast_built)
     assert periods.historical == ("2024A", "2025A")
@@ -110,6 +116,7 @@ def test_every_period_is_labelled_actual_or_estimate(forecast):
 
 
 # --- the 14.1 gate runs before the engine is touched ------------------------
+
 
 def test_a_scenario_missing_drivers_is_refused_before_the_engine_runs(forecast_built):
     """The engine names one missing driver per traceback. The gate names all."""
@@ -128,9 +135,7 @@ def test_a_scenario_missing_drivers_is_refused_before_the_engine_runs(forecast_b
 def test_a_draft_driver_never_reaches_the_engine(forecast_built, approved):
     """14.1. A Draft is not an answer, and an unsourced number in a valuation
     is exactly what the status system exists to prevent."""
-    drafted = approved.with_assumption(
-        assumption("dso", "58.4", status=Status.DRAFT)
-    )
+    drafted = approved.with_assumption(assumption("dso", "58.4", status=Status.DRAFT))
     with pytest.raises(ForecastError, match="Draft"):
         build_scenario_forecast(forecast_built, drafted, BASE)
 
@@ -231,6 +236,7 @@ def test_the_historical_years_are_still_reported_in_the_same_ledger(forecast):
 
 # --- the boundary carries what Section 14 added -----------------------------
 
+
 def test_every_driver_reaches_the_engine_with_its_evidence(forecast):
     """STEP 10 asks for a visible source. Losing it here would make the
     engine's own report thinner than the screen that fed it."""
@@ -248,11 +254,16 @@ def test_a_historically_sourced_tax_rate_is_labelled_as_such(forecast_built, app
     """The basis follows the source type, rather than being typed twice."""
     historical = approved.with_assumption(
         Assumption(
-            code="tax_rate", name="Effective tax rate", value=D("0.25"), unit="ratio",
+            code="tax_rate",
+            name="Effective tax rate",
+            value=D("0.25"),
+            unit="ratio",
             source_type=SourceType.HISTORICAL_DRIVER,
             evidence=Evidence(measured_over=("2024A", "2025A")),
             rationale="the effective rate measured from the 13.6 tax schedule",
-            owner="larry", reviewer="larry", status=Status.APPROVED,
+            owner="larry",
+            reviewer="larry",
+            status=Status.APPROVED,
         )
     )
     built = build_scenario_forecast(forecast_built, historical, BASE)
@@ -265,6 +276,7 @@ def test_the_scenario_travels_with_the_result(forecast):
 
 
 # --- item 108: every scenario and every period (15.20) ----------------------
+
 
 def test_every_check_passes_on_a_forecast_that_ties(forecast):
     checks = check_scenario(forecast)
@@ -292,15 +304,16 @@ def test_the_deferred_set_cannot_silently_grow(forecast):
     )
 
 
-def test_two_scenarios_give_two_forecasts_and_both_are_checked(
-    forecast_built, approved
-):
+def test_two_scenarios_give_two_forecasts_and_both_are_checked(forecast_built, approved):
     """15.20's "every scenario", which a single-scenario panel hides."""
     variant = approved.with_scenario(
         Scenario(id="downside", name="Downside", parent_id=BASE, created_by="larry")
     ).override(
-        "downside", "revenue_growth", D("0.02"),
-        owner="larry", rationale="the low end of the guided range",
+        "downside",
+        "revenue_growth",
+        D("0.02"),
+        owner="larry",
+        rationale="the low end of the guided range",
     )
     # An override is a new number, so it arrives as a Draft and the gate stops
     # the scenario until somebody reviews it. That is the workflow working, not
@@ -319,15 +332,16 @@ def test_two_scenarios_give_two_forecasts_and_both_are_checked(
     assert readiness.for_scenario("downside").is_forecast_ready
 
 
-def test_an_override_arrives_as_a_draft_and_stops_its_scenario(
-    forecast_built, approved
-):
+def test_an_override_arrives_as_a_draft_and_stops_its_scenario(forecast_built, approved):
     """14.7 gives an override its lineage; 14.1 still makes it earn a status."""
     variant = approved.with_scenario(
         Scenario(id="downside", name="Downside", parent_id=BASE, created_by="larry")
     ).override(
-        "downside", "revenue_growth", D("0.02"),
-        owner="larry", rationale="the low end of the guided range",
+        "downside",
+        "revenue_growth",
+        D("0.02"),
+        owner="larry",
+        rationale="the low end of the guided range",
     )
     assert variant.resolve("downside")["revenue_growth"].assumption.status is Status.DRAFT
     with pytest.raises(ForecastError, match="Draft"):
@@ -342,8 +356,11 @@ def _approve(scenarios, scenario_id, code):
 
     current = scenarios.resolve(scenario_id)[code].assumption
     reviewed, _ = transition(
-        current, Status.REVIEWED, actor="larry",
-        reason="checked against the guided range", reviewer="larry",
+        current,
+        Status.REVIEWED,
+        actor="larry",
+        reason="checked against the guided range",
+        reviewer="larry",
     )
     approved_item, _ = transition(
         reviewed, Status.APPROVED, actor="larry", reason="accepted for this scenario"
@@ -351,14 +368,10 @@ def _approve(scenarios, scenario_id, code):
     return scenarios.with_assumption(approved_item)
 
 
-def test_one_failing_scenario_withholds_the_label_from_the_whole_model(
-    forecast_built, approved
-):
+def test_one_failing_scenario_withholds_the_label_from_the_whole_model(forecast_built, approved):
     """A model whose Base balances and whose Downside does not is not ready."""
     base = build_scenario_forecast(forecast_built, approved, BASE)
-    readiness = check_every_scenario(
-        (base,), not_built={"downside": "revenue_growth was Rejected"}
-    )
+    readiness = check_every_scenario((base,), not_built={"downside": "revenue_growth was Rejected"})
     assert not readiness.is_forecast_ready
     assert "downside could not be forecast" in readiness.describe()
 

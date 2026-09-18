@@ -142,9 +142,7 @@ def _tax_schedule(
         rates[year] = assumption.value
         if assumption.source_type is SourceType.HISTORICAL_DRIVER:
             basis = basis or "historical_effective"
-        elif assumption.source_type in (
-            SourceType.COMPANY_FILING, SourceType.COMPANY_GUIDANCE
-        ):
+        elif assumption.source_type in (SourceType.COMPANY_FILING, SourceType.COMPANY_GUIDANCE):
             basis = basis or "statutory"
         else:
             basis = basis or "normalized_effective"
@@ -197,9 +195,7 @@ def _register(
                     ),
                 )
             )
-            drivers.append(
-                (code, scope or "all years", assumption.value, assumption.status.value)
-            )
+            drivers.append((code, scope or "all years", assumption.value, assumption.status.value))
     return register, tuple(drivers)
 
 
@@ -237,9 +233,7 @@ def build_scenario_forecast(
         # The engine names one missing thing at a time. The gate has already
         # checked the drivers, so anything that gets here is a historical
         # balance the forecast anchors on -- which the gate cannot know about.
-        raise ForecastError(
-            f"scenario {scenario_id!r}: {exc}"
-        ) from None
+        raise ForecastError(f"scenario {scenario_id!r}: {exc}") from None
 
     return ScenarioForecast(
         scenario_id=scenario_id,

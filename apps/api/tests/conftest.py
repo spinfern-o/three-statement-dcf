@@ -181,19 +181,19 @@ def three_statements(tmp_path_factory):
             for name, field in result.document.metadata.fields.items()
             if field.value is not None
         },
-        actor="owner", reason="checked the cover page",
+        actor="owner",
+        reason="checked the cover page",
     )
     for fact in list(result.facts):
         if fact.raw_value in ("\u2014", "\u2013", "N/A"):
-            result = correct_fact(result, fact.id, "0", actor="owner",
-                                  reason="the filer reports nil here")
+            result = correct_fact(
+                result, fact.id, "0", actor="owner", reason="the filer reports nil here"
+            )
     for fact in list(result.facts):
         if fact.value is not None and fact.decision is None:
-            result = accept_fact(result, fact.id, actor="owner",
-                                 reason="matches the printed page")
+            result = accept_fact(result, fact.id, actor="owner", reason="matches the printed page")
     result = propose_all(result)
-    result = approve_all(result, actor="owner",
-                         note="each label matches the canonical definition")
+    result = approve_all(result, actor="owner", note="each label matches the canonical definition")
     return apply_findings(result)
 
 
@@ -224,19 +224,19 @@ def _review_and_map(path, root):
             for name, field in result.document.metadata.fields.items()
             if field.value is not None
         },
-        actor="owner", reason="checked the cover page",
+        actor="owner",
+        reason="checked the cover page",
     )
     for fact in list(result.facts):
         if fact.raw_value in ("\u2014", "\u2013", "N/A"):
-            result = correct_fact(result, fact.id, "0", actor="owner",
-                                  reason="the filer reports nil here")
+            result = correct_fact(
+                result, fact.id, "0", actor="owner", reason="the filer reports nil here"
+            )
     for fact in list(result.facts):
         if fact.value is not None and fact.decision is None:
-            result = accept_fact(result, fact.id, actor="owner",
-                                 reason="matches the printed page")
+            result = accept_fact(result, fact.id, actor="owner", reason="matches the printed page")
     result = propose_all(result)
-    result = approve_all(result, actor="owner",
-                         note="each label matches the canonical definition")
+    result = approve_all(result, actor="owner", note="each label matches the canonical definition")
     return apply_findings(result)
 
 
@@ -296,8 +296,13 @@ def approved_scenario(owner: str = "owner"):
     def driver(code, value):
         unit = BY_CODE[code].unit
         fields = dict(
-            code=code, name=code.replace("_", " "), value=value, unit=unit,
-            owner=owner, reviewer=owner, status=Status.APPROVED,
+            code=code,
+            name=code.replace("_", " "),
+            value=value,
+            unit=unit,
+            owner=owner,
+            reviewer=owner,
+            status=Status.APPROVED,
             rationale="entered for this test, with a stated source",
         )
         if unit == "days":
@@ -314,8 +319,13 @@ def approved_scenario(owner: str = "owner"):
 
     def market(code, value, unit):
         return Assumption(
-            code=code, name=code.replace("_", " "), value=value, unit=unit,
-            owner=owner, reviewer=owner, status=Status.APPROVED,
+            code=code,
+            name=code.replace("_", " "),
+            value=value,
+            unit=unit,
+            owner=owner,
+            reviewer=owner,
+            status=Status.APPROVED,
             rationale="observed on the valuation date and recorded with its source",
             source_type=SourceType.EXTERNAL_MARKET_DATA,
             evidence=Evidence(url=f"https://example.test/{code}", date="2026-09-17"),
@@ -399,22 +409,26 @@ def mapped_aggregate(extracted):
     result = confirm_metadata(
         extracted,
         {n: None for n, f in extracted.document.metadata.fields.items() if f.value is not None},
-        actor="owner", reason="checked the cover page",
+        actor="owner",
+        reason="checked the cover page",
     )
     for fact in list(result.facts):
         if fact.raw_value in ("\u2014", "\u2013", "N/A"):
-            result = correct_fact(result, fact.id, "0", actor="owner",
-                                  reason="the filer reports nil here")
+            result = correct_fact(
+                result, fact.id, "0", actor="owner", reason="the filer reports nil here"
+            )
     for fact in list(result.facts):
         if fact.value is not None and fact.decision is None:
-            result = accept_fact(result, fact.id, actor="owner",
-                                 reason="matches the printed page")
+            result = accept_fact(result, fact.id, actor="owner", reason="matches the printed page")
     result = propose_all(result)
     for period in ("2025", "2024"):
-        ids = [f.id for f in result.facts
-               if f.raw_label in labels and f.period_label == period]
-        result = combine_facts(result, ids, "operating_expenses", actor="owner",
-                               note="three categories; the chart has one line")
-    result = approve_all(result, actor="owner",
-                         note="each label matches the canonical definition")
+        ids = [f.id for f in result.facts if f.raw_label in labels and f.period_label == period]
+        result = combine_facts(
+            result,
+            ids,
+            "operating_expenses",
+            actor="owner",
+            note="three categories; the chart has one line",
+        )
+    result = approve_all(result, actor="owner", note="each label matches the canonical definition")
     return apply_findings(result)

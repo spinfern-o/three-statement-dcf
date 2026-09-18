@@ -62,6 +62,7 @@ class FormulaSyntaxError(ValueError):
 
 # --- the syntax tree --------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class Node:
     """Base for every node. `text()` re-renders the formula a person reads."""
@@ -136,6 +137,7 @@ class Call(Node):
 
 # --- tokenizer --------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class Token:
     kind: str  # "number" | "name" | "op" | "(" | ")" | "," | "end"
@@ -175,7 +177,8 @@ def tokenize(formula: str) -> tuple[Token, ...]:
                 if not following:
                     raise FormulaSyntaxError(
                         "a reference ends with a dot and no name after it",
-                        formula, end,
+                        formula,
+                        end,
                     )
                 end = following.end()
             path = formula[index:end]
@@ -191,7 +194,8 @@ def tokenize(formula: str) -> tuple[Token, ...]:
                         "reference is a path into the model's own values, and "
                         "no value is named like a Python special attribute "
                         "(18.3)",
-                        formula, index,
+                        formula,
+                        index,
                     )
             tokens.append(Token("name", path, index))
             index = end
@@ -200,13 +204,15 @@ def tokenize(formula: str) -> tuple[Token, ...]:
             f"{character!r} is not allowed in a formula. Permitted: names, "
             f"decimal numbers, {' '.join(OPERATORS)}, parentheses and commas "
             "(18.2)",
-            formula, index,
+            formula,
+            index,
         )
     tokens.append(Token("end", "", len(formula)))
     return tuple(tokens)
 
 
 # --- parser -----------------------------------------------------------------
+
 
 class _Parser:
     def __init__(self, formula: str):
@@ -227,8 +233,13 @@ class _Parser:
         if self.current.kind != kind:
             raise FormulaSyntaxError(
                 f"expected {what}, found "
-                + (f"{self.current.text!r}" if self.current.kind != "end" else "the end of the formula"),
-                self.formula, self.current.position,
+                + (
+                    f"{self.current.text!r}"
+                    if self.current.kind != "end"
+                    else "the end of the formula"
+                ),
+                self.formula,
+                self.current.position,
             )
         return self.advance()
 
@@ -239,7 +250,8 @@ class _Parser:
         if self.current.kind != "end":
             raise FormulaSyntaxError(
                 f"unexpected {self.current.text!r} after a complete expression",
-                self.formula, self.current.position,
+                self.formula,
+                self.current.position,
             )
         return node
 
@@ -291,7 +303,8 @@ class _Parser:
                     raise FormulaSyntaxError(
                         f"{token.text!r} is not an approved function. Permitted: "
                         f"{', '.join(FUNCTIONS)} (18.2)",
-                        self.formula, token.position,
+                        self.formula,
+                        token.position,
                     )
                 self.advance()
                 arguments = [self.expression()]
@@ -302,19 +315,21 @@ class _Parser:
                 if token.text == "abs" and len(arguments) != 1:
                     raise FormulaSyntaxError(
                         f"abs takes exactly one argument, {len(arguments)} given",
-                        self.formula, token.position,
+                        self.formula,
+                        token.position,
                     )
                 if token.text in ("min", "max") and len(arguments) < 2:
                     raise FormulaSyntaxError(
-                        f"{token.text} takes at least two arguments, "
-                        f"{len(arguments)} given",
-                        self.formula, token.position,
+                        f"{token.text} takes at least two arguments, {len(arguments)} given",
+                        self.formula,
+                        token.position,
                     )
                 return Call(token.text, tuple(arguments))
             if token.text in FUNCTIONS:
                 raise FormulaSyntaxError(
                     f"{token.text!r} is a function and needs arguments",
-                    self.formula, token.position,
+                    self.formula,
+                    token.position,
                 )
             return Reference(token.text)
         if token.kind == "(":
@@ -326,9 +341,7 @@ class _Parser:
             raise FormulaSyntaxError(
                 "the formula ends where a value was expected", self.formula, token.position
             )
-        raise FormulaSyntaxError(
-            f"{token.text!r} is not a value", self.formula, token.position
-        )
+        raise FormulaSyntaxError(f"{token.text!r} is not a value", self.formula, token.position)
 
 
 def parse(formula: str) -> Node:

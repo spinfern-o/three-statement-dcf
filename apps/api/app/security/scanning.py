@@ -109,7 +109,10 @@ def scan(path: str | Path, *, environ=None, timeout: int = SCAN_TIMEOUT_SECONDS)
     argv = command.split() + [str(path)]
     try:
         completed = subprocess.run(
-            argv, capture_output=True, timeout=timeout, check=False,
+            argv,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
         )
     except FileNotFoundError:
         return ScanResult(
@@ -129,9 +132,7 @@ def scan(path: str | Path, *, environ=None, timeout: int = SCAN_TIMEOUT_SECONDS)
     # The scanner's own words, truncated. They describe the file, not its
     # contents, so they are safe to carry -- and a finding with no detail is
     # one nobody can act on.
-    detail = (completed.stdout or completed.stderr or b"").decode(
-        "utf-8", "replace"
-    ).strip()[:500]
+    detail = (completed.stdout or completed.stderr or b"").decode("utf-8", "replace").strip()[:500]
     return ScanResult(
         ScanOutcome.INFECTED,
         detail=detail or f"the scanner exited {completed.returncode}",

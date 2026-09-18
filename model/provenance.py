@@ -89,5 +89,7 @@ def require(value: object, what: str, step: str) -> object:
     """
 
     if value is None:
-        raise ProvenanceError(f"{what} is required by {step} and was not provided. Supply it or stop.")
+        raise ProvenanceError(
+            f"{what} is required by {step} and was not provided. Supply it or stop."
+        )
     return value
