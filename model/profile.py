@@ -109,10 +109,14 @@ class SourceMap:
 
     def page_for(self, key: str) -> int:
         if key not in REQUIRED_SOURCE_MAP_KEYS:
-            raise KeyError(f"{key!r} is not a STEP 2 source-map key. Expected one of {REQUIRED_SOURCE_MAP_KEYS}")
+            raise KeyError(
+                f"{key!r} is not a STEP 2 source-map key. Expected one of {REQUIRED_SOURCE_MAP_KEYS}"
+            )
         page = self.pages.get(key)
         if page is None:
-            raise ProvenanceError(f"STEP 2: no PDF page recorded for {key!r}. Record it before modeling.")
+            raise ProvenanceError(
+                f"STEP 2: no PDF page recorded for {key!r}. Record it before modeling."
+            )
         return page
 
 
@@ -136,13 +140,20 @@ class Periods:
         for year in self.historical:
             m = YEAR_RE.match(year)
             if not m or m.group(2) != "A":
-                raise ProvenanceError(f"Historical year {year!r} must be formatted like '2025A' (A = Actual, STEP 12)")
+                raise ProvenanceError(
+                    f"Historical year {year!r} must be formatted like '2025A' (A = Actual, STEP 12)"
+                )
         for year in self.forecast:
             m = YEAR_RE.match(year)
             if not m or m.group(2) != "E":
-                raise ProvenanceError(f"Forecast year {year!r} must be formatted like '2026E' (E = Estimate, STEP 12)")
-        hist = [int(YEAR_RE.match(y).group(1)) for y in self.historical]
-        fore = [int(YEAR_RE.match(y).group(1)) for y in self.forecast]
+                raise ProvenanceError(
+                    f"Forecast year {year!r} must be formatted like '2026E' (E = Estimate, STEP 12)"
+                )
+        # Every label was validated against YEAR_RE above, so `match` cannot
+        # be None here -- but `_year_of` says that in code rather than leaving
+        # it as something a reader has to verify by scrolling up.
+        hist = [_year_of(y) for y in self.historical]
+        fore = [_year_of(y) for y in self.forecast]
         if hist != sorted(hist) or fore != sorted(fore):
             raise ProvenanceError("Historical and forecast years must each be in ascending order.")
         if len(set(hist)) != len(hist) or len(set(fore)) != len(fore):
@@ -150,11 +161,12 @@ class Periods:
         # Each list must be consecutive. A hole would make every
         # period-over-period change (change in NWC, every roll-forward)
         # silently span two years while being labeled as one.
-        for label, seq, raw in (("historical", hist, self.historical), ("forecast", fore, self.forecast)):
+        for label, seq, raw in (
+            ("historical", hist, self.historical),
+            ("forecast", fore, self.forecast),
+        ):
             gaps = [
-                f"{raw[i]} -> {raw[i + 1]}"
-                for i in range(len(seq) - 1)
-                if seq[i + 1] != seq[i] + 1
+                f"{raw[i]} -> {raw[i + 1]}" for i in range(len(seq) - 1) if seq[i + 1] != seq[i] + 1
             ]
             if gaps:
                 raise ProvenanceError(
@@ -193,3 +205,13 @@ class Periods:
         if year not in self.forecast:
             raise KeyError(f"{year!r} is not a forecast year")
         return self.forecast.index(year) + 1
+
+
+def _year_of(label: str) -> int:
+    """The four-digit year out of a validated period label."""
+    match = YEAR_RE.match(label)
+    if match is None:
+        raise ProvenanceError(
+            f"{label!r} is not a period label; it should have been refused before reaching here"
+        )
+    return int(match.group(1))

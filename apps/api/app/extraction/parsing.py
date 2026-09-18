@@ -86,9 +86,18 @@ SPACES = "              　"
 GROUP_CHARS = " '’"
 
 _NOT_APPLICABLE = {
-    "n/a", "na", "n.a.", "n.a", "not applicable",
-    "n/m", "nm", "n.m.", "n.m", "not meaningful",
-    "not disclosed", "not reported",
+    "n/a",
+    "na",
+    "n.a.",
+    "n.a",
+    "not applicable",
+    "n/m",
+    "nm",
+    "n.m.",
+    "n.m",
+    "not meaningful",
+    "not disclosed",
+    "not reported",
 }
 
 #: source-policy.md: "A written zero is a zero." These spell it in words; the
@@ -309,7 +318,9 @@ def parse_reported_value(
         unit = UnitMarker.PERCENT
 
     stripped = body.strip()
-    inner = stripped[1:-1].strip() if stripped.startswith("(") and stripped.endswith(")") else stripped
+    inner = (
+        stripped[1:-1].strip() if stripped.startswith("(") and stripped.endswith(")") else stripped
+    )
 
     if inner and all(ch in DASHES + " " for ch in inner):
         return ParsedValue(
@@ -436,7 +447,7 @@ def parse_reported_value(
                 ),
             )
         chosen, decimals = candidates[locale]
-        used = locale
+        used: NumberLocale = locale
     else:
         readings = {value for value, _ in candidates.values()}
         if len(readings) > 1:

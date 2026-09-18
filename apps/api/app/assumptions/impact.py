@@ -18,6 +18,7 @@ two would disagree the first time either changed.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -26,8 +27,8 @@ from ..formula.evaluate import Environment
 from ..formula.graph import DependencyGraph
 from ..formula.registry import FormulaSet
 from ..formula.units import unit_for
-from .schema import Assumption
 from .scenarios import ScenarioSet
+from .schema import Assumption
 
 
 @dataclass(frozen=True)
@@ -59,11 +60,11 @@ class Impact:
     before: Decimal
     after: Decimal
     #: Everything that reads this assumption, directly or through others.
-    reaches: "tuple[str, ...]"
+    reaches: tuple[str, ...]
     #: Of those, the ones whose value actually moves.
-    moved: "tuple[MovedValue, ...]"
+    moved: tuple[MovedValue, ...]
     #: Targets that could not be calculated either way, with the reason.
-    unavailable: "dict[str, str]"
+    unavailable: dict[str, str]
 
     @property
     def changes_nothing(self) -> bool:
@@ -80,15 +81,12 @@ class Impact:
                 "nothing reads is usually a driver that is misnamed."
             )
         if self.changes_nothing:
-            return (
-                f"{head}. {len(self.reaches)} output(s) depend on it and none "
-                "of them moves."
-            )
+            return f"{head}. {len(self.reaches)} output(s) depend on it and none of them moves."
         return f"{head}. {len(self.moved)} of {len(self.reaches)} dependent output(s) move."
 
 
 def _environment(
-    base: Environment, resolved: "dict[str, object]", override: "tuple[str, Decimal] | None"
+    base: Environment, resolved: Mapping[str, object], override: tuple[str, Decimal] | None
 ) -> Environment:
     """A copy of `base` with the scenario's assumptions written over it."""
     environment = Environment(dict(base.values))
@@ -139,9 +137,7 @@ def preview(
         if before_model.value(target) != after_model.value(target)
     )
     unavailable = {
-        target: reason
-        for target, reason in after_model.unavailable.items()
-        if target in reaches
+        target: reason for target, reason in after_model.unavailable.items() if target in reaches
     }
     return Impact(
         code=code,
@@ -153,14 +149,14 @@ def preview(
     )
 
 
-def reaches(formulas: FormulaSet, code: str) -> "tuple[str, ...]":
+def reaches(formulas: FormulaSet, code: str) -> tuple[str, ...]:
     """Item 94 on its own: what depends on this driver, without changing it."""
     return tuple(sorted(DependencyGraph(formulas).descendants(code)))
 
 
 def unread_assumptions(
     formulas: FormulaSet, scenarios: ScenarioSet, scenario_id: str
-) -> "tuple[str, ...]":
+) -> tuple[str, ...]:
     """Assumptions nothing in the calculation reads.
 
     Not an error -- a driver may feed a formula family this set does not carry.
@@ -170,9 +166,7 @@ def unread_assumptions(
     """
     graph = DependencyGraph(formulas)
     known = graph.required_inputs | graph.targets
-    return tuple(
-        sorted(code for code in scenarios.resolve(scenario_id) if code not in known)
-    )
+    return tuple(sorted(code for code in scenarios.resolve(scenario_id) if code not in known))
 
 
 def model_for(

@@ -30,7 +30,7 @@ from decimal import Decimal
 
 from model import accounts
 from model.accounts import Statement
-from model.numeric import D, ZERO, quantize_for_display
+from model.numeric import ZERO, D, quantize_for_display
 from model.statements import Ledger
 
 from .base import Availability, Caveat, Reconciliation, Schedule, ScheduleLine
@@ -66,7 +66,7 @@ class WorkingCapitalYear:
     drivers: tuple[Driver, ...]
 
     @staticmethod
-    def _total(lines: "tuple[ScheduleLine, ...]") -> Decimal | None:
+    def _total(lines: tuple[ScheduleLine, ...]) -> Decimal | None:
         present = [line.value for line in lines if line.value is not None]
         return sum(present, ZERO) if present else None
 
@@ -95,11 +95,7 @@ class WorkingCapitalYear:
 
     @property
     def absent(self) -> tuple[str, ...]:
-        return tuple(
-            line.label
-            for line in self.assets + self.liabilities
-            if line.value is None
-        )
+        return tuple(line.label for line in self.assets + self.liabilities if line.value is None)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -109,7 +105,9 @@ class WorkingCapitalSchedule(Schedule):
     excluded: tuple[str, ...] = ()
 
 
-def _lines(ledger: Ledger, year: str, names: "tuple[str, ...]", side: str) -> "tuple[ScheduleLine, ...]":
+def _lines(
+    ledger: Ledger, year: str, names: tuple[str, ...], side: str
+) -> tuple[ScheduleLine, ...]:
     out = []
     for name in names:
         value = ledger.get(name, year)
@@ -117,7 +115,9 @@ def _lines(ledger: Ledger, year: str, names: "tuple[str, ...]", side: str) -> "t
         if value is None:
             out.append(
                 ScheduleLine(
-                    name, None, basis,
+                    name,
+                    None,
+                    basis,
                     absent_reason=f"the filing reports no {name!r} for {year}",
                 )
             )
@@ -144,20 +144,30 @@ def _days(
     denominator = f"{flow_name} (full year)"
     if balance is None:
         return Driver(
-            name, None, numerator, denominator, convention,
+            name,
+            None,
+            numerator,
+            denominator,
+            convention,
             unavailable_reason=f"the filing reports no {balance_name}",
         )
     if flow is None:
         return Driver(
-            name, None, numerator, denominator, convention,
+            name,
+            None,
+            numerator,
+            denominator,
+            convention,
             unavailable_reason=f"the filing reports no {flow_name} to divide by",
         )
     if flow == ZERO:
         return Driver(
-            name, None, numerator, denominator, convention,
-            unavailable_reason=(
-                f"{flow_name} is zero, so days against it are undefined (4.12)"
-            ),
+            name,
+            None,
+            numerator,
+            denominator,
+            convention,
+            unavailable_reason=(f"{flow_name} is zero, so days against it are undefined (4.12)"),
         )
     return Driver(
         name,
@@ -169,7 +179,7 @@ def _days(
 
 
 def working_capital_schedule(
-    ledgers: dict, years: "tuple[str, ...]", days_in_year: Decimal = DAYS_IN_YEAR
+    ledgers: dict, years: tuple[str, ...], days_in_year: Decimal = DAYS_IN_YEAR
 ) -> WorkingCapitalSchedule:
     """13.1, built for every period the filing reports."""
     balance: Ledger = ledgers[Statement.BALANCE]
@@ -179,23 +189,33 @@ def working_capital_schedule(
     rows: list[WorkingCapitalYear] = []
     for year in years:
         assets = _lines(balance, year, accounts.OPERATING_CURRENT_ASSETS, "asset")
-        liabilities = _lines(
-            balance, year, accounts.OPERATING_CURRENT_LIABILITIES, "liability"
-        )
+        liabilities = _lines(balance, year, accounts.OPERATING_CURRENT_LIABILITIES, "liability")
         revenue = income.get(accounts.REVENUE, year)
         cogs = income.get(accounts.COGS, year)
         drivers = (
             _days(
-                "DSO", balance.get(accounts.ACCOUNTS_RECEIVABLE, year),
-                "accounts receivable", revenue, "revenue", days_in_year,
+                "DSO",
+                balance.get(accounts.ACCOUNTS_RECEIVABLE, year),
+                "accounts receivable",
+                revenue,
+                "revenue",
+                days_in_year,
             ),
             _days(
-                "Inventory days", balance.get(accounts.INVENTORY, year),
-                "inventory", cogs, "cost of goods sold", days_in_year,
+                "Inventory days",
+                balance.get(accounts.INVENTORY, year),
+                "inventory",
+                cogs,
+                "cost of goods sold",
+                days_in_year,
             ),
             _days(
-                "DPO", balance.get(accounts.ACCOUNTS_PAYABLE, year),
-                "accounts payable", cogs, "cost of goods sold", days_in_year,
+                "DPO",
+                balance.get(accounts.ACCOUNTS_PAYABLE, year),
+                "accounts payable",
+                cogs,
+                "cost of goods sold",
+                days_in_year,
             ),
         )
         rows.append(WorkingCapitalYear(year, assets, liabilities, drivers))
@@ -233,9 +253,7 @@ def working_capital_schedule(
         )
 
     absent_anywhere = sorted({label for row in rows for label in row.absent})
-    partial = bool(absent_anywhere) or any(
-        d.days is None for row in rows for d in row.drivers
-    )
+    partial = bool(absent_anywhere) or any(d.days is None for row in rows for d in row.drivers)
     return WorkingCapitalSchedule(
         key="working_capital",
         title="Working capital",

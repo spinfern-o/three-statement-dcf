@@ -575,24 +575,46 @@ stack, preserve it and document the deviation"); this is the documentation.
 The cost is real and worth naming: two front-end idioms in one repository once
 Phase 12 lands.
 
-### F-15 — OPEN. The review application has no authentication
+### F-15 — RESOLVED in Phase 15. The review application had no authentication
 
-Decision **2.2.c is CONFIRMED: authentication is required.** The reasoning in
-that row still holds — 2.2.a puts confidential financial PDFs behind a network
-endpoint, and 20.1 classifies them confidential.
+Decision **2.2.c is CONFIRMED: authentication is required** — 2.2.a puts
+confidential financial PDFs behind a network endpoint, and 20.1 classifies them
+confidential.
 
-**It is not implemented.** `review_server.py` binds to `127.0.0.1` by default
-and prints a warning if told to bind anywhere else, which is a mitigation, not
-the requirement. Until a credential sits in front of it, this is a local
-review tool, and deploying it as the private hosted application 2.2.a
-describes would put filings on a network with nothing guarding them.
+**It was unimplemented from Phase 4 to Phase 14**, with the mitigation that
+`review_server.py` binds to `127.0.0.1` and prints a warning if told to bind
+anywhere else. That was recorded here rather than left to be discovered, and it
+was the right thing to record: a mitigation is not the requirement, and a
+mitigation that depends on a reader passing the right flag and reading a warning
+is not even a good mitigation.
 
-What it needs, and why none of it is guessed here: a session mechanism, a
-credential store, and a decision about what the second factor is for a
-single-user application — none of which is a Section 2 row, and all of which
-belongs with Phase 15 (security and operations) rather than being half-built
-now. Recorded so it cannot be mistaken for done.
+Phase 15 item 145 built it, in
+[`apps/api/app/security/`](../apps/api/app/security):
 
+- a password verified against a `hashlib.scrypt` hash held in the environment,
+  never in the repository (20.3, 20.4);
+- a signed session cookie, `HttpOnly`, `SameSite=Strict`, `Secure` off loopback,
+  expiring **absolutely** eight hours after sign-in;
+- a CSRF token on every state-changing request (20.12), enforced in local-review
+  mode too, because authentication and CSRF are different defences;
+- login attempts rate-limited, with a successful sign-in clearing the count so
+  somebody else's guessing cannot lock the one real user out (20.14);
+- 20.7's authorization on every read, at the single point every document route
+  already passes through.
+
+And the warning became a **refusal**: `review_server.py` will not bind to
+anything but loopback without `REVIEW_PASSWORD_HASH` set. Without one it serves
+locally in local-review mode with a banner on every page saying so — which is
+not a way to turn 2.2.c off but the development affordance that would otherwise
+be somebody commenting out the middleware, made visible and constrained instead.
+
+The three things this row said it needed have answers, each recorded with its
+reasoning in the modules themselves: the session mechanism is a signed cookie
+with no server-side store (there is one user and one boolean to carry); the
+credential store is the environment; and there is **no second factor**, because
+2.2.c requires a credential and does not require two, and inventing an
+enrolment flow for a single user would be building a thing nobody asked for in
+the place where getting it wrong costs most.
 
 ### F-16 — RESOLVED in Phase 5. The canonical chart had no definitions
 
@@ -830,6 +852,247 @@ what the stylesheet claims.
 
 ---
 
+### F-34 — Phase 17. The application was sending no security headers at all
+
+Item 175 asks that TLS and security headers be verified. There was nothing to
+verify: every response left the application with FastAPI's defaults and
+nothing else — no CSP, no `nosniff`, no `Referrer-Policy`, and no
+`Cache-Control: no-store` on a page showing a filing.
+
+Twelve phases of authorization work had been sitting behind a browser that was
+free to cache a filing in a shared proxy, sniff a page image into something
+executable, or hand a document id to whatever a reader clicked through to.
+None of that is an authorization bug, which is exactly why none of the
+authorization tests found it.
+
+`app/security/headers.py` now sends them, from the application rather than
+from the proxy, so a proxy misconfiguration cannot silently drop them. Two
+choices in it are worth recording:
+
+**`script-src 'none'` is not aspirational.** Deviation F-14 decided this
+application ships no JavaScript, which makes the strictest possible CSP
+simply true rather than ambitious. `default-src 'none'` with `connect-src
+'none'` follows for the same reason. The claim rests on a test —
+`test_no_template_contains_a_script_tag` — because a CSP that a later template
+quietly violates is worse than none: the browser breaks the page rather than
+the author noticing.
+
+`style-src-attr 'unsafe-inline'` is the one concession, and it is a real one.
+The chart bars and the grid set widths and column spans through the `style`
+attribute, which is the only way to express a data-driven length without
+JavaScript. It is scoped to attributes, so `<style>` blocks and sheets remain
+`'self'`.
+
+**HSTS is sent only on an HTTPS request.** Sending `Strict-Transport-Security`
+over plaintext is meaningless — a browser ignores it — and it makes a
+`curl -I` against a plaintext deployment look compliant. The middleware reads
+the ASGI scope's scheme and omits it otherwise, so the header's presence
+is evidence and not decoration.
+
+The middleware is installed **after** the guard, so it wraps the guard's own
+refusals. A 303 to `/login` is a response too, and it was the one response an
+unauthenticated reader was guaranteed to receive.
+
+### F-35 — Phase 17. A smoke test that authenticates cannot run against production
+
+Item 179 asks for production smoke tests *without exposing private data*, and
+those two halves pull against each other. A smoke test that logs in proves
+more; it also holds a credential, and anything it prints about what it found
+is a filing detail printed by a monitoring job.
+
+`app/verification/smoke.py` resolves it by **never authenticating**. It cannot
+reach a filing, so it cannot expose one, and the credential problem does not
+arise. What it checks instead is the shape of a correct deployment, which is
+most of what a smoke test is actually for: that the process answers, that it
+names its own commit, that the commit is not `-dirty` (item 178), that an
+unauthenticated request for `/` is refused, that the refusal carries no filing
+content, and that all six security headers are on it.
+
+Sixteen checks. Against a guarded loopback server it reports fifteen passes
+and one failure — `deploys a clean tree (178)` — which is correct: the tree it
+ran from had uncommitted changes. A check that passed there would be useless.
+
+One bug in it is worth recording because of its shape rather than its size.
+The first version looked up `"Content-Security-Policy"` in a plain dict.
+uvicorn sends header names lowercased, so it reported **every header absent on
+a deployment that was sending all of them**. That is the worst failure mode
+available to a smoke test: it fails on a correct deployment, so the person
+reading it goes and changes the deployment. HTTP header names are
+case-insensitive and servers disagree about case; `_Headers` now lowercases on
+both sides.
+
+### F-36 — Phase 17. There are no migrations, and item 173 is answered anyway
+
+Item 173 asks that database migrations and a rollback plan be verified. This
+application stores JSON files on a filesystem
+(`app/persistence/json_store.py`); PostgreSQL is specification 3.2.d and is
+still open. There is no migration tool to verify.
+
+The honest answer is not "N/A". What 173 wants is that a deployment can be
+undone without losing data, and that is answerable here: the stored PDF is
+never rewritten (rule 1.12), so every derived artefact can be rebuilt from it;
+records carry their own version and a reader refuses one it does not
+understand rather than guessing; and `security/backup.py` takes a verified
+snapshot before the deploy. [`docs/deployment.md`](deployment.md) §4 is that
+plan, and it says plainly that this section is the part that has to be
+rewritten when the JSON store is replaced.
+
+Recorded as a finding rather than a decision because it is a gap being
+reported, not a choice being made.
+
+### F-33 — RESOLVED in Phase 16. `margin: 0 auto` on a flex item opts out of stretch
+
+22.6.e asks for a visual test with long company names. Substituting one — a
+real-shaped name ending "Aktiengesellschaft (Reorganised) Incorporated" — made
+**two screens scroll sideways at 390px**, which is the one thing WCAG 1.4.10
+does not exempt. F-25 was supposed to have closed that in Phase 12.
+
+It had, for the reason F-25 identified. This is a different route to the same
+failure, and the mechanism is worth writing down because `min-width: 0` does
+nothing about it.
+
+    .layout { padding: var(--space-7); max-width: 1680px; margin: 0 auto; }
+
+`.layout` is a flex item of `.shell-main`, a column. **An auto margin on a flex
+item's cross axis opts the item out of `stretch`**: instead of being stretched
+to the container's inner width and then shrunk, it is sized to *fit-content*,
+which is `max(min-content, min(max-content, available))`. So its min-content
+won — and its min-content is whatever the widest table demands. At 390px the
+mapping screen's layout became **498px**.
+
+`min-width: 0` was already on that element and could not help, because the item
+was never being stretched-then-shrunk; it was being sized to its contents from
+the start. A definite `width: 100%` makes the cross size definite again, and
+the wide table then overflows into its own `.table-scroll` as intended.
+
+The lesson generalises past this rule: **`min-width: 0` fixes shrinking, not
+sizing.** An element sized to its content has no shrink step to constrain.
+
+Two content-level defects came out of the same test, both the same shape — a
+token with no break opportunity in it:
+
+- **a text input's default intrinsic width is about twenty characters and does
+  not shrink.** Four stacked inside a table cell demanded 431px at a 390px
+  viewport. `max-width: 100%` with `box-sizing: border-box` makes them fluid,
+  which is what every one of them here wants anyway.
+- **`987,654,321,098` is one token to a line-breaker.** So is a canonical code,
+  a hash prefix, and "Aktiengesellschaft". `overflow-wrap: anywhere` was on
+  `.raw`, `code` and `.small` only, so a figure in a finding message overflowed
+  a card by 108px. It is now on every prose container and every non-numeric
+  table cell — and deliberately **not** on `.num`, because a figure broken
+  across two lines is unreadable and numeric columns take 1.4.10's exemption
+  inside `.table-scroll` instead.
+
+None of the three was reachable by the Phase 12 sweep, which varies the
+viewport and holds the data fixed. These vary the data and hold the viewport at
+its narrowest. Both are needed, and 22.6 asks for both.
+
+### F-31 — RESOLVED in Phase 16. A "strict for model/" config was strict for everything
+
+Item 155 asks for strict type checks. The decision recorded in
+[`pyproject.toml`](../pyproject.toml) is that **`model/` is checked strictly
+and `apps/api/app/` is checked but not strictly**, and the reasoning is stated
+there: `model/` is the arithmetic, where a type error is a wrong number, and it
+imports nothing but the standard library; `apps/api/app/` sits on FastAPI,
+PyMuPDF and openpyxl, whose own type information is incomplete, and making it
+strict would produce a lot of `Any` with a strict flag on top — which reads as
+checked and is not.
+
+The first configuration expressed that with
+
+    [[tool.mypy.overrides]]
+    module = "model.*"
+    strict = true
+
+and reported **397 errors across 73 files**, most of them in the package it was
+not supposed to be checking strictly. `strict` is a global flag; in a
+per-module override it is applied more broadly than it reads. Listing the seven
+flags it implies, explicitly, gave 108 — the number the decision actually
+described.
+
+The lesson is the one worth keeping: **a configuration that reads correctly and
+behaves differently produces a number nobody can interpret.** 397 looks like a
+codebase in trouble and was a config bug; 108 was the real figure, and every
+one of them was worth reading.
+
+### F-32 — RESOLVED in Phase 16. Sixteen guards the checker could not verify
+
+Working the 108 down to zero found one class of defect over and over, and it is
+the one this codebase is most exposed to.
+
+The sparse ledger returns `Decimal | None` — absent is not zero (rule 1.3) —
+and the arithmetic that consumes it was guarded in forms a type checker cannot
+narrow:
+
+    if None in (begin, end, cfo, cfi, cff):       # model/checks.py
+        continue
+    delta = (begin + cfo + cfi + cff) - end
+
+    if all(v is not None for v in expected.values()):   # STEP 37's rebuild
+        rebuilt = expected["ebit"] * (D(1) - expected["tax_rate"]) + ...
+
+Both guard correctly **today**. Neither states the guarantee in a form anything
+can check — so the next edit that adds a sixth term, or moves a check, produces
+a `TypeError` in a subtraction, on the first filing that omits a cash-flow
+subtotal. That is not a hypothetical failure mode here; it is the *central* one,
+and it would surface as a crashed check run rather than as a wrong number, which
+is the better of the two but not by much.
+
+Sixteen sites were rewritten into narrowing forms — naming each operand,
+binding narrowed locals, or taking the value as a parameter so the guarantee
+crosses the function boundary. Three were genuine latent crashes rather than
+unverifiable guards:
+
+- **a table with no detected header row** indexed `table.cell(None, column)`
+  in two places, which would raise on the first filing whose header could not
+  be found;
+- **`callable[[str], str | None]`** as an annotation — the builtin predicate,
+  not `Callable`, which never evaluated because of
+  `from __future__ import annotations`;
+- **`_tree: Node = field(default=None)`**, a non-optional field whose own
+  default was `None`.
+
+And five loop variables were reused across loops of different types in the same
+function — `row` for an `InterestYear` and then a `RollForwardYear`, `year` for
+a label and then a period object. Each read as one kind of thing throughout and
+was two.
+
+**Six fields typed `object`** were the other recurring shape:
+`ExtractionResult.mappings`, `ScenarioForecast.result`,
+`ScenarioValuation.valuation` and three on the portfolio row. Each had a comment
+naming the real type. A comment naming a type is not a type: five modules were
+reaching through `result` for `.income`, `.balance` and `.taxes` on nothing but
+faith, and the loose annotations existed to avoid an import cycle that
+`TYPE_CHECKING` handles in two lines.
+
+`model/` and `apps/api/app/` both pass now — 134 files, no issues — and both
+are gated in CI.
+
+### F-30 — RESOLVED in Phase 15. A CSRF middleware ate every request body
+
+Written the obvious way — Starlette's `@app.middleware("http")` decorator — the
+guard checked the CSRF token by calling `await request.form()`, and that
+**consumes the request body**. `BaseHTTPMiddleware` offers no supported way to
+hand it on afterwards, so every route downstream saw an empty body.
+
+The failure is quiet in the way that matters. It does not raise anything about
+middleware or bodies; it surfaces as
+
+    422: {"loc": ["body", "page"], "msg": "Field required"}
+
+on a field the browser did send. A reader debugging that starts by looking at
+the form, then at the route signature, then at the browser — three places the
+bug is not.
+
+Twenty-one existing tests caught it here, which is the whole argument for
+building a security layer against a suite that already exercises every route.
+Had this shipped with the two routes a new phase happens to test, it would have
+broken the other thirty in a way nobody would attribute to CSRF.
+
+The fix is a raw ASGI middleware: at that layer the body is bytes, reading it
+is one loop and replaying it to the application is three lines. A test asserts a
+POST's fields arrive intact, so the shape cannot come back.
+
 ### F-27 — RESOLVED in Phase 14. Every export said the currency was unconfirmed
 
 `DetectedMetadata` is a dataclass holding **one field**, `fields: dict[str,
@@ -1008,6 +1271,214 @@ Buildable now, because it depends on no OPEN decision:
 - Adding a dependency-audit step to CI (3.5.c, 20.20),
   and printing the Section 25 disclaimer in the CLI report (20.19). None of
   these depends on an OPEN decision.
+
+**Phase 16 (items 154-168) is built**, in
+[`apps/api/app/verification/`](../apps/api/app/verification), with
+[`release-readiness.md`](release-readiness.md) as its output and
+[`pyproject.toml`](../pyproject.toml) carrying the two tool configurations.
+
+**Item 168's report is generated, and that is the whole design.** "Produce a
+release-readiness report with PASS/FAIL evidence" could be satisfied by a
+markdown file somebody wrote, and a file somebody wrote is a claim about the
+code rather than evidence about it -- read six months later by whoever has to
+decide whether to trust a number. So every row comes from running something,
+the command is printed beside the result, and the exit code is non-zero unless
+every gate passed.
+
+**It caught three things on its first run**, which is the argument for building
+it rather than writing it: two files I had just added were unformatted, and
+**the test count in `README.md` was stale** -- the exact drift item 167 exists
+to find. It went stale twice more in the same hour as tests were added, and was
+caught both times.
+
+**4.20's claim is made here and nowhere else.** The clause permits "less than
+0.0001% error" only once the benchmark suite passes *and* the report identifies
+the exact dataset and formulas. The in-app panel cannot satisfy the first half
+-- a web process does not observe the test suite -- so it reports coverage and
+says the result is not observed. A report generator *runs* the suite, so it can
+satisfy both halves: it names the fixtures, the extreme-input cases and the
+randomized sweep, and lists all twenty-two of 4.16's outputs with where each
+comparison lives. When the benchmark does not pass, or was skipped, the contract
+is reported **UNPROVEN** rather than carried forward from the last green run.
+Three tests assert that, because it is the one claim in this repository that
+would be most tempting to make anyway.
+
+**A skipped gate blocks the verdict.** Rule 1.14 applied to the report itself: a
+check that did not run has not passed, and a release report whose worst row
+reads NOT RUN is one somebody will read as green.
+
+**A READY verdict says it is not permission to deploy.** Phase 17 item 169 is
+explicit -- do not deploy until the target, the access level and the data policy
+are confirmed -- and a report saying READY is precisely the artefact most likely
+to be quoted as though it were that permission. A test asserts the sentence is
+there.
+
+**Section 22's plan is a map with its gaps written in.** Fifty-five clauses;
+forty-nine covered by named tests, six with a stated reason. `Coverage` refuses
+construction with neither a test nor a reason, because a row with neither reads
+as covered -- which is the failure mode of every test plan. The six: 22.1.j
+(RBAC is not applicable under 2.2.d, not untested), 22.3.f (no fixture carries
+both an original and a restated prior year) and all four of 22.8's performance
+targets, which 22.8 itself scopes "to be measured on documented hardware/data"
+that no deployment has yet.
+
+**Writing that map found its own defect.** Twenty-seven of the test names in the
+first draft did not exist -- guessed from what a test *should* be called rather
+than read from the tree. `missing_tests()` is what found them, and it now runs
+in the suite, so a renamed test is a failure rather than a silently weakened
+claim.
+
+**The production-build gate was checking nothing, and admitting that made it a
+gate.** `assert app.routes` passes for any application: this FastAPI version
+wraps an included router as a *single* entry, so `len(app.routes)` is 4 whether
+the router declares thirty routes or none. It now counts the router's own
+declared paths (33), serves a request, and resolves both static mounts.
+
+Items 154 and 155 found **F-31** (a mypy configuration that read as "strict for
+`model/`" and was strict for everything, reporting 397 errors across a package
+the decision did not cover) and **F-32** (sixteen `Decimal | None` guards
+written in forms no checker can verify, three genuine latent crashes, five loop
+variables reused across loops of different types, and six fields typed `object`
+with a comment naming the real type). Items 156 to 162 found **F-33**
+(`margin: 0 auto` on a flex item opts it out of `stretch`, so the item sizes to
+its content's min-content -- F-25's failure through a door `min-width: 0` does
+not close).
+
+**Phase 15 (items 145-153) is built**, in
+[`apps/api/app/security/`](../apps/api/app/security) with
+[`incident-response.md`](incident-response.md) beside it. **F-15 is closed.**
+
+Decision 2.2.c has read "authentication required" since Phase 2, and F-15 has
+recorded it unimplemented since Phase 4 with the mitigation that
+`review_server.py` binds to localhost. A mitigation is not the requirement, and
+one that depends on a reader passing the right flag is not even a good one.
+`review_server.py` now **refuses** to bind anywhere but loopback without a
+credential, rather than printing a warning people scroll past.
+
+**No cryptography is invented.** 20.2's note in `security-model.md` says this
+application must not implement its own, and nothing here does: `hashlib.scrypt`
+for the password, `hmac.compare_digest` for every secret comparison,
+`secrets.token_bytes` for the key. The one construction assembled rather than
+called is a signed cookie -- HMAC-SHA256 over `issued|expires|nonce` -- which is
+twelve lines a reader can check, and is what every framework does.
+
+**scrypt rather than a hash that is merely cryptographic.** The threat to a
+password hash is offline guessing against a stolen copy, and a fast hash makes
+that cheap. The parameters ask for 32 MiB per verification: a fraction of a
+second for the one person logging in, and 32 MiB per guess for somebody working
+through a stolen hash. It is in the standard library, so the most costly place
+to get a dependency wrong does not have one.
+
+**The guard is a middleware and defaults to closed.** A per-route dependency
+has to be added to every route, and the failure mode of forgetting one is an
+unprotected endpoint that looks exactly like a protected one -- there are over
+thirty routes and more arrive each phase. `PUBLIC` is four entries, each with
+its reason written beside it, and everything else needs a session.
+
+**It is a raw ASGI middleware, and that is a finding rather than a preference
+-- F-30.** Checking a CSRF token means reading the form, and reading the form
+consumes the request body. Written on Starlette's `BaseHTTPMiddleware` the
+guard read the token and every route then saw an *empty* body -- which does not
+fail loudly: it surfaces as a validation error on a field the browser did send.
+Twenty-one tests caught it here. At the ASGI layer the body is bytes and
+replaying it is three lines.
+
+**Session expiry is absolute, not idle.** An idle timeout keeps a session alive
+indefinitely for somebody who leaves a tab open, and the tab is the thing
+likeliest to be left open on an unlocked screen.
+
+**CSRF is enforced in local-review mode too**, because authentication and CSRF
+are different defences: a local server is exactly what a page in another tab
+can post to. The token is derived from the session under the signing key rather
+than stored, so there is nothing to expire or clean up.
+
+**20.7's easy half and its hard half.** The check is one line in
+`routes.py:_load`, because every document route already comes through that
+function and a check a route must remember is a check a route will one day not
+have. The hard half is that **an unauthorized document answers exactly as one
+that does not exist** -- same status, same text. Distinguishing them tells a
+prober which identifiers are real, and an identifier here belongs to a filing
+nobody has released. A test asserts the two responses are byte-identical.
+
+Under 2.2.b every document has the same owner, so this check can never fail
+today. It is built and tested with a second owner anyway: the alternative is a
+system whose authorization is a comment saying it would not matter, and the day
+it starts to matter is the day somebody adds a second user -- not the day to
+discover that reads were never checked.
+
+**20.10's isolation says what it does not buy.** PDF parsing runs in a spawned
+child under memory, CPU and wall-clock limits, so a crash, a runaway allocation
+or an endless loop ends there rather than in the web process -- and the isolated
+render is asserted byte-for-byte identical to the in-process one, so the
+separation changed nothing. It is **not** a boundary against code execution: the
+child runs as the same user with the same filesystem and the same network.
+Writing that down matters more than the code, because an isolation layer whose
+limits are unstated gets treated as a sandbox and the next person builds on a
+guarantee it never made.
+
+**20.9 reports "not scanned" rather than "clean".** There is no scanner in this
+repository and bundling one would mean either a signature database that is
+stale the day it is committed, or sending a confidential filing to a third
+party. So it is a hook, and with nothing configured the result is a recorded
+fact that nothing looked at this file. A field reading "clean" because nobody
+looked is worse than no field: it answers the question a reviewer was about to
+ask, wrongly.
+
+**20.17's flagged interaction, answered.** `security-model.md` asked in Phase 2
+what happens to the `AuditEvent` rows referencing a deleted document, and named
+three options. Deletion **tombstones**: cascading deletes the record of the
+deletion along with everything else, which is the one entry somebody will later
+need, and refusing while references exist means a document can never be deleted
+because ingestion always writes one. The tombstone keeps the identifier, the
+hash and the filename; it keeps none of the content, which is the point of a
+permanent deletion.
+
+**20.18's confirmation is the filename typed back, not a button.** A button is
+the same gesture whatever it is attached to, and the gesture is what muscle
+memory performs. No default value and no autofocus.
+
+**"An untested backup is not a backup" is 2.6.d's own sentence, so the restore
+test is the deliverable.** `snapshot` writes an archive with a manifest naming
+every file and its SHA-256; `verify` restores into a scratch directory and
+re-hashes everything. A tar that extracts proves the tar is well-formed, not
+that the bytes inside are the bytes that went in. The quarterly restore test is
+a function that runs in CI on every commit rather than a calendar entry
+somebody honours.
+
+**20.20 runs on every commit, not before a release.** `pip-audit --strict` over
+the whole installed tree, transitive dependencies included, because a
+vulnerability disclosed today is in the tree today and a gate that only fires at
+release time reports it at the worst possible moment. Beside it,
+[`repository_scan.py`](../apps/api/app/security/repository_scan.py) refuses a
+commit carrying a source PDF or a secret *value* -- item 166's confirmation,
+made into a check rather than a box somebody ticks.
+
+The fixture test in that scan is worth recording, because the first version was
+wrong. It required each fixture PDF to label itself `FICTIONAL`, which they do
+not: the ledger's note about `FICTIONAL` is about the engine's YAML fixtures,
+not the PDFs. The real invariant is stronger and was already in the tree --
+every fixture is **pinned by hash** in `test_fixtures.py` *and* **built by**
+`build_fixtures.py`. A hash says what a file is; only the generator says where
+it came from.
+
+**Section 25's disclaimer was on one surface and a half.** 25 says "show it in
+the model, release flow, and exports", and the web footer carried a
+*two-sentence* version while the CLI report carried none. The two sentences the
+short form dropped are the two about this system in particular: that historical
+figures may carry extraction errors until reviewed, and that outputs must be
+verified before being relied on. Trimming a disclaimer keeps the part that
+sounds most like boilerplate. [`model/disclaimer.py`](../model/disclaimer.py)
+is now the single text, on every screen, in the release gate, in all four
+exports and at the end of the CLI report, with a test per surface.
+
+**`incident-response.md` names the residual risks before an incident.** The
+sandbox is not a security boundary, uploads are unscanned unless configured, the
+rate limiters are per process, the backup archive is not encrypted by the
+process that writes it, and a session cannot be revoked except by rotating the
+signing key. A procedure that does not say what it cannot defend against is read
+as a guarantee it never made. The document also fixes an order that matters:
+**rotate the signing key before the password**, or an existing session stays
+valid for up to eight hours.
 
 **Phase 14 (items 138-144) is built**, in
 [`apps/api/app/exports/`](../apps/api/app/exports) with

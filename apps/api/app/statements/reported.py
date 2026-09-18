@@ -16,7 +16,7 @@ from ..mapping.normalized import statement_for
 from .build import engine_year
 
 
-def reported_strings(result: ExtractionResult) -> "dict[tuple[str, str], str]":
+def reported_strings(result: ExtractionResult) -> dict[tuple[str, str], str]:
     """`(canonical_code, engine year) -> what was printed`.
 
     An aggregate shows every contributor, joined, because 11.5's "show the
@@ -41,7 +41,7 @@ def reported_strings(result: ExtractionResult) -> "dict[tuple[str, str], str]":
     return {key: " + ".join(values) for key, values in collected.items()}
 
 
-def citations(result: ExtractionResult) -> "dict[tuple[str, str], list[dict]]":
+def citations(result: ExtractionResult) -> dict[tuple[str, str], list[dict]]:
     """Item 65. Everything a cell should be able to show about where it came from."""
     mappings = result.mappings
     if mappings is None:

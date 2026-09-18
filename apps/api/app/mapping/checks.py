@@ -20,6 +20,7 @@ and silently adjusting either side destroys the evidence that would find it.
 
 from __future__ import annotations
 
+import itertools
 import re
 from dataclasses import dataclass
 from decimal import Decimal
@@ -53,7 +54,10 @@ class Finding:
 
 # --- item 54: 11.6 ----------------------------------------------------------
 
-def duplicate_counting(result: ExtractionResult, mappings: MappingSet | None = None) -> tuple[Finding, ...]:
+
+def duplicate_counting(
+    result: ExtractionResult, mappings: MappingSet | None = None
+) -> tuple[Finding, ...]:
     """Find every way the mappings would count one figure twice."""
     mapping_set = mappings if mappings is not None else result.mappings
     if mapping_set is None:
@@ -90,7 +94,9 @@ def duplicate_counting(result: ExtractionResult, mappings: MappingSet | None = N
                         )
                     )
                 elif in_sum_relationship(first, second):
-                    inner, outer = (first, second) if second in _ancestors(first) else (second, first)
+                    inner, outer = (
+                        (first, second) if second in _ancestors(first) else (second, first)
+                    )
                     findings.append(
                         Finding(
                             code=ReasonCode.DOUBLE_COUNTED,
@@ -111,9 +117,7 @@ def duplicate_counting(result: ExtractionResult, mappings: MappingSet | None = N
         fact = facts.get(mapping.reported_fact_id)
         if fact is None or not mapping.contributes:
             continue
-        grouped.setdefault((mapping.canonical_code, fact.period_label), []).append(
-            (fact, mapping)
-        )
+        grouped.setdefault((mapping.canonical_code, fact.period_label), []).append((fact, mapping))
 
     for (code, period), pairs in grouped.items():
         if len(pairs) < 2:
@@ -157,6 +161,7 @@ def _is_cross_statement_duplicate(result, code: str, pairs) -> bool:
 
 
 # --- item 55: 11.7, 12.4.i --------------------------------------------------
+
 
 def subtotal_reconciliation(
     result: ExtractionResult,
@@ -271,7 +276,7 @@ def cross_statement_reconciliation(
     findings.extend(_net_income_linkage(ledger, tol))
 
     years = sorted(p for p in {key[1] for key in ledger} if _YEAR.match(p))
-    for earlier, later in zip(years, years[1:]):
+    for earlier, later in itertools.pairwise(years):
         if int(later) != int(earlier) + 1:
             continue
         opening = ledger.get((accounts.CASH, earlier, StatementType.BALANCE))
@@ -280,13 +285,24 @@ def cross_statement_reconciliation(
             ledger.get((code, later, StatementType.CASHFLOW))
             for code in (accounts.CFO, accounts.CFI, accounts.CFF)
         ]
-        if opening is None or closing is None or any(f is None for f in flows):
+        if opening is None or closing is None:
             continue
-        if opening.value is None or closing.value is None or any(f.value is None for f in flows):
+        # Each flow named, rather than `any(f is None for f in flows)`: both
+        # guard the same thing, and only this form lets a checker -- or a
+        # reader adding a fourth subtotal -- see that the three values added
+        # below are present. An unguarded None here is a TypeError on the
+        # first filing that omits a cash-flow subtotal.
+        cfo, cfi, cff = flows
+        if cfo is None or cfi is None or cff is None:
+            continue
+        opening_value, closing_value = opening.value, closing.value
+        if opening_value is None or closing_value is None:
+            continue
+        if cfo.value is None or cfi.value is None or cff.value is None:
             continue
 
-        expected = opening.value + flows[0].value + flows[1].value + flows[2].value
-        if tol.close(expected, closing.value):
+        expected = opening_value + cfo.value + cfi.value + cff.value
+        if tol.close(expected, closing_value):
             continue
         findings.append(
             Finding(
@@ -294,16 +310,17 @@ def cross_statement_reconciliation(
                 canonical_code=accounts.CASH,
                 period_label=later,
                 message=(
-                    f"opening cash {opening.value:,} plus the three {later} cash-flow "
+                    f"opening cash {opening_value:,} plus the three {later} cash-flow "
                     f"subtotals gives {expected:,}, but the balance sheet reports "
-                    f"{closing.value:,}. A cash roll-forward that does not close "
+                    f"{closing_value:,}. A cash roll-forward that does not close "
                     f"means a flow is mapped to the wrong side, or a flow is "
                     f"missing entirely."
                 ),
-                fact_ids=opening.contributors + closing.contributors
-                + tuple(fid for f in flows for fid in f.contributors),
+                fact_ids=opening.contributors
+                + closing.contributors
+                + tuple(fid for flow in (cfo, cfi, cff) for fid in flow.contributors),
                 expected=expected,
-                actual=closing.value,
+                actual=closing_value,
             )
         )
     return tuple(findings)
@@ -360,6 +377,7 @@ def all_findings(
 
 
 # --- applying the findings to the facts -------------------------------------
+
 
 def apply_findings(
     result: ExtractionResult, tolerance: Tolerance | None = None

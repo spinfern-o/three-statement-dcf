@@ -67,16 +67,25 @@ def make(code="revenue_growth", value="0.08", **kwargs):
 
 # --- item 89: the schema (14.2, 14.3, 14.4) ---------------------------------
 
+
 def test_the_five_statuses_are_exactly_14_2s():
     assert [s.value for s in Status] == [
-        "Draft", "Needs Source", "Reviewed", "Approved", "Rejected"
+        "Draft",
+        "Needs Source",
+        "Reviewed",
+        "Approved",
+        "Rejected",
     ]
 
 
 def test_the_six_source_types_are_exactly_14_3s():
     assert [s.value for s in SourceType] == [
-        "Company Guidance", "Company Filing", "External Market Data",
-        "Historical Driver", "Analyst Assumption", "Scenario Override",
+        "Company Guidance",
+        "Company Filing",
+        "External Market Data",
+        "Historical Driver",
+        "Analyst Assumption",
+        "Scenario Override",
     ]
 
 
@@ -111,13 +120,19 @@ def test_a_float_value_is_refused_rather_than_converted():
 
     with pytest.raises(PrecisionError, match="arrived as a float"):
         Assumption(
-            code="c", name="n", value=0.08, unit="ratio", owner="larry",
+            code="c",
+            name="n",
+            value=0.08,
+            unit="ratio",
+            owner="larry",
             rationale="because of things",
-            source_type=SourceType.ANALYST_ASSUMPTION, evidence=Evidence(),
+            source_type=SourceType.ANALYST_ASSUMPTION,
+            evidence=Evidence(),
         )
 
 
 # --- item 91: the evidence rules -------------------------------------------
+
 
 def test_a_filing_cited_without_a_page_is_not_a_citation():
     with pytest.raises(AssumptionError, match="STEP 2 makes the page"):
@@ -147,12 +162,16 @@ def test_a_historical_driver_must_say_which_periods_it_measured():
     """A DSO of 59.9 days means nothing without saying 59.9 days of which year."""
     with pytest.raises(AssumptionError, match="which year"):
         make(
-            code="dso", unit="days", value="59.9",
+            code="dso",
+            unit="days",
+            value="59.9",
             source_type=SourceType.HISTORICAL_DRIVER,
             evidence=Evidence(),
         )
     ok = make(
-        code="dso", unit="days", value="59.9",
+        code="dso",
+        unit="days",
+        value="59.9",
         source_type=SourceType.HISTORICAL_DRIVER,
         evidence=Evidence(measured_over=("2025A",)),
     )
@@ -173,10 +192,7 @@ def test_self_review_is_recorded_rather_than_refused():
 
 def test_every_source_type_maps_onto_one_of_the_engines_three_bases():
     """The fuller vocabulary must not lose STEP 10's distinction."""
-    bases = {
-        make(source_type=kind, **_extras_for(kind)).engine_basis
-        for kind in SourceType
-    }
+    bases = {make(source_type=kind, **_extras_for(kind)).engine_basis for kind in SourceType}
     assert bases == {"company_guidance", "external_research", "model_assumption"}
 
 
@@ -198,25 +214,34 @@ def test_a_scenario_override_must_name_what_it_overrides():
 
 # --- item 92: scenarios (14.6, 14.7, 14.9) ----------------------------------
 
+
 def test_a_set_needs_a_base_scenario():
     with pytest.raises(ScenarioError, match="needs a 'base' scenario"):
         ScenarioSet((Scenario(id="upside", name="Upside"),))
 
 
 @pytest.mark.parametrize(
-    "name", ["Likely case", "Expected case", "P90", "High confidence case",
-             "Probable outcome", "Median case"]
+    "name",
+    [
+        "Likely case",
+        "Expected case",
+        "P90",
+        "High confidence case",
+        "Probable outcome",
+        "Median case",
+    ],
 )
 def test_a_name_that_implies_probability_is_refused(name):
     """14.9, and 1.19 behind it: this system models no distribution."""
-    with pytest.raises(ScenarioError, match="likelihood|distribution"):
+    with pytest.raises(ScenarioError, match=r"likelihood|distribution"):
         Scenario(id="x", name=name)
 
 
 def test_a_probability_implying_name_is_allowed_once_it_is_sourced():
     """14.9's escape clause, read strictly: modelled AND sourced."""
     scenario = Scenario(
-        id="x", name="Likely case",
+        id="x",
+        name="Likely case",
         probability=Probability(D("0.6"), "internal forecast poll", "2026-09-01"),
     )
     assert scenario.name == "Likely case"
@@ -229,9 +254,7 @@ def test_a_probability_without_a_source_does_not_unlock_the_name():
 
 def test_a_variant_that_differs_in_nothing_is_reported(base_set):
     """14.6: a named case the model does not contain is a label."""
-    with_upside = base_set.with_scenario(
-        Scenario(id="upside", name="Upside", parent_id=BASE)
-    )
+    with_upside = base_set.with_scenario(Scenario(id="upside", name="Upside", parent_id=BASE))
     problem = with_upside.check_differences("upside")
     assert "differs from 'base' in nothing" in problem
     assert with_upside.differences("upside") == ()
@@ -242,8 +265,11 @@ def test_an_override_keeps_its_lineage(base_set):
     scenarios = base_set.with_scenario(
         Scenario(id="upside", name="Upside", parent_id=BASE)
     ).override(
-        "upside", "revenue_growth", D("0.12"),
-        owner="larry", rationale="top of the guided range",
+        "upside",
+        "revenue_growth",
+        D("0.12"),
+        owner="larry",
+        rationale="top of the guided range",
     )
     assert scenarios.check_differences("upside") == ""
     assert scenarios.differences("upside") == (("revenue_growth", D("0.08"), D("0.12")),)
@@ -271,19 +297,19 @@ def test_overriding_something_the_parent_does_not_carry_is_refused(base_set):
 
 def test_inheritance_cannot_be_circular():
     with pytest.raises(ScenarioError, match="circular"):
-        ScenarioSet((
-            base_scenario(),
-            Scenario(id="a", name="A", parent_id="b"),
-            Scenario(id="b", name="B", parent_id="a"),
-        ))
+        ScenarioSet(
+            (
+                base_scenario(),
+                Scenario(id="a", name="A", parent_id="b"),
+                Scenario(id="b", name="B", parent_id="a"),
+            )
+        )
 
 
 def test_a_grandchild_resolves_through_both_parents(base_set):
-    scenarios = (
-        base_set
-        .with_scenario(Scenario(id="upside", name="Upside", parent_id=BASE))
-        .override("upside", "revenue_growth", D("0.12"), owner="l", rationale="r")
-    )
+    scenarios = base_set.with_scenario(
+        Scenario(id="upside", name="Upside", parent_id=BASE)
+    ).override("upside", "revenue_growth", D("0.12"), owner="l", rationale="r")
     scenarios = scenarios.with_scenario(
         Scenario(id="upside_fast", name="Upside with faster collection", parent_id="upside")
     ).override("upside_fast", "dso", D("45"), owner="l", rationale="collection programme")
@@ -297,6 +323,7 @@ def test_a_grandchild_resolves_through_both_parents(base_set):
 
 # --- item 95: the workflow --------------------------------------------------
 
+
 def test_draft_cannot_go_straight_to_approved():
     with pytest.raises(WorkflowError, match="four statuses and a decoration"):
         transition(make(), Status.APPROVED, actor="larry", reason="looks fine")
@@ -308,7 +335,7 @@ def test_a_status_change_needs_a_reason():
 
 
 def test_reviewed_needs_a_named_reviewer():
-    with pytest.raises(WorkflowError, match="named.*reviewer"):
+    with pytest.raises(WorkflowError, match=r"named.*reviewer"):
         transition(make(), Status.REVIEWED, actor="larry", reason="checked p.31")
 
 
@@ -319,7 +346,10 @@ def test_a_no_op_transition_is_refused():
 
 def test_the_happy_path_records_who_and_why():
     reviewed, first = transition(
-        make(), Status.REVIEWED, actor="larry", reason="checked against p.31",
+        make(),
+        Status.REVIEWED,
+        actor="larry",
+        reason="checked against p.31",
         reviewer="larry",
     )
     approved, second = transition(
@@ -337,9 +367,7 @@ def test_an_approved_assumption_is_reopened_through_draft_not_re_approved():
     reviewed, _ = transition(
         make(), Status.REVIEWED, actor="larry", reason="checked", reviewer="larry"
     )
-    approved, _ = transition(
-        reviewed, Status.APPROVED, actor="larry", reason="accepted"
-    )
+    approved, _ = transition(reviewed, Status.APPROVED, actor="larry", reason="accepted")
     with pytest.raises(WorkflowError, match="cannot go from Approved to Reviewed"):
         transition(approved, Status.REVIEWED, actor="larry", reason="second look")
 
@@ -376,8 +404,7 @@ def test_a_driver_scoped_to_one_year_is_missing_from_the_others(approved_set):
         tuple(a for a in approved_set.assumptions if a.code != "revenue_growth"),
     )
     narrowed = without.with_assumption(
-        make(code="revenue_growth", periods=("2026E",), status=Status.APPROVED,
-             reviewer="larry")
+        make(code="revenue_growth", periods=("2026E",), status=Status.APPROVED, reviewer="larry")
     )
     result = evaluate(narrowed, BASE, PERIODS)
     assert any("revenue_growth for 2027E" in item for item in result.missing)
@@ -391,8 +418,13 @@ def test_a_period_scoped_driver_shadows_the_all_years_one(approved_set):
     rule here the two would race on insertion order.
     """
     both = approved_set.with_assumption(
-        make(code="revenue_growth", value="0.15", periods=("2027E",),
-             status=Status.APPROVED, reviewer="larry")
+        make(
+            code="revenue_growth",
+            value="0.15",
+            periods=("2027E",),
+            status=Status.APPROVED,
+            reviewer="larry",
+        )
     )
     assert both.resolve(BASE, period="2027E")["revenue_growth"].assumption.value == D("0.15")
     assert both.resolve(BASE, period="2026E")["revenue_growth"].assumption.value == D("0.05")
@@ -411,8 +443,13 @@ def test_declaring_both_methodologies_is_refused(approved_set):
     # The fixture supplies `cogs_amount`; declaring the percentage as well is
     # the ambiguity STEP 14 refuses.
     both = approved_set.with_assumption(
-        make(code="cogs_pct_revenue", unit="ratio", value="0.6",
-             status=Status.APPROVED, reviewer="larry")
+        make(
+            code="cogs_pct_revenue",
+            unit="ratio",
+            value="0.6",
+            status=Status.APPROVED,
+            reviewer="larry",
+        )
     )
     result = evaluate(both, BASE, PERIODS)
     assert not result.may_calculate
@@ -429,9 +466,15 @@ def test_an_approved_set_may_calculate_and_says_what_was_self_reviewed(approved_
 def test_a_rejected_driver_blocks_even_though_it_has_a_status(approved_set):
     """14.1 read literally is satisfied by any status. Rejected is an answer of no."""
     rejected = approved_set.with_assumption(
-        make(code="dso", unit="days", value="59.9", status=Status.REJECTED,
-             reviewer="larry", source_type=SourceType.HISTORICAL_DRIVER,
-             evidence=Evidence(measured_over=("2025A",))),
+        make(
+            code="dso",
+            unit="days",
+            value="59.9",
+            status=Status.REJECTED,
+            reviewer="larry",
+            source_type=SourceType.HISTORICAL_DRIVER,
+            evidence=Evidence(measured_over=("2025A",)),
+        ),
     )
     result = evaluate(rejected, BASE, PERIODS)
     assert not result.may_calculate
@@ -439,6 +482,7 @@ def test_a_rejected_driver_blocks_even_though_it_has_a_status(approved_set):
 
 
 # --- the driver table must stay a reading of the engine --------------------
+
 
 def test_every_required_driver_is_read_by_the_forecast():
     import inspect
@@ -491,6 +535,7 @@ def test_the_required_set_is_deduplicated():
 
 # --- fixtures ---------------------------------------------------------------
 
+
 @pytest.fixture
 def base_set():
     """A base scenario with three of the eleven required drivers."""
@@ -498,12 +543,20 @@ def base_set():
         (base_scenario("larry"),),
         (
             make(code="revenue_growth", value="0.08"),
-            make(code="dso", unit="days", value="59.9",
-                 source_type=SourceType.HISTORICAL_DRIVER,
-                 evidence=Evidence(measured_over=("2025A",))),
-            make(code="inventory_days", unit="days", value="77.9",
-                 source_type=SourceType.HISTORICAL_DRIVER,
-                 evidence=Evidence(measured_over=("2025A",))),
+            make(
+                code="dso",
+                unit="days",
+                value="59.9",
+                source_type=SourceType.HISTORICAL_DRIVER,
+                evidence=Evidence(measured_over=("2025A",)),
+            ),
+            make(
+                code="inventory_days",
+                unit="days",
+                value="77.9",
+                source_type=SourceType.HISTORICAL_DRIVER,
+                evidence=Evidence(measured_over=("2025A",)),
+            ),
         ),
     )
 

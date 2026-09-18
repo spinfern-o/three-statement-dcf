@@ -27,6 +27,43 @@ NOT_A_PDF = FIXTURES / "not_actually_a_pdf.pdf"
 TRUNCATED = FIXTURES / "truncated.pdf"
 
 
+def browser_client(app):
+    """A `TestClient` that sends the CSRF token, the way a browser does.
+
+    20.12 requires every state-changing request to carry this session's token,
+    and a browser gets it from the hidden field in the form it is submitting.
+    A test posting without one is not testing the domain logic it was written
+    for -- it is testing the CSRF guard, which has its own tests in
+    `test_security.py` that supply no token, a stale token and a forged one.
+
+    So this fills the field in when the caller has not, and never overrides a
+    caller who has: a test that wants to submit a bad token still can.
+    """
+    from fastapi.testclient import TestClient
+
+    class _Browser(TestClient):
+        def post(self, url, *args, **kwargs):
+            data = kwargs.get("data")
+            if data is None and "files" not in kwargs and "json" not in kwargs:
+                data = {}
+            if isinstance(data, dict) and "csrf_token" not in data:
+                kwargs["data"] = {**data, "csrf_token": self.csrf_token()}
+            return super().post(url, *args, **kwargs)
+
+        def csrf_token(self) -> str:
+            """This client's current token, derived the way the guard does."""
+            from apps.api.app.security import csrf, sessions
+
+            state = self.app.state
+            cookie = self.cookies.get(sessions.COOKIE_NAME, "")
+            nonce = "local-review"
+            if state.credential is not None and cookie:
+                nonce = sessions.verify(state.signing_key, cookie).nonce
+            return csrf.token_for(state.signing_key, nonce)
+
+    return _Browser(app)
+
+
 @pytest.fixture
 def store_root(tmp_path):
     return tmp_path / "sources"
@@ -92,11 +129,10 @@ def stored(ingest_fixture, repository):
 @pytest.fixture
 def client(store_root, stored):
     """A test client over a store that already holds one extraction."""
-    from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
 
-    with TestClient(create_app(store_root)) as test_client:
+    with browser_client(create_app(store_root)) as test_client:
         test_client.document_id = stored.document.id
         yield test_client
 
@@ -104,11 +140,10 @@ def client(store_root, stored):
 @pytest.fixture
 def empty_client(tmp_path):
     """A client over a store with nothing in it, for the empty state."""
-    from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
 
-    with TestClient(create_app(tmp_path / "empty")) as test_client:
+    with browser_client(create_app(tmp_path / "empty")) as test_client:
         yield test_client
 
 
@@ -146,19 +181,19 @@ def three_statements(tmp_path_factory):
             for name, field in result.document.metadata.fields.items()
             if field.value is not None
         },
-        actor="owner", reason="checked the cover page",
+        actor="owner",
+        reason="checked the cover page",
     )
     for fact in list(result.facts):
         if fact.raw_value in ("\u2014", "\u2013", "N/A"):
-            result = correct_fact(result, fact.id, "0", actor="owner",
-                                  reason="the filer reports nil here")
+            result = correct_fact(
+                result, fact.id, "0", actor="owner", reason="the filer reports nil here"
+            )
     for fact in list(result.facts):
         if fact.value is not None and fact.decision is None:
-            result = accept_fact(result, fact.id, actor="owner",
-                                 reason="matches the printed page")
+            result = accept_fact(result, fact.id, actor="owner", reason="matches the printed page")
     result = propose_all(result)
-    result = approve_all(result, actor="owner",
-                         note="each label matches the canonical definition")
+    result = approve_all(result, actor="owner", note="each label matches the canonical definition")
     return apply_findings(result)
 
 
@@ -189,19 +224,19 @@ def _review_and_map(path, root):
             for name, field in result.document.metadata.fields.items()
             if field.value is not None
         },
-        actor="owner", reason="checked the cover page",
+        actor="owner",
+        reason="checked the cover page",
     )
     for fact in list(result.facts):
         if fact.raw_value in ("\u2014", "\u2013", "N/A"):
-            result = correct_fact(result, fact.id, "0", actor="owner",
-                                  reason="the filer reports nil here")
+            result = correct_fact(
+                result, fact.id, "0", actor="owner", reason="the filer reports nil here"
+            )
     for fact in list(result.facts):
         if fact.value is not None and fact.decision is None:
-            result = accept_fact(result, fact.id, actor="owner",
-                                 reason="matches the printed page")
+            result = accept_fact(result, fact.id, actor="owner", reason="matches the printed page")
     result = propose_all(result)
-    result = approve_all(result, actor="owner",
-                         note="each label matches the canonical definition")
+    result = approve_all(result, actor="owner", note="each label matches the canonical definition")
     return apply_findings(result)
 
 
@@ -225,7 +260,6 @@ def forecast_client(tmp_path, forecastable):
     application stores it, so the screens read the same JSON a reviewer's own
     session would.
     """
-    from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
     from apps.api.app.assumptions.store import ScenarioStore
@@ -235,7 +269,7 @@ def forecast_client(tmp_path, forecastable):
     JsonDocumentRepository(root).save(forecastable)
     ScenarioStore(root).save(forecastable.document.id, approved_scenario("owner"))
 
-    with TestClient(create_app(root)) as test_client:
+    with browser_client(create_app(root)) as test_client:
         test_client.document_id = forecastable.document.id
         yield test_client
 
@@ -262,8 +296,13 @@ def approved_scenario(owner: str = "owner"):
     def driver(code, value):
         unit = BY_CODE[code].unit
         fields = dict(
-            code=code, name=code.replace("_", " "), value=value, unit=unit,
-            owner=owner, reviewer=owner, status=Status.APPROVED,
+            code=code,
+            name=code.replace("_", " "),
+            value=value,
+            unit=unit,
+            owner=owner,
+            reviewer=owner,
+            status=Status.APPROVED,
             rationale="entered for this test, with a stated source",
         )
         if unit == "days":
@@ -280,8 +319,13 @@ def approved_scenario(owner: str = "owner"):
 
     def market(code, value, unit):
         return Assumption(
-            code=code, name=code.replace("_", " "), value=value, unit=unit,
-            owner=owner, reviewer=owner, status=Status.APPROVED,
+            code=code,
+            name=code.replace("_", " "),
+            value=value,
+            unit=unit,
+            owner=owner,
+            reviewer=owner,
+            status=Status.APPROVED,
             rationale="observed on the valuation date and recorded with its source",
             source_type=SourceType.EXTERNAL_MARKET_DATA,
             evidence=Evidence(url=f"https://example.test/{code}", date="2026-09-17"),
@@ -326,14 +370,13 @@ def three_statement_client(tmp_path, three_statements):
     review, which is the right subject for the source room and the wrong one
     for a screen that only has something to show once mappings are approved.
     """
-    from fastapi.testclient import TestClient
 
     from apps.api.app.api.main import create_app
     from apps.api.app.persistence.json_store import JsonDocumentRepository
 
     root = tmp_path / "reviewed"
     JsonDocumentRepository(root).save(three_statements)
-    with TestClient(create_app(root)) as test_client:
+    with browser_client(create_app(root)) as test_client:
         test_client.document_id = three_statements.document.id
         yield test_client
 
@@ -366,22 +409,26 @@ def mapped_aggregate(extracted):
     result = confirm_metadata(
         extracted,
         {n: None for n, f in extracted.document.metadata.fields.items() if f.value is not None},
-        actor="owner", reason="checked the cover page",
+        actor="owner",
+        reason="checked the cover page",
     )
     for fact in list(result.facts):
         if fact.raw_value in ("\u2014", "\u2013", "N/A"):
-            result = correct_fact(result, fact.id, "0", actor="owner",
-                                  reason="the filer reports nil here")
+            result = correct_fact(
+                result, fact.id, "0", actor="owner", reason="the filer reports nil here"
+            )
     for fact in list(result.facts):
         if fact.value is not None and fact.decision is None:
-            result = accept_fact(result, fact.id, actor="owner",
-                                 reason="matches the printed page")
+            result = accept_fact(result, fact.id, actor="owner", reason="matches the printed page")
     result = propose_all(result)
     for period in ("2025", "2024"):
-        ids = [f.id for f in result.facts
-               if f.raw_label in labels and f.period_label == period]
-        result = combine_facts(result, ids, "operating_expenses", actor="owner",
-                               note="three categories; the chart has one line")
-    result = approve_all(result, actor="owner",
-                         note="each label matches the canonical definition")
+        ids = [f.id for f in result.facts if f.raw_label in labels and f.period_label == period]
+        result = combine_facts(
+            result,
+            ids,
+            "operating_expenses",
+            actor="owner",
+            note="three categories; the chart has one line",
+        )
+    result = approve_all(result, actor="owner", note="each label matches the canonical definition")
     return apply_findings(result)

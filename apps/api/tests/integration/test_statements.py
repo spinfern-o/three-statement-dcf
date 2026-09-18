@@ -76,6 +76,7 @@ YEARS = ("2024A", "2025A")
 
 # --- items 59, 60, 61 -------------------------------------------------------
 
+
 def test_the_years_are_the_ones_the_filing_presents(built):
     assert built.years == YEARS
 
@@ -110,7 +111,7 @@ def test_net_income_is_on_both_statements_and_they_are_separate_cells(built):
 
 def test_every_cell_carries_a_page_and_the_companys_own_wording(built):
     """STEP 4 and acceptance criterion 24.3."""
-    for statement, ledger in built.ledgers.items():
+    for _statement, ledger in built.ledgers.items():
         for year in YEARS:
             for code in ledger.accounts_present(year):
                 cell = ledger._cells[(code, year)]
@@ -128,9 +129,7 @@ def test_an_aggregate_names_every_line_it_summed(mapped_aggregate):
     cannot find any of them on the page.
     """
     built = build_statements(mapped_aggregate)
-    cell = built.ledgers[accounts.Statement.INCOME]._cells[
-        (accounts.OPERATING_EXPENSES, "2025A")
-    ]
+    cell = built.ledgers[accounts.Statement.INCOME]._cells[(accounts.OPERATING_EXPENSES, "2025A")]
     assert cell.value == D("345500")
     assert "Selling, general and administrative" in cell.source.line_item
     assert "Research and development" in cell.source.line_item
@@ -146,6 +145,7 @@ def test_engine_year_adds_the_actual_suffix():
 
 
 # --- items 66, 67 -----------------------------------------------------------
+
 
 def test_every_historical_check_passes_on_a_filing_that_ties(built):
     results = run_historical_checks(built)
@@ -199,7 +199,8 @@ def test_a_check_with_nothing_to_check_skips(extracted):
     result = confirm_metadata(
         extracted,
         {n: None for n, f in extracted.document.metadata.fields.items() if f.value is not None},
-        actor="owner", reason="cover",
+        actor="owner",
+        reason="cover",
     )
     for fact in list(result.facts):
         if fact.value is not None:
@@ -229,10 +230,14 @@ def _mapped_without_confirming(extracted):
     }
     result = propose_all(extracted)
     for period in ("2025", "2024"):
-        ids = [f.id for f in result.facts
-               if f.raw_label in labels and f.period_label == period]
-        result = combine_facts(result, ids, accounts.OPERATING_EXPENSES,
-                               actor="owner", note="three categories, one line")
+        ids = [f.id for f in result.facts if f.raw_label in labels and f.period_label == period]
+        result = combine_facts(
+            result,
+            ids,
+            accounts.OPERATING_EXPENSES,
+            actor="owner",
+            note="three categories, one line",
+        )
     return approve_all(result, actor="owner", note="definitions align")
 
 
@@ -263,6 +268,7 @@ def test_unverified_cells_are_reported_not_hidden(extracted):
 
 
 # --- items 62, 63, 64 -------------------------------------------------------
+
 
 def test_common_size_uses_revenue_for_the_income_statement(built):
     rows = {r.item.canonical_code: r for r in statement_view(built, accounts.Statement.INCOME)}
@@ -321,6 +327,7 @@ def test_the_equity_statement_says_it_is_not_available():
 
 
 # --- the last mile ----------------------------------------------------------
+
 
 def test_the_export_produces_files_the_engine_loads(three_statements, tmp_path):
     """The join, end to end, through the engine's own loaders."""
@@ -391,7 +398,8 @@ def test_the_engine_still_halts_on_what_a_filing_cannot_supply(three_statements,
 
     process = subprocess.run(
         [sys.executable, "run_model.py", "--inputs", str(tmp_path)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert process.returncode == 2
     assert "MODEL HALTED" in process.stderr
@@ -399,6 +407,7 @@ def test_the_engine_still_halts_on_what_a_filing_cannot_supply(three_statements,
 
 
 # --- helpers ----------------------------------------------------------------
+
 
 def _fact(result, label, period, page=None):
     for fact in result.facts:

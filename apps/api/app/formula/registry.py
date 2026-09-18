@@ -74,7 +74,10 @@ class FormulaDefinition:
     #: "exact" or "ctx", as the catalogue's Rounding column defines them.
     rounding: str = "exact"
 
-    _tree: Node = field(init=False, repr=False, compare=False, default=None)
+    # None until `__post_init__` parses the expression. Declared optional,
+    # because the default is None and a non-optional annotation over a None
+    # default is a lie the checker was the first to notice.
+    _tree: Node | None = field(init=False, repr=False, compare=False, default=None)
 
     def __post_init__(self) -> None:
         if not self.code.strip():
@@ -104,6 +107,18 @@ class FormulaDefinition:
 
     @property
     def tree(self) -> Node:
+        """The parsed expression. Parsed in `__post_init__`, so never None here.
+
+        The check is not redundant: `_tree` is declared optional because its
+        default is, and a property that returned None to a caller expecting a
+        `Node` would fail somewhere else entirely.
+        """
+        if self._tree is None:  # pragma: no cover - __post_init__ always sets it
+            raise RuntimeError(
+                f"{self.code}: the expression was never parsed. That is a broken "
+                "invariant in this class, not a problem with the formula -- so "
+                "it is not a FormulaSyntaxError."
+            )
         return self._tree
 
     @property
@@ -111,7 +126,7 @@ class FormulaDefinition:
         return unit_for(self.output_unit)
 
     @property
-    def inputs(self) -> "frozenset[str]":
+    def inputs(self) -> frozenset[str]:
         return self.tree.references()
 
     @property
@@ -122,9 +137,7 @@ class FormulaDefinition:
         Rewording a definition is an editorial change and must not make a
         stored calculation look stale; changing the expression must.
         """
-        return _digest(
-            self.code, str(self.version), self.tree.text(), self.output_unit
-        )
+        return _digest(self.code, str(self.version), self.tree.text(), self.output_unit)
 
     def describe(self) -> str:
         return (
@@ -142,13 +155,13 @@ class FormulaSet:
     in place makes that reference meaningless.
     """
 
-    definitions: "tuple[FormulaDefinition, ...]"
+    definitions: tuple[FormulaDefinition, ...]
     version: int = 1
     note: str = ""
 
     def __post_init__(self) -> None:
-        by_target: "dict[str, str]" = {}
-        by_code: "dict[str, str]" = {}
+        by_target: dict[str, str] = {}
+        by_code: dict[str, str] = {}
         for definition in self.definitions:
             if definition.target in by_target:
                 raise RegistryError(
@@ -171,7 +184,7 @@ class FormulaSet:
         return len(self.definitions)
 
     @property
-    def targets(self) -> "tuple[str, ...]":
+    def targets(self) -> tuple[str, ...]:
         return tuple(d.target for d in self.definitions)
 
     def for_target(self, target: str) -> FormulaDefinition | None:
@@ -186,7 +199,7 @@ class FormulaSet:
                 return definition
         raise KeyError(f"no formula {code!r} in this set")
 
-    def subset(self, targets: "frozenset[str]") -> "FormulaSet":
+    def subset(self, targets: frozenset[str]) -> FormulaSet:
         return FormulaSet(
             tuple(d for d in self.definitions if d.target in targets),
             version=self.version,
@@ -202,9 +215,7 @@ class FormulaSet:
         )
 
 
-def calculation_fingerprint(
-    formulas: FormulaSet, inputs: "dict[str, Decimal]"
-) -> str:
+def calculation_fingerprint(formulas: FormulaSet, inputs: dict[str, Decimal]) -> str:
     """18.7: "Hash inputs and formula version for reproducibility."
 
     The same formulas over the same inputs hash the same; one changed digit

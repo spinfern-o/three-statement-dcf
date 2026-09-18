@@ -13,7 +13,8 @@ and an unresolved conflict is a hard error, not a warning.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Iterator
+from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 
@@ -96,7 +97,9 @@ class Conflict:
                 "STEP 11 requires explicitly choosing which one the model uses."
             )
         if not self.rationale.strip():
-            raise ProvenanceError(f"Conflict {self.topic!r}: a rationale for the choice is required (STEP 11)")
+            raise ProvenanceError(
+                f"Conflict {self.topic!r}: a rationale for the choice is required (STEP 11)"
+            )
 
     def describe(self) -> str:
         return (
@@ -152,7 +155,9 @@ class Assumptions:
 
     def unused(self) -> list[str]:
         """Declared but never read -- usually a typo or a stale driver."""
-        return sorted(f"{n} [{y or 'all years'}]" for (n, y) in self._items if (n, y) not in self._used)
+        return sorted(
+            f"{n} [{y or 'all years'}]" for (n, y) in self._items if (n, y) not in self._used
+        )
 
     def by_basis(self) -> dict[Basis, list[Assumption]]:
         """STEP 10: report the three categories separately."""
@@ -166,5 +171,5 @@ class Assumptions:
     def __len__(self) -> int:
         return len(self._items)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Assumption]:
         return iter(sorted(self._items.values(), key=lambda a: (a.name, a.year or "")))

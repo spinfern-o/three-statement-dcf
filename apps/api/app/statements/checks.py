@@ -55,13 +55,14 @@ def balance_sheet_balances(built: BuiltStatements, tol: Tolerance) -> CheckResul
 
     if not checked:
         return _result(
-            name, Status.SKIP,
-            "no year reports all three of total assets, total liabilities and "
-            "total equity",
+            name,
+            Status.SKIP,
+            "no year reports all three of total assets, total liabilities and total equity",
         )
     if failures:
         return _result(
-            name, Status.FAIL,
+            name,
+            Status.FAIL,
             "; ".join(failures) + " -- find the mapping error, do not plug it (STEP 6)",
         )
     return _result(name, Status.PASS, f"{checked} year(s) balance")
@@ -77,11 +78,16 @@ def cash_reconciles(built: BuiltStatements, tol: Tolerance) -> CheckResult:
     for earlier, later in zip(built.years, built.years[1:]):
         opening = balance.get(accounts.CASH, earlier)
         closing = balance.get(accounts.CASH, later)
-        flows = [cashflow.get(code, later) for code in (accounts.CFO, accounts.CFI, accounts.CFF)]
-        if opening is None or closing is None or any(f is None for f in flows):
+        cfo = cashflow.get(accounts.CFO, later)
+        cfi = cashflow.get(accounts.CFI, later)
+        cff = cashflow.get(accounts.CFF, later)
+        # Each named rather than `any(f is None for f in flows)`: both guard
+        # the same thing, and only this form shows that the three values added
+        # below are present.
+        if opening is None or closing is None or cfo is None or cfi is None or cff is None:
             continue
         checked += 1
-        expected = opening + flows[0] + flows[1] + flows[2]
+        expected = opening + cfo + cfi + cff
         if not tol.close(expected, closing):
             failures.append(
                 f"{later}: {opening:,} + the three subtotals gives {expected:,}, "
@@ -90,7 +96,8 @@ def cash_reconciles(built: BuiltStatements, tol: Tolerance) -> CheckResult:
 
     if not checked:
         return _result(
-            name, Status.SKIP,
+            name,
+            Status.SKIP,
             "no consecutive pair of years has both an opening and closing cash "
             "balance and all three cash-flow subtotals. A filing whose cash flow "
             "statement was not extracted cannot pass this, and reporting it as a "
@@ -115,12 +122,15 @@ def subtotals_reconcile(built: BuiltStatements, tol: Tolerance) -> CheckResult:
         return _result(name, Status.SKIP, "no subtotal is both reported and derivable")
     if discrepancies:
         return _result(
-            name, Status.FAIL,
+            name,
+            Status.FAIL,
             "; ".join(str(d) for d in discrepancies)
             + " -- a subtotal disagreeing with its own components is usually a "
-              "mapping error, not a rounding one",
+            "mapping error, not a rounding one",
         )
-    return _result(name, Status.PASS, f"{compared} reported subtotal(s) agree with their components")
+    return _result(
+        name, Status.PASS, f"{compared} reported subtotal(s) agree with their components"
+    )
 
 
 def _comparable(ledger: Ledger, years) -> int:
@@ -129,9 +139,7 @@ def _comparable(ledger: Ledger, years) -> int:
         for year in years:
             if not ledger.has(code, year):
                 continue
-            required = [
-                c for c in plus + minus if c not in accounts.OPTIONAL_IN_DERIVATION
-            ]
+            required = [c for c in plus + minus if c not in accounts.OPTIONAL_IN_DERIVATION]
             if all(ledger.has(c, year) for c in required):
                 count += 1
     return count
@@ -177,8 +185,12 @@ def every_cell_is_cited(built: BuiltStatements, tol: Tolerance) -> CheckResult:
                     missing.append(f"{statement.value} {code} {year}")
     if missing:
         return _result(name, Status.FAIL, ", ".join(missing[:5]))
-    total = sum(len(l.accounts_present(y)) for l in built.ledgers.values() for y in built.years)
-    return _result(name, Status.PASS, f"{total} cell(s), each with a document, page and reported label")
+    total = sum(
+        len(ledger.accounts_present(y)) for ledger in built.ledgers.values() for y in built.years
+    )
+    return _result(
+        name, Status.PASS, f"{total} cell(s), each with a document, page and reported label"
+    )
 
 
 def verification_is_complete(built: BuiltStatements, tol: Tolerance) -> CheckResult:
@@ -187,7 +199,8 @@ def verification_is_complete(built: BuiltStatements, tol: Tolerance) -> CheckRes
     if built.unverified:
         shown = ", ".join(f"{code} {year}" for code, year in built.unverified[:5])
         return _result(
-            name, Status.FAIL,
+            name,
+            Status.FAIL,
             f"{len(built.unverified)} cell(s) rest on facts that have not met all "
             f"seven conditions of source-policy.md §9: {shown}",
         )
@@ -212,9 +225,6 @@ def run_historical_checks(
     return tuple(check(built, tol) for check in HISTORICAL_CHECKS)
 
 
-def summarize(results: "tuple[CheckResult, ...]") -> str:
+def summarize(results: tuple[CheckResult, ...]) -> str:
     counts = {status: sum(1 for r in results if r.status is status) for status in Status}
-    return (
-        f"{counts[Status.PASS]} PASS   {counts[Status.FAIL]} FAIL   "
-        f"{counts[Status.SKIP]} SKIP"
-    )
+    return f"{counts[Status.PASS]} PASS   {counts[Status.FAIL]} FAIL   {counts[Status.SKIP]} SKIP"

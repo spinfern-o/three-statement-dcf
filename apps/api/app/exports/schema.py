@@ -37,9 +37,21 @@ SCHEMA_ID = f"https://spinfern-o.invalid/three-statement-dcf/export-{SCHEMA_VERS
 #: rather than partially checked.
 SUPPORTED = frozenset(
     {
-        "$schema", "$id", "title", "description", "type", "properties",
-        "required", "additionalProperties", "items", "enum", "minimum",
-        "minItems", "pattern", "definitions", "$ref",
+        "$schema",
+        "$id",
+        "title",
+        "description",
+        "type",
+        "properties",
+        "required",
+        "additionalProperties",
+        "items",
+        "enum",
+        "minimum",
+        "minItems",
+        "pattern",
+        "definitions",
+        "$ref",
     }
 )
 
@@ -137,9 +149,18 @@ EXPORT_SCHEMA = {
         "tables": {"type": "array", "items": _TABLE, "minItems": 16},
     },
     "required": [
-        "schema_version", "generated_at", "model_version",
-        "model_version_components", "document_id", "company", "scenario_id",
-        "currency", "units", "valuation_date", "limitations", "tables",
+        "schema_version",
+        "generated_at",
+        "model_version",
+        "model_version_components",
+        "document_id",
+        "company",
+        "scenario_id",
+        "currency",
+        "units",
+        "valuation_date",
+        "limitations",
+        "tables",
     ],
     "additionalProperties": False,
 }
@@ -149,9 +170,9 @@ class SchemaError(ValueError):
     """The payload does not match the schema, and this says where."""
 
 
-def unsupported_keywords(schema: dict) -> "set[str]":
+def unsupported_keywords(schema: dict) -> set[str]:
     """Every keyword in `schema` that `validate` does not implement."""
-    found: "set[str]" = set()
+    found: set[str] = set()
 
     def walk(node):
         if isinstance(node, dict):
@@ -186,7 +207,11 @@ def _type_ok(value, expected) -> bool:
             return True
         if kind == "integer" and isinstance(value, int) and not isinstance(value, bool):
             return True
-        if kind == "number" and isinstance(value, (int, Decimal, float)) and not isinstance(value, bool):
+        if (
+            kind == "number"
+            and isinstance(value, (int, Decimal, float))
+            and not isinstance(value, bool)
+        ):
             return True
     return False
 
@@ -198,12 +223,14 @@ def _check(value, schema: dict, path: str) -> None:
         raise SchemaError(f"{path}: expected {schema['type']}, got {type(value).__name__}")
     if "enum" in schema and value not in schema["enum"]:
         raise SchemaError(f"{path}: {value!r} is not one of {schema['enum']}")
-    if "pattern" in schema and isinstance(value, str):
-        if not re.match(schema["pattern"], value):
-            raise SchemaError(f"{path}: {value!r} does not match {schema['pattern']}")
-    if "minimum" in schema and isinstance(value, (int, float, Decimal)):
-        if value < schema["minimum"]:
-            raise SchemaError(f"{path}: {value} is below {schema['minimum']}")
+    if "pattern" in schema and isinstance(value, str) and not re.match(schema["pattern"], value):
+        raise SchemaError(f"{path}: {value!r} does not match {schema['pattern']}")
+    if (
+        "minimum" in schema
+        and isinstance(value, (int, float, Decimal))
+        and value < schema["minimum"]
+    ):
+        raise SchemaError(f"{path}: {value} is below {schema['minimum']}")
 
     if isinstance(value, dict):
         properties = schema.get("properties", {})

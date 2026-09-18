@@ -104,7 +104,7 @@ class FactMapping:
         """False for a rejected mapping, which takes no part in a statement."""
         return self.mapping_type is not MappingType.REJECTED
 
-    def approve(self, *, actor: str, note: str) -> "FactMapping":
+    def approve(self, *, actor: str, note: str) -> FactMapping:
         """11.11. A human agrees. Requires a note (7.4.e)."""
         if not note.strip():
             raise MappingError(
@@ -147,7 +147,7 @@ class MappingSet:
     supersedes: int | None = None
 
     @classmethod
-    def empty(cls, *, actor: str = "system") -> "MappingSet":
+    def empty(cls, *, actor: str = "system") -> MappingSet:
         return cls(
             version=1,
             created_at=utc_now(),
@@ -198,7 +198,7 @@ class MappingSet:
 
     # --- writing: each returns the NEXT version ----------------------------
 
-    def _next(self, mappings, *, actor: str, reason: str) -> "MappingSet":
+    def _next(self, mappings, *, actor: str, reason: str) -> MappingSet:
         if not reason.strip():
             raise MappingError("a mapping-set version needs a reason (11.12, 10.33)")
         return MappingSet(
@@ -210,22 +210,20 @@ class MappingSet:
             supersedes=self.version,
         )
 
-    def add(self, *new: FactMapping, actor: str, reason: str) -> "MappingSet":
+    def add(self, *new: FactMapping, actor: str, reason: str) -> MappingSet:
         return self._next(self.mappings + new, actor=actor, reason=reason)
 
-    def replace_fact(
-        self, fact_id: str, *new: FactMapping, actor: str, reason: str
-    ) -> "MappingSet":
+    def replace_fact(self, fact_id: str, *new: FactMapping, actor: str, reason: str) -> MappingSet:
         """Replace every mapping of one fact. The edit path, and the split path."""
         kept = tuple(m for m in self.mappings if m.reported_fact_id != fact_id)
         return self._next(kept + new, actor=actor, reason=reason)
 
-    def update(self, mapping: FactMapping, *, actor: str, reason: str) -> "MappingSet":
+    def update(self, mapping: FactMapping, *, actor: str, reason: str) -> MappingSet:
         self.get(mapping.id)
         swapped = tuple(mapping if m.id == mapping.id else m for m in self.mappings)
         return self._next(swapped, actor=actor, reason=reason)
 
-    def remove_fact(self, fact_id: str, *, actor: str, reason: str) -> "MappingSet":
+    def remove_fact(self, fact_id: str, *, actor: str, reason: str) -> MappingSet:
         kept = tuple(m for m in self.mappings if m.reported_fact_id != fact_id)
         if len(kept) == len(self.mappings):
             raise MappingError(f"fact {fact_id!r} has no mappings to remove")

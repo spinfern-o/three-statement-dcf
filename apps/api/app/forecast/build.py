@@ -36,13 +36,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from model.assumptions import Assumption as EngineAssumption
 from model.accounts import Statement
+from model.assumptions import Assumption as EngineAssumption
 from model.assumptions import Assumptions, Basis
+from model.forecast import ForecastResult
 from model.profile import Periods
+from model.provenance import ProvenanceError
 from model.schedules import TaxSchedule
 from model.statements import Ledger
-from model.provenance import ProvenanceError
 
 from ..assumptions.gate import evaluate as evaluate_gate
 from ..assumptions.scenarios import ScenarioSet
@@ -65,17 +66,22 @@ class ScenarioForecast:
     scenario_id: str
     periods: Periods
     #: The engine's own result. Not a copy, not a reimplementation.
-    result: object
+    #:
+    #: Typed as `ForecastResult` rather than `object`. It was the latter, which
+    #: said "the engine's" in a comment and told no checker and no editor
+    #: anything -- and five modules downstream were reaching through it for
+    #: `.income`, `.balance`, `.cashflow` and `.taxes` on nothing but faith.
+    result: ForecastResult
     #: The tax basis STEP 16 requires be stated, and where it came from.
     tax_basis: str
     tax_source: str
     #: Every driver the engine read, with the status it carried.
-    drivers: "tuple[tuple[str, str, Decimal, str], ...]"
+    drivers: tuple[tuple[str, str, Decimal, str], ...]
     #: Assumptions declared and never read -- usually a misspelled code.
-    unused: "tuple[str, ...]"
+    unused: tuple[str, ...]
 
     @property
-    def forecast_years(self) -> "tuple[str, ...]":
+    def forecast_years(self) -> tuple[str, ...]:
         return self.periods.forecast
 
     @property
@@ -110,7 +116,7 @@ def forecast_periods(built: BuiltStatements, count: int = FORECAST_YEARS) -> Per
 
 def _tax_schedule(
     scenarios: ScenarioSet, scenario_id: str, periods: Periods
-) -> "tuple[TaxSchedule, str, str]":
+) -> tuple[TaxSchedule, str, str]:
     """STEP 16: the rate, and which basis it is, stated.
 
     The engine takes the tax rate through a `TaxSchedule` rather than through
@@ -121,7 +127,7 @@ def _tax_schedule(
     """
     from ..assumptions.schema import SourceType
 
-    rates: "dict[str, Decimal]" = {}
+    rates: dict[str, Decimal] = {}
     basis = ""
     source = ""
     for year in periods.forecast:
@@ -136,9 +142,7 @@ def _tax_schedule(
         rates[year] = assumption.value
         if assumption.source_type is SourceType.HISTORICAL_DRIVER:
             basis = basis or "historical_effective"
-        elif assumption.source_type in (
-            SourceType.COMPANY_FILING, SourceType.COMPANY_GUIDANCE
-        ):
+        elif assumption.source_type in (SourceType.COMPANY_FILING, SourceType.COMPANY_GUIDANCE):
             basis = basis or "statutory"
         else:
             basis = basis or "normalized_effective"
@@ -148,7 +152,7 @@ def _tax_schedule(
 
 def _register(
     scenarios: ScenarioSet, scenario_id: str, periods: Periods
-) -> "tuple[Assumptions, tuple[tuple[str, str, Decimal, str], ...]]":
+) -> tuple[Assumptions, tuple[tuple[str, str, Decimal, str], ...]]:
     """The website's register, narrowed to the engine's.
 
     Every assumption keeps its rationale as the engine's `source` string, so
@@ -157,8 +161,8 @@ def _register(
     would make the engine's report thinner than the screen that fed it.
     """
     register = Assumptions()
-    drivers: "list[tuple[str, str, Decimal, str]]" = []
-    seen: "set[tuple[str, str | None]]" = set()
+    drivers: list[tuple[str, str, Decimal, str]] = []
+    seen: set[tuple[str, str | None]] = set()
 
     for year in periods.forecast:
         for code, resolved in sorted(scenarios.resolve(scenario_id, period=year).items()):
@@ -191,9 +195,7 @@ def _register(
                     ),
                 )
             )
-            drivers.append(
-                (code, scope or "all years", assumption.value, assumption.status.value)
-            )
+            drivers.append((code, scope or "all years", assumption.value, assumption.status.value))
     return register, tuple(drivers)
 
 
@@ -231,9 +233,7 @@ def build_scenario_forecast(
         # The engine names one missing thing at a time. The gate has already
         # checked the drivers, so anything that gets here is a historical
         # balance the forecast anchors on -- which the gate cannot know about.
-        raise ForecastError(
-            f"scenario {scenario_id!r}: {exc}"
-        ) from None
+        raise ForecastError(f"scenario {scenario_id!r}: {exc}") from None
 
     return ScenarioForecast(
         scenario_id=scenario_id,

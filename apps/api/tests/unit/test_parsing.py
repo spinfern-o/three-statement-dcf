@@ -27,6 +27,7 @@ EU = NumberLocale.COMMA_DECIMAL
 
 # --- rule 1.5 ---------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "raw, code",
     [
@@ -74,6 +75,7 @@ def test_the_raw_string_is_always_retained():
 
 # --- 10.27, separator ambiguity ---------------------------------------------
 
+
 def test_an_ambiguous_number_is_refused_while_the_locale_is_unconfirmed():
     parsed = parse_reported_value("1,234")
     assert parsed.value is None
@@ -99,12 +101,12 @@ def test_a_confirmed_locale_resolves_it(raw, locale, expected):
 @pytest.mark.parametrize(
     "raw, expected",
     [
-        ("1,234,567", "1234567"),   # two comma groups: only dot-decimal reads this
-        ("1.234.567", "1234567"),   # two dot groups: only comma-decimal reads this
+        ("1,234,567", "1234567"),  # two comma groups: only dot-decimal reads this
+        ("1.234.567", "1234567"),  # two dot groups: only comma-decimal reads this
         ("1,234.56", "1234.56"),
         ("1.234,56", "1234.56"),
-        ("1,23", "1.23"),           # a US group must be exactly three digits
-        ("12", "12"),               # both readings agree, so it is not ambiguous
+        ("1,23", "1.23"),  # a US group must be exactly three digits
+        ("12", "12"),  # both readings agree, so it is not ambiguous
         (".5", "0.5"),
     ],
 )
@@ -124,10 +126,14 @@ def test_a_number_inconsistent_with_the_confirmed_locale_is_refused():
 def test_things_that_are_not_numbers_are_refused(raw):
     parsed = parse_reported_value(raw, locale=US)
     assert parsed.value is None
-    assert ReasonCode.NOT_NUMERIC in parsed.reason_codes or ReasonCode.SEPARATOR_AMBIGUOUS in parsed.reason_codes
+    assert (
+        ReasonCode.NOT_NUMERIC in parsed.reason_codes
+        or ReasonCode.SEPARATOR_AMBIGUOUS in parsed.reason_codes
+    )
 
 
 # --- 10.16, signs -----------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "raw, value, source",
@@ -154,6 +160,7 @@ def test_contradictory_sign_markers_are_refused():
 
 
 # --- 10.18, footnote markers ------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "raw, value, marker",
@@ -184,6 +191,7 @@ def test_a_parenthesized_number_alone_is_negative_not_a_footnote():
 
 # --- units ------------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "raw, symbol",
     [("$1,234", "$"), ("1,234 USD", "USD"), ("USD 1,234", "USD"), ("€1.234", "€")],
@@ -208,6 +216,7 @@ def test_three_uppercase_letters_alone_are_not_a_currency():
 
 # --- 4.14, source precision --------------------------------------------------
 
+
 @pytest.mark.parametrize("raw, decimals", [("1,234", 0), ("1,234.5", 1), ("1,234.50", 2)])
 def test_the_printed_precision_is_recorded(raw, decimals):
     assert parse_reported_value(raw, locale=US).decimals == decimals
@@ -219,6 +228,7 @@ def test_trailing_zeros_are_preserved_exactly():
 
 
 # --- full-width forms --------------------------------------------------------
+
 
 def test_full_width_digits_are_folded():
     assert parse_reported_value("１，２３４", locale=US).value == Decimal("1234")

@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from .numeric import D, ZERO
+from .numeric import ZERO, D
 from .provenance import ProvenanceError
 
 
@@ -58,12 +58,16 @@ class RollForward:
     ) -> RollForwardRow:
         beginning = D(beginning, what=f"{self.name} {year} beginning")
         additions = {k: D(v, what=f"{self.name} {year} {k}") for k, v in (additions or {}).items()}
-        reductions = {k: D(v, what=f"{self.name} {year} {k}") for k, v in (reductions or {}).items()}
+        reductions = {
+            k: D(v, what=f"{self.name} {year} {k}") for k, v in (reductions or {}).items()
+        }
         if self._order:
             prior = self.rows[self._order[-1]]
             # Relative, for the same reason as model/checks.py: an absolute
             # bound is a different test at every reporting scale.
-            if abs(prior.ending - beginning) > D("1e-9") * max(abs(prior.ending), abs(beginning), D(1)):
+            if abs(prior.ending - beginning) > D("1e-9") * max(
+                abs(prior.ending), abs(beginning), D(1)
+            ):
                 raise ProvenanceError(
                     f"{self.name}: {year} beginning balance {beginning:,.1f} does not equal "
                     f"{prior.year} ending balance {prior.ending:,.1f}. The schedule must chain "
@@ -202,7 +206,9 @@ class TaxSchedule:
         for year, rate in self.rate_by_year.items():
             value = D(rate, what=f"tax rate {year}")
             if not 0 <= value < 1:
-                raise ProvenanceError(f"Tax rate for {year} must be a decimal in [0, 1), got {rate!r}")
+                raise ProvenanceError(
+                    f"Tax rate for {year} must be a decimal in [0, 1), got {rate!r}"
+                )
             coerced[year] = value
         self.rate_by_year = coerced
 

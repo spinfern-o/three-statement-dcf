@@ -68,6 +68,7 @@ def bare(three_statements):
 
 # --- 21.1: sixteen tabs, in its order ---------------------------------------
 
+
 def test_every_tab_21_1_names_is_present_in_its_order(model):
     assert model.names == tuple(name for name, _ in TAB_ORDER)
     assert len(model.names) == 16
@@ -90,6 +91,7 @@ def test_sheet_titles_fit_what_excel_allows(model):
 
 # --- item 142: the model version --------------------------------------------
 
+
 def test_the_same_model_exported_twice_carries_the_same_version(forecastable):
     scenarios = approved_scenario("owner")
     first = gather(forecastable, scenarios)
@@ -108,16 +110,26 @@ def test_changing_one_assumption_changes_the_version(forecastable):
     existing = scenarios.resolve("base")[code].assumption
     moved = Assumption(
         **{
-            **{f: getattr(existing, f) for f in (
-                "code", "name", "unit", "periods", "scenario_id", "source_type",
-                "evidence", "rationale", "owner", "reviewer", "status",
-            )},
+            **{
+                f: getattr(existing, f)
+                for f in (
+                    "code",
+                    "name",
+                    "unit",
+                    "periods",
+                    "scenario_id",
+                    "source_type",
+                    "evidence",
+                    "rationale",
+                    "owner",
+                    "reviewer",
+                    "status",
+                )
+            },
             "value": existing.value + Decimal("0.0000001"),
         }
     )
-    after = model_version(
-        forecastable, scenarios.with_assumption(moved), "base"
-    ).version_id
+    after = model_version(forecastable, scenarios.with_assumption(moved), "base").version_id
     assert after != before
 
 
@@ -141,12 +153,19 @@ def test_a_different_scenario_is_a_different_version(forecastable):
     code = "revenue_growth"
     existing = scenarios.resolve("base")[code].assumption
     scenarios = scenarios.with_scenario(
-        Scenario(id="variant-a", name="Variant A", parent_id="base",
-                 description="revenue one basis point ahead of base",
-                 created_by="owner")
+        Scenario(
+            id="variant-a",
+            name="Variant A",
+            parent_id="base",
+            description="revenue one basis point ahead of base",
+            created_by="owner",
+        )
     ).override(
-        "variant-a", code, existing.value + Decimal("0.0001"),
-        owner="owner", rationale="a deliberately small, sourced difference",
+        "variant-a",
+        code,
+        existing.value + Decimal("0.0001"),
+        owner="owner",
+        rationale="a deliberately small, sourced difference",
     )
     base = model_version(forecastable, scenarios, "base").version_id
     other = model_version(forecastable, scenarios, "variant-a").version_id
@@ -164,6 +183,7 @@ def test_the_short_version_is_long_enough_to_distinguish_models():
 
 
 # --- item 138: JSON, and the schema it validates against --------------------
+
 
 def test_the_json_validates_against_the_published_schema(model):
     body = json.loads(to_json(model))
@@ -230,6 +250,7 @@ def test_the_json_carries_the_display_string_beside_the_exact_value(model):
 
 # --- item 139: CSV, and the defence that must not eat a minus sign ----------
 
+
 def test_a_formula_in_a_text_cell_is_neutralized():
     for character in DANGEROUS:
         text, defused = neutralize(Cell.text(f"{character}cmd|'/c calc'!A1"))
@@ -292,6 +313,7 @@ def test_neutralized_cells_are_reported_rather_than_silently_changed(model):
 
 # --- item 140: the workbook -------------------------------------------------
 
+
 def test_the_workbook_has_every_tab_in_21_1s_order(model):
     workbook = build_workbook(model)
     assert workbook.sheetnames == [title for _, title in TAB_ORDER]
@@ -324,11 +346,14 @@ def test_no_text_in_the_workbook_becomes_a_formula():
         scenario_id="base",
         version_id="msv1:" + "0" * 64,
         generated_at="2026-09-17T00:00:00+00:00",
-        currency="USD", units="units", valuation_date="",
+        currency="USD",
+        units="units",
+        valuation_date="",
         limitations=("A synthetic model.",),
         tables=tuple(
             Table(
-                name=name, title=title,
+                name=name,
+                title=title,
                 columns=(Column("label", "Label"), Column("value", "Value", "currency")),
                 rows=(
                     (Cell.text("=1+1"), Cell.number(Decimal("-5"))),
@@ -353,7 +378,7 @@ def test_the_workbook_and_the_csv_neutralize_the_same_cells():
 
 def test_the_legend_explains_every_style_it_uses():
     assert len(LEGEND) == 4
-    for name, meaning in LEGEND:
+    for _name, meaning in LEGEND:
         assert meaning.strip()
 
 
@@ -401,7 +426,9 @@ def test_survives_the_workbook_is_the_files_question_not_the_doubles():
     # because the string is 0.08500000000000001 -- which parses back to the
     # same double and displays as 0.085. Nothing was lost.
     exposed = Decimal("0.085")
-    assert Decimal("%.16g" % float(exposed)) != exposed, "the string is noisy"
+    # Spelled the way openpyxl spells it, because the assertion is about that
+    # exact expression rather than about formatting a number.
+    assert Decimal("%.16g" % float(exposed)) != exposed, "the string is noisy"  # noqa: UP031
     assert survives_the_workbook(exposed), "the number survives anyway"
 
 
@@ -417,6 +444,7 @@ def test_the_cover_states_currency_units_scenario_and_version(model):
 
 
 # --- item 141: the PDF report -----------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def report_text(model):
@@ -457,6 +485,7 @@ def test_every_page_carries_the_footer(model):
 
 # --- item 143: the export equals the website --------------------------------
 
+
 def test_every_historical_figure_in_the_export_is_on_the_statements_page(forecast_client):
     """21.8, checked against the rendered page rather than the view function.
 
@@ -465,9 +494,7 @@ def test_every_historical_figure_in_the_export_is_on_the_statements_page(forecas
     """
     client = forecast_client
     page = client.get(f"/documents/{client.document_id}/statements").text
-    exported = gather(
-        client.app.state.repository.load_result(client.document_id), None
-    )
+    exported = gather(client.app.state.repository.load_result(client.document_id), None)
     checked = 0
     for name in ("historical_is", "historical_bs", "historical_cf"):
         for row in exported.table(name).rows:
@@ -504,14 +531,17 @@ def test_the_four_formats_agree_with_each_other(model):
     for table in model.tables:
         exported = next(t for t in body["tables"] if t["name"] == table.name)
         sheet = workbook[table.title]
-        rows = list(csv.reader(
-            io.StringIO(
-                "\n".join(
-                    line for line in table_to_csv(model, table).splitlines()
-                    if not line.startswith("#")
+        rows = list(
+            csv.reader(
+                io.StringIO(
+                    "\n".join(
+                        line
+                        for line in table_to_csv(model, table).splitlines()
+                        if not line.startswith("#")
+                    )
                 )
             )
-        ))
+        )
         for index, row in enumerate(table.rows):
             for column, cell in enumerate(row):
                 assert exported["rows"][index][column]["display"] == cell.display
@@ -560,9 +590,7 @@ def test_every_download_is_served(forecast_client, path, media):
 
 
 def test_a_download_filename_carries_the_model_version(forecast_client):
-    response = forecast_client.get(
-        f"/documents/{forecast_client.document_id}/exports/model.xlsx"
-    )
+    response = forecast_client.get(f"/documents/{forecast_client.document_id}/exports/model.xlsx")
     disposition = response.headers["content-disposition"]
     model = gather(
         forecast_client.app.state.repository.load_result(forecast_client.document_id),
@@ -572,9 +600,7 @@ def test_a_download_filename_carries_the_model_version(forecast_client):
 
 
 def test_an_unknown_table_is_a_404_not_an_empty_file(forecast_client):
-    response = forecast_client.get(
-        f"/documents/{forecast_client.document_id}/exports/invented.csv"
-    )
+    response = forecast_client.get(f"/documents/{forecast_client.document_id}/exports/invented.csv")
     assert response.status_code == 404
 
 
@@ -611,9 +637,7 @@ def extreme_model():
                 name=name,
                 title=title,
                 columns=(Column("label", "Label"), Column("value", "Value", "currency")),
-                rows=tuple(
-                    (Cell.text(label), Cell.number(value)) for label, value in EXTREMES
-                ),
+                rows=tuple((Cell.text(label), Cell.number(value)) for label, value in EXTREMES),
             )
             for name, title in TAB_ORDER
         ),
@@ -629,9 +653,9 @@ def test_every_extreme_survives_the_json_exactly(extreme_model):
 def test_every_extreme_survives_the_csv_exactly(extreme_model):
     table = extreme_model.table("cover")
     body = table_to_csv(extreme_model, table)
-    rows = list(csv.reader(
-        io.StringIO("\n".join(l for l in body.splitlines() if not l.startswith("#")))
-    ))
+    rows = list(
+        csv.reader(io.StringIO("\n".join(x for x in body.splitlines() if not x.startswith("#"))))
+    )
     assert [Decimal(row[1]) for row in rows[1:]] == [value for _, value in EXTREMES]
 
 
@@ -676,13 +700,15 @@ def test_a_cell_with_no_value_carries_a_reason_rather_than_a_blank():
 def test_a_ragged_table_is_refused_rather_than_exported_shifted():
     with pytest.raises(ValueError, match="ragged"):
         Table(
-            name="x", title="X",
+            name="x",
+            title="X",
             columns=(Column("a", "A"), Column("b", "B")),
             rows=((Cell.text("only one"),),),
         )
 
 
 # --- the metadata read that this phase had to fix ---------------------------
+
 
 def test_metadata_is_read_through_its_field_dictionary(forecastable):
     """F-27. `DetectedMetadata` is a dict of fields, not an object of attributes."""

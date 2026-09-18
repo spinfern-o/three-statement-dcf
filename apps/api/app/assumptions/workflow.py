@@ -42,7 +42,7 @@ from .schema import Assumption, AssumptionError, Status
 
 #: Which status may follow which. Declared as data so the diagram above and
 #: the code cannot drift.
-LEGAL_TRANSITIONS: "dict[Status, frozenset[Status]]" = {
+LEGAL_TRANSITIONS: dict[Status, frozenset[Status]] = {
     Status.DRAFT: frozenset({Status.NEEDS_SOURCE, Status.REVIEWED, Status.REJECTED}),
     Status.NEEDS_SOURCE: frozenset({Status.DRAFT, Status.REVIEWED, Status.REJECTED}),
     Status.REVIEWED: frozenset({Status.APPROVED, Status.REJECTED, Status.DRAFT}),
@@ -88,7 +88,7 @@ def transition(
     actor: str,
     reason: str,
     reviewer: str = "",
-) -> "tuple[Assumption, StatusChange]":
+) -> tuple[Assumption, StatusChange]:
     """Move one assumption's status, or refuse and say why.
 
     The reason is mandatory for the same reason `review/actions.py` makes it
@@ -156,25 +156,24 @@ def _check_evidence_still_holds(assumption: Assumption) -> None:
     try:
         assumption._check_evidence()
     except AssumptionError as exc:
-        raise WorkflowError(
-            f"{assumption.code} cannot be approved: {exc}"
-        ) from None
+        raise WorkflowError(f"{assumption.code} cannot be approved: {exc}") from None
 
 
 # --- 14.1: the gate -------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class GateResult:
     """Whether a forecast may calculate, and exactly what is in the way."""
 
     #: Required driver choices with nothing supplied at all.
-    missing: "tuple[str, ...]"
+    missing: tuple[str, ...]
     #: Supplied, but with a status that is not an answer.
-    unresolved: "tuple[tuple[str, str], ...]"
+    unresolved: tuple[tuple[str, str], ...]
     #: Both members of a one-of-two pair declared (STEP 14/18).
-    ambiguous: "tuple[str, ...]"
+    ambiguous: tuple[str, ...]
     #: Approved on the strength of the owner's own review.
-    self_reviewed: "tuple[str, ...]"
+    self_reviewed: tuple[str, ...]
 
     @property
     def may_calculate(self) -> bool:
@@ -184,10 +183,7 @@ class GateResult:
         if self.may_calculate:
             note = ""
             if self.self_reviewed:
-                note = (
-                    f" {len(self.self_reviewed)} of them were approved by their "
-                    "own owner."
-                )
+                note = f" {len(self.self_reviewed)} of them were approved by their own owner."
             return "Every required assumption is Approved or Reviewed." + note
         lines = []
         if self.missing:

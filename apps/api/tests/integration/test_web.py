@@ -7,6 +7,7 @@ status that becomes colour-only -- rather than how anything looks.
 
 from __future__ import annotations
 
+import itertools
 import re
 
 
@@ -16,9 +17,19 @@ def _room(client, page: int = 2, **params):
 
 # --- item 39: navigation ----------------------------------------------------
 
+
 def test_health(client):
-    """Phase 1 item 14."""
-    assert client.get("/health").json() == {"status": "ok"}
+    """Phase 1 item 14, and Phase 17 item 180.
+
+    The endpoint was `{"status": "ok"}` alone until 180 asked for a build
+    record. It still answers liveness first -- a deployment probe reads
+    `status` and nothing else -- and now also carries the three versions that
+    let somebody holding two disagreeing exports say which build made each.
+    """
+    body = client.get("/health").json()
+    assert body["status"] == "ok"
+    for field in ("commit", "commit_source", "schema_version", "formula_version"):
+        assert body[field], field
 
 
 def test_the_portfolio_lists_the_document(client, stored):
@@ -52,6 +63,7 @@ def test_a_page_outside_the_document_is_404(client):
 
 # --- item 40: the page viewer ----------------------------------------------
 
+
 def test_the_page_renders_as_a_png(client):
     response = client.get(f"/documents/{client.document_id}/pages/2/image.png")
     assert response.status_code == 200
@@ -73,6 +85,7 @@ def test_rendering_does_not_alter_the_stored_pdf(client, stored, store):
 
 # --- item 41: bookmarks -----------------------------------------------------
 
+
 def test_bookmarks_name_the_statements_and_their_evidence(client):
     body = _room(client).text
     assert "Income statement" in body
@@ -87,10 +100,12 @@ def test_a_statement_with_no_page_is_reported_missing(client):
 
 # --- item 42: bounding boxes ------------------------------------------------
 
+
 def test_every_fact_on_the_page_gets_a_box(client, stored):
     body = _room(client).text
     on_page_2 = [
-        f for f in stored.facts
+        f
+        for f in stored.facts
         if (loc := stored.location(f.source_location_id)) and loc.page_number == 2
     ]
     assert on_page_2
@@ -113,9 +128,10 @@ def test_the_overlay_is_hidden_from_assistive_technology(client):
 
 # --- item 43: raw versus parsed --------------------------------------------
 
+
 def test_both_the_printed_string_and_the_parsed_value_are_shown(client):
     body = _room(client).text
-    assert "(750,000)" in body       # as printed
+    assert "(750,000)" in body  # as printed
     assert "-750,000" in body or "750,000" in body
 
 
@@ -137,6 +153,7 @@ def test_confidence_is_explained_not_just_printed(client):
 
 
 # --- item 44: metadata confirmation ----------------------------------------
+
 
 def test_metadata_starts_unconfirmed_on_screen(client):
     body = _room(client).text
@@ -180,6 +197,7 @@ def test_correcting_one_field(client):
 
 # --- items 45-47 over HTTP --------------------------------------------------
 
+
 def _first_fact_id(stored, page=2):
     for fact in stored.facts:
         location = stored.location(fact.source_location_id)
@@ -192,7 +210,8 @@ def test_a_decision_is_a_post_that_redirects(client, stored):
     """303, so a refresh does not write a second audit entry for one action."""
     client.post(
         f"/documents/{client.document_id}/metadata",
-        data={"page": "2", "reason": "checked"}, follow_redirects=True,
+        data={"page": "2", "reason": "checked"},
+        follow_redirects=True,
     )
     response = client.post(
         f"/documents/{client.document_id}/facts/{_first_fact_id(stored)}",
@@ -205,7 +224,8 @@ def test_a_decision_is_a_post_that_redirects(client, stored):
 def test_a_decision_persists_across_requests(client, stored, repository):
     client.post(
         f"/documents/{client.document_id}/metadata",
-        data={"page": "2", "reason": "checked"}, follow_redirects=True,
+        data={"page": "2", "reason": "checked"},
+        follow_redirects=True,
     )
     fact_id = _first_fact_id(stored)
     client.post(
@@ -214,13 +234,13 @@ def test_a_decision_persists_across_requests(client, stored, repository):
         follow_redirects=True,
     )
     reloaded = repository.load_result(client.document_id)
-    decided = [f for f in reloaded.facts if f.id == fact_id][0]
+    decided = next(f for f in reloaded.facts if f.id == fact_id)
     assert decided.decision.reason == "matches page 2 line 1"
 
 
 def test_a_refusal_is_presented_as_an_answer_not_a_crash(client, stored):
     """Accepting a fact whose cell held an em dash is SUPPOSED to fail."""
-    dash = [f for f in stored.facts if f.raw_value == "—"][0]
+    dash = next(f for f in stored.facts if f.raw_value == "—")
     response = client.post(
         f"/documents/{client.document_id}/facts/{dash.id}",
         data={"action": "accept", "reason": "it is zero", "page": "2"},
@@ -234,7 +254,8 @@ def test_a_refusal_is_presented_as_an_answer_not_a_crash(client, stored):
 def test_the_audit_log_is_on_the_page(client, stored):
     client.post(
         f"/documents/{client.document_id}/metadata",
-        data={"page": "2", "reason": "checked the cover"}, follow_redirects=True,
+        data={"page": "2", "reason": "checked the cover"},
+        follow_redirects=True,
     )
     body = _room(client).text
     assert "Audit log" in body
@@ -252,6 +273,7 @@ def test_an_unknown_action_is_refused(client, stored):
 
 # --- item 48: progress on screen -------------------------------------------
 
+
 def test_progress_shows_zero_verified_and_says_why(client):
     body = _room(client).text
     assert "0 verified" in body
@@ -259,6 +281,7 @@ def test_progress_shows_zero_verified_and_says_why(client):
 
 
 # --- item 49 (structure half): 6.6 accessibility ---------------------------
+
 
 def test_there_is_a_skip_link_first(client):
     body = _room(client).text
@@ -268,7 +291,7 @@ def test_there_is_a_skip_link_first(client):
 
 def test_landmarks_exist(client):
     body = _room(client).text
-    for landmark in ("<header", "<main id=\"main\"", "<nav", "<footer"):
+    for landmark in ("<header", '<main id="main"', "<nav", "<footer"):
         assert landmark in body, landmark
 
 
@@ -280,7 +303,7 @@ def test_heading_order_does_not_skip_a_level(client):
     levels = [int(m) for m in re.findall(r"<h([1-6])[ >]", _room(client).text)]
     assert levels, "no headings"
     assert levels[0] == 1
-    for previous, current in zip(levels, levels[1:]):
+    for previous, current in itertools.pairwise(levels):
         assert current <= previous + 1, f"h{previous} followed by h{current}"
 
 
@@ -310,9 +333,17 @@ def test_the_progress_meter_has_a_text_equivalent(client):
 
 
 def test_the_disclaimer_is_on_every_page(client, empty_client):
-    """20.19, 1.19, 1.20."""
+    """20.19, 1.19, 1.20, and Section 25's own wording.
+
+    This used to accept either "not investment advice" or "investment advice",
+    which a two-sentence trimmed version satisfied. Section 25 asks for the
+    same *meaning* as four sentences, and the two a short form drops are the
+    two about this system in particular. So the assertion is the whole text.
+    """
+    from model.disclaimer import DISCLAIMER
+
     for body in (_room(client).text, empty_client.get("/").text):
-        assert "not investment advice" in body or "investment advice" in body
+        assert DISCLAIMER in body
 
 
 def test_tokens_and_stylesheet_are_served(client):
@@ -327,6 +358,7 @@ def test_the_interactive_api_explorer_is_off(client):
 
 # --- item 52: the mapping review table (7.4) --------------------------------
 
+
 def _mapping_url(client, *rest):
     return "/".join([f"/documents/{client.document_id}/mapping", *rest])
 
@@ -334,7 +366,8 @@ def _mapping_url(client, *rest):
 def _confirm(client):
     client.post(
         f"/documents/{client.document_id}/metadata",
-        data={"page": "2", "reason": "checked the cover"}, follow_redirects=True,
+        data={"page": "2", "reason": "checked the cover"},
+        follow_redirects=True,
     )
 
 
@@ -399,7 +432,8 @@ def test_approve_all_refuses_rather_than_approving_around_a_double_count(client)
     client.post(_mapping_url(client, "propose"), follow_redirects=True)
     response = client.post(
         _mapping_url(client, "approve-all"),
-        data={"note": "everything looks fine"}, follow_redirects=True,
+        data={"note": "everything looks fine"},
+        follow_redirects=True,
     )
     assert "double-count" in response.text
     assert 'role="alert"' in response.text
@@ -411,7 +445,9 @@ def test_a_bad_allocation_line_says_which_line(client, stored):
     response = client.post(
         _mapping_url(client, "facts", fact.id),
         data={
-            "action": "split", "note": "test", "basis": "note 3",
+            "action": "split",
+            "note": "test",
+            "basis": "note 3",
             "allocation": "revenue 1200000\nother_income_expense = 50000",
         },
         follow_redirects=True,
@@ -431,7 +467,7 @@ def test_the_mapping_page_keeps_the_accessibility_contract(client):
     body = client.get(_mapping_url(client)).text
     assert body.count("<h1>") == 1
     levels = [int(m) for m in re.findall(r"<h([1-6])[ >]", body)]
-    for previous, current in zip(levels, levels[1:]):
+    for previous, current in itertools.pairwise(levels):
         assert current <= previous + 1
     controls = re.findall(r'<(?:input|select|textarea)\b[^>]*id="([^"]+)"[^>]*>', body)
     labelled = set(re.findall(r'<label[^>]*for="([^"]+)"', body))
@@ -439,6 +475,7 @@ def test_the_mapping_page_keeps_the_accessibility_contract(client):
 
 
 # --- items 59-67: the historical statements screen (7.5) --------------------
+
 
 def test_the_statements_page_explains_itself_before_anything_is_mapped(client):
     """6.5.i: an empty state says what is missing."""
@@ -449,9 +486,7 @@ def test_the_statements_page_explains_itself_before_anything_is_mapped(client):
 
 
 def test_the_mapping_page_links_to_the_statements(client):
-    assert f"/documents/{client.document_id}/statements" in client.get(
-        _mapping_url(client)
-    ).text
+    assert f"/documents/{client.document_id}/statements" in client.get(_mapping_url(client)).text
 
 
 def test_the_statements_page_shows_the_checks_and_their_skips(client):
@@ -470,6 +505,7 @@ def test_the_equity_statement_says_it_is_not_available(client):
 
 # --- items 69-77: the supporting schedules screen (7.6) ---------------------
 
+
 def test_the_schedules_page_explains_itself_before_anything_is_mapped(client):
     """6.5.i: an empty state says what is missing, not an empty table."""
     response = client.get(f"/documents/{client.document_id}/schedules")
@@ -478,9 +514,10 @@ def test_the_schedules_page_explains_itself_before_anything_is_mapped(client):
 
 
 def test_the_statements_page_links_to_the_schedules(client):
-    assert f"/documents/{client.document_id}/schedules" in client.get(
-        f"/documents/{client.document_id}/statements"
-    ).text
+    assert (
+        f"/documents/{client.document_id}/schedules"
+        in client.get(f"/documents/{client.document_id}/statements").text
+    )
 
 
 def test_the_schedules_page_shows_every_schedule_section_13_asks_for(
@@ -489,9 +526,15 @@ def test_the_schedules_page_shows_every_schedule_section_13_asks_for(
     client = three_statement_client
     body = client.get(f"/documents/{client.document_id}/schedules").text
     for title in (
-        "Working capital", "PP&amp;E and depreciation", "Intangibles and amortization",
-        "Debt and interest", "Leases", "Taxes", "Retained earnings",
-        "Common equity", "Share count and dilution",
+        "Working capital",
+        "PP&amp;E and depreciation",
+        "Intangibles and amortization",
+        "Debt and interest",
+        "Leases",
+        "Taxes",
+        "Retained earnings",
+        "Common equity",
+        "Share count and dilution",
     ):
         assert title in body, f"{title} is missing from the schedules screen"
 
@@ -556,6 +599,7 @@ def test_the_schedules_page_keeps_the_accessibility_contract(
 
 # --- items 78-88: the formula engine screen (18.10, 18.11) ------------------
 
+
 def test_the_formulas_page_explains_itself_before_anything_is_mapped(client):
     response = client.get(f"/documents/{client.document_id}/formulas")
     assert response.status_code == 200
@@ -563,9 +607,10 @@ def test_the_formulas_page_explains_itself_before_anything_is_mapped(client):
 
 
 def test_the_statements_page_links_to_the_formulas(client):
-    assert f"/documents/{client.document_id}/formulas" in client.get(
-        f"/documents/{client.document_id}/statements"
-    ).text
+    assert (
+        f"/documents/{client.document_id}/formulas"
+        in client.get(f"/documents/{client.document_id}/statements").text
+    )
 
 
 def test_the_formulas_page_shows_the_formula_and_the_exact_inputs(
@@ -622,6 +667,7 @@ def test_the_formulas_page_shows_a_fingerprint_per_period(
 
 # --- items 89-96: the assumptions screen (7.7) ------------------------------
 
+
 def _assumptions(client, **params):
     from urllib.parse import urlencode
 
@@ -640,9 +686,15 @@ def test_the_assumptions_page_lists_every_required_driver_even_when_empty(
 ):
     """14.5 and 7.7.e: a driver missing from the screen is a driver nobody decided."""
     body = _assumptions(three_statement_client).text
-    for code in ("revenue_growth", "dso", "inventory_days", "dpo",
-                 "interest_rate_on_debt", "depreciation_pct_beginning_ppe",
-                 "tax_rate"):
+    for code in (
+        "revenue_growth",
+        "dso",
+        "inventory_days",
+        "dpo",
+        "interest_rate_on_debt",
+        "depreciation_pct_beginning_ppe",
+        "tax_rate",
+    ):
         assert code in body, f"{code} is not on the assumptions screen"
     assert "nothing entered" in body
 
@@ -692,12 +744,12 @@ def test_a_draft_cannot_be_approved_without_passing_through_review(
     client = three_statement_client
     client.post(
         f"/documents/{client.document_id}/assumptions/accept",
-        data={"scenario_id": "base", "code": "dso"}, follow_redirects=True,
+        data={"scenario_id": "base", "code": "dso"},
+        follow_redirects=True,
     )
     response = client.post(
         f"/documents/{client.document_id}/assumptions/dso/status",
-        data={"scenario_id": "base", "to": "Approved", "reviewer": "larry",
-              "reason": "looks fine"},
+        data={"scenario_id": "base", "to": "Approved", "reviewer": "larry", "reason": "looks fine"},
         follow_redirects=True,
     )
     assert "cannot go from Draft to Approved" in response.text
@@ -708,12 +760,12 @@ def test_a_status_change_without_a_reason_is_refused(three_statement_client):
     client = three_statement_client
     client.post(
         f"/documents/{client.document_id}/assumptions/accept",
-        data={"scenario_id": "base", "code": "dpo"}, follow_redirects=True,
+        data={"scenario_id": "base", "code": "dpo"},
+        follow_redirects=True,
     )
     response = client.post(
         f"/documents/{client.document_id}/assumptions/dpo/status",
-        data={"scenario_id": "base", "to": "Reviewed", "reviewer": "larry",
-              "reason": ""},
+        data={"scenario_id": "base", "to": "Reviewed", "reviewer": "larry", "reason": ""},
         follow_redirects=True,
     )
     assert "needs a written reason" in response.text
@@ -723,12 +775,17 @@ def test_reviewing_a_driver_moves_it_and_survives_a_reload(three_statement_clien
     client = three_statement_client
     client.post(
         f"/documents/{client.document_id}/assumptions/accept",
-        data={"scenario_id": "base", "code": "inventory_days"}, follow_redirects=True,
+        data={"scenario_id": "base", "code": "inventory_days"},
+        follow_redirects=True,
     )
     response = client.post(
         f"/documents/{client.document_id}/assumptions/inventory_days/status",
-        data={"scenario_id": "base", "to": "Reviewed", "reviewer": "larry",
-              "reason": "checked against the 13.1 schedule"},
+        data={
+            "scenario_id": "base",
+            "to": "Reviewed",
+            "reviewer": "larry",
+            "reason": "checked against the 13.1 schedule",
+        },
         follow_redirects=True,
     )
     assert "is now Reviewed" in response.text
@@ -742,7 +799,8 @@ def test_previewing_a_change_shows_the_impact_and_saves_nothing(
     client = three_statement_client
     client.post(
         f"/documents/{client.document_id}/assumptions/accept",
-        data={"scenario_id": "base", "code": "tax_rate"}, follow_redirects=True,
+        data={"scenario_id": "base", "code": "tax_rate"},
+        follow_redirects=True,
     )
     before = _assumptions(client).text
 
@@ -772,7 +830,8 @@ def test_a_float_shaped_preview_value_is_still_an_exact_decimal(
     client = three_statement_client
     client.post(
         f"/documents/{client.document_id}/assumptions/accept",
-        data={"scenario_id": "base", "code": "tax_rate"}, follow_redirects=True,
+        data={"scenario_id": "base", "code": "tax_rate"},
+        follow_redirects=True,
     )
     response = client.post(
         f"/documents/{client.document_id}/assumptions/preview",
@@ -788,7 +847,8 @@ def test_a_nonsense_preview_value_is_refused_with_a_message(
     client = three_statement_client
     client.post(
         f"/documents/{client.document_id}/assumptions/accept",
-        data={"scenario_id": "base", "code": "tax_rate"}, follow_redirects=True,
+        data={"scenario_id": "base", "code": "tax_rate"},
+        follow_redirects=True,
     )
     response = client.post(
         f"/documents/{client.document_id}/assumptions/preview",
@@ -804,7 +864,7 @@ def test_the_assumptions_page_keeps_the_accessibility_contract(
     body = _assumptions(three_statement_client).text
     assert body.count("<caption>") >= 3
     assert '<th scope="col"' in body and '<th scope="row"' in body
-    assert 'table-scroll' in body and 'tabindex="0" role="region"' in body
+    assert "table-scroll" in body and 'tabindex="0" role="region"' in body
     assert "{{" not in body
     # Every form control the screen renders has a label bound to it.
     import re
@@ -814,6 +874,7 @@ def test_the_assumptions_page_keeps_the_accessibility_contract(
 
 
 # --- items 97-108: the forecast statements screen (7.8) ---------------------
+
 
 def test_the_forecast_page_says_why_it_cannot_forecast(three_statement_client):
     """`three_statements.pdf` reports no other-noncurrent lines, and the
@@ -877,11 +938,12 @@ def test_the_forecast_page_keeps_the_accessibility_contract(forecast_client):
     body = client.get(f"/documents/{client.document_id}/forecast").text
     assert body.count("<caption>") >= 4
     assert '<th scope="col"' in body and '<th scope="row"' in body
-    assert 'table-scroll' in body and 'tabindex="0" role="region"' in body
+    assert "table-scroll" in body and 'tabindex="0" role="region"' in body
     assert "{{" not in body
 
 
 # --- items 109-120: the DCF valuation screen (7.9) --------------------------
+
 
 def test_the_valuation_page_says_why_it_cannot_value(three_statement_client):
     client = three_statement_client
@@ -894,8 +956,14 @@ def test_the_valuation_page_shows_the_wacc_build_with_its_sources(forecast_clien
     client = forecast_client
     body = client.get(f"/documents/{client.document_id}/valuation").text
     assert "WACC build and its sources" in body
-    for code in ("risk_free_rate", "beta", "equity_risk_premium",
-                 "pretax_cost_of_debt", "market_value_equity", "market_value_debt"):
+    for code in (
+        "risk_free_rate",
+        "beta",
+        "equity_risk_premium",
+        "pretax_cost_of_debt",
+        "market_value_equity",
+        "market_value_debt",
+    ):
         assert code in body, f"{code} is not on the WACC panel"
     assert "https://example.test/beta" in body
     assert "2026-09-17" in body, "every market input carries its observation date"
@@ -961,11 +1029,12 @@ def test_the_valuation_page_keeps_the_accessibility_contract(forecast_client):
     body = client.get(f"/documents/{client.document_id}/valuation").text
     assert body.count("<caption>") >= 4
     assert '<th scope="col"' in body and '<th scope="row"' in body
-    assert 'table-scroll' in body and 'tabindex="0" role="region"' in body
+    assert "table-scroll" in body and 'tabindex="0" role="region"' in body
     assert "{{" not in body
 
 
 # --- items 121-129: the dashboard and the navigation shell ------------------
+
 
 def test_the_portfolio_shows_a_computed_status_per_model(forecast_client):
     """7.1.b, computed from what the model contains rather than stored."""
@@ -1029,11 +1098,17 @@ def test_the_empty_portfolio_explains_what_is_missing(empty_client):
 def test_every_screen_carries_the_navigation_shell(forecast_client):
     """Item 123: one shell, injected once, so no page can ship without a way back."""
     client = forecast_client
-    for path in ("", "/mapping", "/statements", "/schedules", "/formulas",
-                 "/assumptions", "/forecast", "/valuation"):
-        body = client.get(
-            f"/documents/{client.document_id}{path}", follow_redirects=True
-        ).text
+    for path in (
+        "",
+        "/mapping",
+        "/statements",
+        "/schedules",
+        "/formulas",
+        "/assumptions",
+        "/forecast",
+        "/valuation",
+    ):
+        body = client.get(f"/documents/{client.document_id}{path}", follow_redirects=True).text
         assert 'class="shell-nav" aria-label="Sections"' in body, path
         assert 'href="/documents/' in body
 
@@ -1044,7 +1119,7 @@ def test_the_current_section_is_marked_on_the_page_it_is_on(forecast_client):
     assert 'aria-current="page"' in body
     marker = body.index('aria-current="page"')
     # The marked link is the Schedules one.
-    assert "schedules" in body[marker - 200:marker]
+    assert "schedules" in body[marker - 200 : marker]
 
 
 def test_the_fonts_are_served_from_this_application(forecast_client):
@@ -1082,6 +1157,7 @@ def test_the_statement_tables_freeze_their_headers(forecast_client):
 
 # --- items 131-137: the diagnostics screen (7.10) ---------------------------
 
+
 def test_the_diagnostics_page_shows_all_thirty_checks(forecast_client):
     client = forecast_client
     body = client.get(f"/documents/{client.document_id}/diagnostics").text
@@ -1110,17 +1186,20 @@ def test_the_release_gate_says_what_it_is_standing_in_for(forecast_client):
 def test_the_checklist_shows_where_the_work_stopped(forecast_client):
     client = forecast_client
     body = client.get(f"/documents/{client.document_id}/diagnostics").text
-    for stage in ("Source and mapping", "Historical statements and schedules",
-                  "Forecast", "Valuation", "Numbers and lineage"):
+    for stage in (
+        "Source and mapping",
+        "Historical statements and schedules",
+        "Forecast",
+        "Valuation",
+        "Numbers and lineage",
+    ):
         assert stage in body
 
 
 def test_the_lineage_panel_traces_a_line_back_to_its_page(forecast_client):
     """7.10.d and 17.30."""
     client = forecast_client
-    body = client.get(
-        f"/documents/{client.document_id}/diagnostics?code=revenue|2025A"
-    ).text
+    body = client.get(f"/documents/{client.document_id}/diagnostics?code=revenue|2025A").text
     assert "Source-to-output lineage" in body
     assert "revenue 2025A" in body
     assert "printed as" in body

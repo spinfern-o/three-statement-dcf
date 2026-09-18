@@ -25,42 +25,37 @@ def _metadata(result: ExtractionResult, name: str) -> str:
     return str(field.value or "")
 
 
-def standing_for(
-    result: ExtractionResult, scenarios: ScenarioSet | None = None
-) -> Standing:
+def standing_for(result: ExtractionResult, scenarios: ScenarioSet | None = None) -> Standing:
     """7.1.b and 7.1.c for one model."""
     progress = review_progress(result)
-    gates: "list[tuple[str, bool, str]]" = []
-    unresolved: "list[str]" = []
+    gates: list[tuple[str, bool, str]] = []
+    unresolved: list[str] = []
 
     # --- Extracting: the pipeline produced facts -----------------------------
     extracted = bool(result.facts)
-    gates.append((
-        "Extraction produced facts",
-        extracted,
-        f"{len(result.facts)} fact(s) read from the filing"
-        if extracted
-        else "the pipeline has not produced any facts from this document yet",
-    ))
+    gates.append(
+        (
+            "Extraction produced facts",
+            extracted,
+            f"{len(result.facts)} fact(s) read from the filing"
+            if extracted
+            else "the pipeline has not produced any facts from this document yet",
+        )
+    )
 
     # --- Needs Review: there is something for a person to do ----------------
     reviewed = extracted and progress.decided == progress.total and progress.metadata_confirmed
-    detail = (
-        f"{progress.decided} of {progress.total} facts decided"
-        + ("" if progress.metadata_confirmed else "; metadata not confirmed")
+    detail = f"{progress.decided} of {progress.total} facts decided" + (
+        "" if progress.metadata_confirmed else "; metadata not confirmed"
     )
     gates.append(("Every fact decided and the metadata confirmed", reviewed, detail))
     if extracted and not reviewed:
         if progress.decided < progress.total:
-            unresolved.append(
-                f"{progress.total - progress.decided} fact(s) nobody has decided"
-            )
+            unresolved.append(f"{progress.total - progress.decided} fact(s) nobody has decided")
         if not progress.metadata_confirmed:
             unresolved.append("the document's metadata is not confirmed (10.9)")
     if progress.unresolved:
-        unresolved.append(
-            f"{progress.unresolved} fact(s) carry a blocking code nobody resolved"
-        )
+        unresolved.append(f"{progress.unresolved} fact(s) carry a blocking code nobody resolved")
 
     # --- Validated: the statements build strictly ---------------------------
     validated = False
@@ -69,31 +64,40 @@ def standing_for(
         try:
             statements = build_statements(result, strict=True)
             validated = True
-            gates.append((
-                "The historical statements build from verified, approved facts",
-                True,
-                f"{len(statements.years)} period(s), every cell citing a page",
-            ))
+            gates.append(
+                (
+                    "The historical statements build from verified, approved facts",
+                    True,
+                    f"{len(statements.years)} period(s), every cell citing a page",
+                )
+            )
         except BuildError as exc:
             gates.append(("The historical statements build", False, str(exc)))
             unresolved.append(str(exc).split(".")[0])
     else:
-        gates.append((
-            "The historical statements build", False,
-            "not attempted: the review is not finished",
-        ))
+        gates.append(
+            (
+                "The historical statements build",
+                False,
+                "not attempted: the review is not finished",
+            )
+        )
 
     # --- Forecast Ready and Valuation Ready ---------------------------------
     forecast_ready = False
     valuation_ready = False
-    if validated and scenarios is not None:
+    # `statements is not None` is implied by `validated` and is stated anyway:
+    # nothing in the name says so, and the two would come apart silently.
+    if validated and statements is not None and scenarios is not None:
         periods = forecast_periods(statements)
         gate = evaluate_gate(scenarios, BASE, periods.forecast)
-        gates.append((
-            "Every required assumption is an answer (14.1)",
-            gate.may_calculate,
-            gate.describe(),
-        ))
+        gates.append(
+            (
+                "Every required assumption is an answer (14.1)",
+                gate.may_calculate,
+                gate.describe(),
+            )
+        )
         if not gate.may_calculate:
             unresolved.append(gate.describe())
         else:
@@ -108,20 +112,23 @@ def standing_for(
         if forecast_ready:
             missing = missing_inputs(scenarios, BASE)
             valuation_ready = not missing
-            gates.append((
-                "Every cost-of-capital input is supplied (16.6-16.10)",
-                valuation_ready,
-                "all present" if valuation_ready else "not supplied: " + ", ".join(missing),
-            ))
-            if missing:
-                unresolved.append(
-                    "cost-of-capital inputs not supplied: " + ", ".join(missing)
+            gates.append(
+                (
+                    "Every cost-of-capital input is supplied (16.6-16.10)",
+                    valuation_ready,
+                    "all present" if valuation_ready else "not supplied: " + ", ".join(missing),
                 )
+            )
+            if missing:
+                unresolved.append("cost-of-capital inputs not supplied: " + ", ".join(missing))
     elif validated:
-        gates.append((
-            "Every required assumption is an answer (14.1)", False,
-            "no scenario has been started for this model",
-        ))
+        gates.append(
+            (
+                "Every required assumption is an answer (14.1)",
+                False,
+                "no scenario has been started for this model",
+            )
+        )
         unresolved.append("no scenario has been started")
 
     # The furthest stage whose gate is satisfied.

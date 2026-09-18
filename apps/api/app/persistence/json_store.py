@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from collections.abc import Iterable
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -41,13 +42,6 @@ from ..extraction.metadata import (
 from ..extraction.pages import PageKind, PageProfile
 from ..extraction.parsing import NumberLocale, ParsedValue, SignSource, UnitMarker
 from ..extraction.reasons import Confidence, EvidenceCheck, ReasonCode
-from ..mapping.sets import (
-    FactMapping,
-    MappingSet,
-    MappingType,
-    Origin,
-    SignNormalization,
-)
 from ..extraction.records import (
     AuditEvent,
     ExtractionResult,
@@ -59,6 +53,13 @@ from ..extraction.records import (
     Scope,
     SourceDocument,
     SourceLocation,
+)
+from ..mapping.sets import (
+    FactMapping,
+    MappingSet,
+    MappingType,
+    Origin,
+    SignNormalization,
 )
 
 
@@ -204,8 +205,27 @@ def _box(data: dict) -> BoundingBox:
     )
 
 
-def _codes(values) -> tuple[ReasonCode, ...]:
-    return tuple(ReasonCode(v) for v in values)
+def _codes(values: Iterable[str]) -> tuple[ReasonCode, ...]:
+    """Look each stored code back up by value.
+
+    `ReasonCode(value)` is an enum lookup, not construction -- but the class
+    has a four-argument `__new__` for its attached metadata, so a checker
+    reads the one-argument call as a constructor missing three arguments.
+    `_by_value` does the lookup explicitly and raises a readable error for a
+    code this version does not know, which is what a stored record from a
+    later version would produce.
+    """
+    return tuple(_by_value(v) for v in values)
+
+
+def _by_value(value: str) -> ReasonCode:
+    for code in ReasonCode:
+        if code.value == value:
+            return code
+    raise ValueError(
+        f"{value!r} is not a reason code this version knows. A record written "
+        "by a later version is not one this one can read back safely."
+    )
 
 
 def _evidence(data: dict | None) -> Evidence | None:
@@ -340,7 +360,7 @@ def _fact(data: dict) -> ReportedFact:
         corrected_value=_decimal(data["corrected_value"]),
         resolutions=tuple(
             Resolution(
-                code=ReasonCode(r["code"]),
+                code=_by_value(r["code"]),
                 actor=r["actor"],
                 note=r["note"],
                 at=_dt(r["at"]),
@@ -416,7 +436,7 @@ def result_from_jsonable(payload: dict) -> ExtractionResult:
     return ExtractionResult(
         document=_document(payload["document"]),
         tables=tuple(_table(t) for t in payload["tables"]),
-        locations=tuple(_location(l) for l in payload["locations"]),
+        locations=tuple(_location(item) for item in payload["locations"]),
         facts=tuple(_fact(f) for f in payload["facts"]),
         audit=tuple(
             AuditEvent(

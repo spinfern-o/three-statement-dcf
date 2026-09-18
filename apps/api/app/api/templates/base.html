@@ -40,15 +40,38 @@
         {% if document is defined and document %}
         <span class="units small muted">{{ context_units }}</span>
         {% endif %}
+        {% if not local_review %}
+        {# A logout is a POST: a GET that ends a session can be a link in an
+           email, or an image tag on another page. #}
+        <form method="post" action="/logout" style="margin:0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="linklike">Sign out</button>
+        </form>
+        {% endif %}
       </header>
+
+      {% if local_review %}
+      {# 2.2.c requires a credential. When none is configured the application
+         still serves, to loopback only, and says so here rather than looking
+         identical to the guarded deployment. A reviewer who cannot tell
+         whether the thing in front of them is protected will assume it is. #}
+      <div class="notice notice-warning" role="status">
+        <strong>Local review mode &mdash; no credential is configured.</strong>
+        This server is serving an unreleased filing with nothing in front of
+        it, and refuses to bind to anything but localhost. Set
+        <span class="raw">REVIEW_PASSWORD_HASH</span> to require one (2.2.c).
+      </div>
+      {% endif %}
 
       {% block body %}{% endblock %}
 
       <footer>
         {{ owner }} &middot; {{ footer }}
-        <br>
-        Scenario forecasts are not facts or guarantees, and nothing here is
-        investment advice (specification 1.19, 1.20).
+        {# Section 25: the full language, not a trimmed version of it. The two
+           sentences a short form drops are the two about THIS system -- that
+           historical figures may carry extraction errors until reviewed, and
+           that outputs must be verified before being relied on. #}
+        <p>{{ disclaimer }}</p>
       </footer>
     </div>
   </div>

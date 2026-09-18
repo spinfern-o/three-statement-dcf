@@ -36,8 +36,8 @@ from ..extraction.jobs import FactVerificationState
 from ..extraction.records import AuditEvent, ExtractionResult, ReportedFact
 from .chart import line_item
 from .checks import duplicate_counting
-from .proposals import explain_no_proposal, infer_sign, propose
 from .normalized import statement_of_fact
+from .proposals import explain_no_proposal, infer_sign, propose
 from .sets import (
     FactMapping,
     MappingError,
@@ -65,7 +65,7 @@ def _fact(result: ExtractionResult, fact_id: str) -> ReportedFact:
     raise MappingError(f"no fact {fact_id!r} in document {result.document.id}")
 
 
-def _sign(fact: ReportedFact, code: str, override: "bool | None", amount=None):
+def _sign(fact: ReportedFact, code: str, override: bool | None, amount=None):
     """11.8. Infer the flip from the chart's convention unless told otherwise.
 
     A filing printing "(300,000)" for SG&A has printed an expense as negative;
@@ -111,6 +111,7 @@ def _commit(
 
 # --- item 51 applied: propose for everything --------------------------------
 
+
 def propose_all(result: ExtractionResult, *, actor: str = "system") -> ExtractionResult:
     """Run the proposer over every undecided fact. Proposes; approves nothing."""
     current = _mappings(result)
@@ -146,7 +147,10 @@ def propose_all(result: ExtractionResult, *, actor: str = "system") -> Extractio
         *new, actor=actor, reason=f"proposed {len(new)} mapping(s); {unmatched} unmatched"
     )
     return _commit(
-        result, mappings, actor=actor, action="propose_mappings",
+        result,
+        mappings,
+        actor=actor,
+        action="propose_mappings",
         entity_id=result.document.id,
         detail=(
             f"{len(new)} mapping(s) proposed, {unmatched} fact(s) matched no rule and "
@@ -166,6 +170,7 @@ def why_no_proposal(result: ExtractionResult, fact: ReportedFact) -> str:
 
 
 # --- the ordinary mapping ---------------------------------------------------
+
 
 def map_fact(
     result: ExtractionResult,
@@ -196,17 +201,22 @@ def map_fact(
         fact_id, mapping, actor=actor, reason=f"mapped {fact.raw_label!r} to {canonical_code}"
     )
     return _commit(
-        result, mappings, actor=actor, action="map_fact", entity_id=mapping.id,
+        result,
+        mappings,
+        actor=actor,
+        action="map_fact",
+        entity_id=mapping.id,
         detail=f"{fact.raw_label!r} {fact.period_label} -> {canonical_code}: {note}",
     )
 
 
 # --- item 53: split ---------------------------------------------------------
 
+
 def split_fact(
     result: ExtractionResult,
     fact_id: str,
-    allocations: "list[tuple[str, str]]",
+    allocations: list[tuple[str, str]],
     *,
     basis: str,
     actor: str,
@@ -271,21 +281,28 @@ def split_fact(
         for code, amount in parsed
     ]
     mappings = _mappings(result).replace_fact(
-        fact_id, *mappings_for_fact, actor=actor,
+        fact_id,
+        *mappings_for_fact,
+        actor=actor,
         reason=f"split {fact.raw_label!r} across {len(parsed)} lines",
     )
     breakdown = ", ".join(f"{code}={amount}" for code, amount in parsed)
     return _commit(
-        result, mappings, actor=actor, action="split_fact", entity_id=fact_id,
+        result,
+        mappings,
+        actor=actor,
+        action="split_fact",
+        entity_id=fact_id,
         detail=f"{fact.raw_label!r} {fact.period_label} split {breakdown}; basis: {basis}",
     )
 
 
 # --- item 53: combine -------------------------------------------------------
 
+
 def combine_facts(
     result: ExtractionResult,
-    fact_ids: "list[str]",
+    fact_ids: list[str],
     canonical_code: str,
     *,
     actor: str,
@@ -326,17 +343,24 @@ def combine_facts(
     mappings = _mappings(result)
     for fact, mapping in zip(facts, mappings_for_facts):
         mappings = mappings.replace_fact(
-            fact.id, mapping, actor=actor,
+            fact.id,
+            mapping,
+            actor=actor,
             reason=f"aggregated {fact.raw_label!r} into {canonical_code}",
         )
     labels = ", ".join(repr(f.raw_label) for f in facts)
     return _commit(
-        result, mappings, actor=actor, action="combine_facts", entity_id=canonical_code,
+        result,
+        mappings,
+        actor=actor,
+        action="combine_facts",
+        entity_id=canonical_code,
         detail=f"{labels} -> {canonical_code} for {facts[0].period_label}: {note}",
     )
 
 
 # --- reject -----------------------------------------------------------------
+
 
 def reject_mapping(
     result: ExtractionResult, fact_id: str, *, actor: str, note: str
@@ -345,14 +369,20 @@ def reject_mapping(
     note = _require_note(note, "reject a mapping")
     fact = _fact(result, fact_id)
     mapping = manual(
-        fact_id=fact_id, code=_nearest_code(result, fact), note=note,
+        fact_id=fact_id,
+        code=_nearest_code(result, fact),
+        note=note,
         mapping_type=MappingType.REJECTED,
     )
     mappings = _mappings(result).replace_fact(
         fact_id, mapping, actor=actor, reason=f"rejected the mapping of {fact.raw_label!r}"
     )
     return _commit(
-        result, mappings, actor=actor, action="reject_mapping", entity_id=fact_id,
+        result,
+        mappings,
+        actor=actor,
+        action="reject_mapping",
+        entity_id=fact_id,
         detail=f"{fact.raw_label!r} {fact.period_label} maps to nothing: {note}",
     )
 
@@ -364,6 +394,7 @@ def _nearest_code(result: ExtractionResult, fact: ReportedFact) -> str:
 
 
 # --- item 56: approval ------------------------------------------------------
+
 
 def approve_fact_mapping(
     result: ExtractionResult, fact_id: str, *, actor: str, note: str
@@ -380,24 +411,27 @@ def approve_fact_mapping(
         )
 
     problems = [
-        finding for finding in duplicate_counting(result, current)
-        if fact_id in finding.fact_ids
+        finding for finding in duplicate_counting(result, current) if fact_id in finding.fact_ids
     ]
     if problems:
         raise MappingError(
             "this mapping would double-count, and 11.6 says prevent it rather "
-            "than report it:\n  "
-            + "\n  ".join(finding.message for finding in problems)
+            "than report it:\n  " + "\n  ".join(finding.message for finding in problems)
         )
 
     mappings = current
     for mapping in existing:
         mappings = mappings.update(
-            mapping.approve(actor=actor, note=note), actor=actor,
+            mapping.approve(actor=actor, note=note),
+            actor=actor,
             reason=f"approved the mapping of {fact.raw_label!r}",
         )
     return _commit(
-        result, mappings, actor=actor, action="approve_mapping", entity_id=fact_id,
+        result,
+        mappings,
+        actor=actor,
+        action="approve_mapping",
+        entity_id=fact_id,
         detail=(
             f"{fact.raw_label!r} {fact.period_label} -> "
             + ", ".join(m.canonical_code for m in existing)

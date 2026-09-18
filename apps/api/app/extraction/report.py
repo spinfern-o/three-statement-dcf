@@ -48,8 +48,11 @@ def document_block(result: ExtractionResult) -> str:
     return "\n".join(lines)
 
 
-def pages_block(pages: "tuple[PageProfile, ...]") -> str:
-    lines = [heading("PAGES (10.6)"), f"  {'page':>5}  {'kind':13} {'chars':>7} {'images':>7}  rotation"]
+def pages_block(pages: tuple[PageProfile, ...]) -> str:
+    lines = [
+        heading("PAGES (10.6)"),
+        f"  {'page':>5}  {'kind':13} {'chars':>7} {'images':>7}  rotation",
+    ]
     for page in pages:
         lines.append(
             f"  {page.page_number:>5}  {page.kind.value:13} {page.character_count:>7} "
@@ -173,7 +176,7 @@ def audit_block(result: ExtractionResult) -> str:
     return "\n".join(lines)
 
 
-def job_block(history: "tuple[str, ...]") -> str:
+def job_block(history: tuple[str, ...]) -> str:
     lines = [heading("EXTRACTION JOB (item 29)")]
     lines.extend("  " + entry for entry in history)
     return "\n".join(lines)

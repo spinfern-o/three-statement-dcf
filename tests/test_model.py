@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import math
-from decimal import Decimal
-
-import pytest
-
 import model.accounts as A
-from model.numeric import D
 from model.checks import Status, run_all_checks
+from model.numeric import D
 from model.statements import Ledger
 
 
@@ -84,7 +79,12 @@ def test_ppe_schedule_rolls_forward(forecast, loaded):
     for year in forecast.periods.forecast:
         row = forecast.ppe.rows[year]
         assert row.beginning == prior
-        expected = row.beginning + row.additions["CapEx"] - row.reductions["Depreciation"] - row.reductions["Disposals"]
+        expected = (
+            row.beginning
+            + row.additions["CapEx"]
+            - row.reductions["Depreciation"]
+            - row.reductions["Disposals"]
+        )
         assert row.ending == expected
         assert forecast.balance.get(A.PPE_NET, year) == row.ending
         prior = row.ending
@@ -120,7 +120,10 @@ def test_nwc_excludes_cash_and_debt(forecast):
     debt = forecast.balance.get(A.DEBT, year)
     assert cash > 0 and debt > 0
     assert row.nwc != row.nwc + cash
-    assert all(acct not in (A.CASH, A.DEBT) for acct in A.OPERATING_CURRENT_ASSETS + A.OPERATING_CURRENT_LIABILITIES)
+    assert all(
+        acct not in (A.CASH, A.DEBT)
+        for acct in A.OPERATING_CURRENT_ASSETS + A.OPERATING_CURRENT_LIABILITIES
+    )
 
 
 def test_balance_sheet_balances_every_forecast_year(forecast):
@@ -165,7 +168,9 @@ def test_every_forecast_cell_has_a_driver(forecast):
 def test_fcff_formula(fcff_years):
     """FCFF = EBIT x (1 - t) + D&A - CapEx - Change in NWC."""
     for item in fcff_years:
-        expected = item.ebit * (D(1) - item.tax_rate) + item.d_and_a - item.capex - item.change_in_nwc
+        expected = (
+            item.ebit * (D(1) - item.tax_rate) + item.d_and_a - item.capex - item.change_in_nwc
+        )
         assert item.fcff == expected
 
 
@@ -223,8 +228,14 @@ def test_private_company_has_no_share_price(fcff_years, loaded):
     from model.dcf import run_dcf
 
     vi = loaded["valuation_inputs"]
-    result = run_dcf(fcff_years, vi["cost_of_capital"], vi["terminal_growth"],
-                     vi["equity_bridge"], loaded["periods"], diluted_shares=None)
+    result = run_dcf(
+        fcff_years,
+        vi["cost_of_capital"],
+        vi["terminal_growth"],
+        vi["equity_bridge"],
+        loaded["periods"],
+        diluted_shares=None,
+    )
     assert result.implied_share_price is None
     assert result.equity_value > 0
 
@@ -236,9 +247,14 @@ def test_sensitivity_grid(loaded, fcff_years):
 
     vi = loaded["valuation_inputs"]
     grid = sensitivity_grid(
-        fcff_years, vi["cost_of_capital"], vi["equity_bridge"], loaded["periods"],
-        wacc_values=[D("0.06"), D("0.08")], growth_values=[D("0.02"), D("0.07")],
-        diluted_shares=vi["diluted_shares"], shares_source=vi["shares_source"],
+        fcff_years,
+        vi["cost_of_capital"],
+        vi["equity_bridge"],
+        loaded["periods"],
+        wacc_values=[D("0.06"), D("0.08")],
+        growth_values=[D("0.02"), D("0.07")],
+        diluted_shares=vi["diluted_shares"],
+        shares_source=vi["shares_source"],
     )
     assert len(grid) == 2 and len(grid[0]) == 2
     # WACC 0.06 vs g 0.07 violates STEP 31 and is reported as such
@@ -264,8 +280,12 @@ def test_a_broken_balance_sheet_fails_rather_than_being_plugged(forecast, fcff_y
 
     broken = copy.deepcopy(forecast)
     year = broken.periods.forecast[0]
-    broken.balance.set_forecast(A.CASH, year, broken.balance.get(A.CASH, year) + D("50"), "deliberate corruption")
-    broken.balance.set_derived(A.TOTAL_ASSETS, year, broken.balance.get(A.TOTAL_ASSETS, year) + D("50"), "corrupted")
+    broken.balance.set_forecast(
+        A.CASH, year, broken.balance.get(A.CASH, year) + D("50"), "deliberate corruption"
+    )
+    broken.balance.set_derived(
+        A.TOTAL_ASSETS, year, broken.balance.get(A.TOTAL_ASSETS, year) + D("50"), "corrupted"
+    )
 
     results = run_all_checks(broken, fcff_years, valuation)
     by_name = {r.name: r for r in results}
@@ -282,6 +302,7 @@ def test_a_broken_balance_sheet_fails_rather_than_being_plugged(forecast, fcff_y
 def test_a_missing_input_skips_rather_than_passes(forecast, fcff_years, valuation):
     """A check that cannot run reports SKIP. A silent PASS would be worse."""
     import copy
+
     from model.accounts import Statement
     from model.statements import Ledger
 

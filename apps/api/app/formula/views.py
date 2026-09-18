@@ -57,18 +57,18 @@ class CellTrace:
 @dataclass(frozen=True)
 class YearTrace:
     year: str
-    cells: "tuple[CellTrace, ...]"
+    cells: tuple[CellTrace, ...]
     #: 18.14: what could not be computed, and why. Never a zero.
-    unavailable: "dict[str, str]"
+    unavailable: dict[str, str]
     #: Residual lines supplied as nil, and the policy that allowed it.
-    assumed_nil: "dict[str, str]"
+    assumed_nil: dict[str, str]
     #: 18.7.
     fingerprint: str
     #: 18.11: every leaf input the calculation rested on.
-    inputs: "dict[str, Decimal]"
+    inputs: dict[str, Decimal]
 
     @property
-    def disagreements(self) -> "tuple[CellTrace, ...]":
+    def disagreements(self) -> tuple[CellTrace, ...]:
         return tuple(cell for cell in self.cells if cell.agrees is False)
 
 
@@ -76,12 +76,12 @@ class YearTrace:
 class FormulaReport:
     formulas: FormulaSet
     #: 18.5, and the proof of 18.6 -- an order exists, so there is no cycle.
-    order: "tuple[str, ...]"
-    required_inputs: "tuple[str, ...]"
-    years: "tuple[YearTrace, ...]"
+    order: tuple[str, ...]
+    required_inputs: tuple[str, ...]
+    years: tuple[YearTrace, ...]
 
     @property
-    def cycles(self) -> "tuple[tuple[str, ...], ...]":
+    def cycles(self) -> tuple[tuple[str, ...], ...]:
         return DependencyGraph(self.formulas).cycles()
 
     @property
@@ -107,7 +107,7 @@ def _statement_of(account: str) -> Statement:
     raise KeyError(account)  # pragma: no cover
 
 
-def _traces(model: CalculatedModel, built: BuiltStatements, year: str) -> "tuple[CellTrace, ...]":
+def _traces(model: CalculatedModel, built: BuiltStatements, year: str) -> tuple[CellTrace, ...]:
     out = []
     for target in sorted(model.cells):
         cell = model.cells[target]

@@ -47,7 +47,7 @@ class ModelVersion:
 
     version_id: str
     #: Each `(component, digest_or_value)` that went into it, in order.
-    components: "tuple[tuple[str, str], ...]"
+    components: tuple[tuple[str, str], ...]
     document_hash: str
     scenario_id: str
 
@@ -59,7 +59,7 @@ class ModelVersion:
         return f"{VERSION_SCHEME}:{self.version_id}"
 
 
-def _assumption_parts(scenarios, scenario_id: str) -> "list[str]":
+def _assumption_parts(scenarios, scenario_id: str) -> list[str]:
     """Every resolved assumption, as `code@periods=value:status`, in code order.
 
     Resolved rather than raw: what the model *is* includes which scenario's
@@ -120,7 +120,7 @@ def model_version(
 ) -> ModelVersion:
     """Compute 21.7's identifier from what this model contains."""
     document_hash = result.document.immutable_hash
-    components: "list[tuple[str, str]]" = [
+    components: list[tuple[str, str]] = [
         ("scheme", VERSION_SCHEME),
         ("document", document_hash),
         ("mapping", _mapping_part(result)),

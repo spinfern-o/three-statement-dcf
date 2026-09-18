@@ -40,7 +40,7 @@ class Standing:
     inherited_from: str
 
     @property
-    def concerns(self) -> "tuple[str, ...]":
+    def concerns(self) -> tuple[str, ...]:
         out = []
         if self.self_reviewed:
             out.append("approved by its own owner")
@@ -56,7 +56,7 @@ class Row:
     """One driver the forecast needs, and what the scenario has for it."""
 
     choice: str
-    codes: "tuple[str, ...]"
+    codes: tuple[str, ...]
     #: The assumption supplying it, if exactly one does.
     assumption: Assumption | None
     standing: Standing | None
@@ -86,7 +86,7 @@ def _standing(resolved: Resolved) -> Standing:
 
 def required_rows(
     scenarios: ScenarioSet, scenario_id: str, period: str | None = None
-) -> "tuple[Row, ...]":
+) -> tuple[Row, ...]:
     """One row per required driver choice, satisfied or not.
 
     Driven by `REQUIRED` rather than by what happens to be stored, so a driver
@@ -104,9 +104,14 @@ def required_rows(
         if not supplied:
             rows.append(
                 Row(
-                    choice=describe_choice(choice), codes=codes, assumption=None,
-                    standing=None, from_scenario="",
-                    problem="not supplied", step=first.step, unit=first.unit,
+                    choice=describe_choice(choice),
+                    codes=codes,
+                    assumption=None,
+                    standing=None,
+                    from_scenario="",
+                    problem="not supplied",
+                    step=first.step,
+                    unit=first.unit,
                     note=first.note,
                 )
             )
@@ -114,13 +119,18 @@ def required_rows(
         if len(supplied) > 1:
             rows.append(
                 Row(
-                    choice=describe_choice(choice), codes=codes, assumption=None,
-                    standing=None, from_scenario="",
+                    choice=describe_choice(choice),
+                    codes=codes,
+                    assumption=None,
+                    standing=None,
+                    from_scenario="",
                     problem=(
                         f"{' and '.join(supplied)} are both declared; STEP 14/18 "
                         "require one stated methodology per line"
                     ),
-                    step=first.step, unit=first.unit, note=first.note,
+                    step=first.step,
+                    unit=first.unit,
+                    note=first.note,
                 )
             )
             continue
@@ -153,7 +163,7 @@ def required_rows(
 
 def optional_rows(
     scenarios: ScenarioSet, scenario_id: str, period: str | None = None
-) -> "tuple[Row, ...]":
+) -> tuple[Row, ...]:
     """Discretionary drivers the scenario actually carries.
 
     Not listed when absent: `_optional` in the engine defaults them to zero
@@ -170,9 +180,15 @@ def optional_rows(
         driver = BY_CODE[code]
         rows.append(
             Row(
-                choice=code, codes=(code,), assumption=item.assumption,
-                standing=_standing(item), from_scenario=item.from_scenario,
-                problem="", step=driver.step, unit=driver.unit, note=driver.note,
+                choice=code,
+                codes=(code,),
+                assumption=item.assumption,
+                standing=_standing(item),
+                from_scenario=item.from_scenario,
+                problem="",
+                step=driver.step,
+                unit=driver.unit,
+                note=driver.note,
             )
         )
     return tuple(rows)
@@ -183,16 +199,16 @@ class ScenarioRow:
     scenario_id: str
     name: str
     parent_id: str | None
-    lineage: "tuple[str, ...]"
+    lineage: tuple[str, ...]
     own: int
     resolved: int
     #: 14.6's check: empty when the scenario is a real variant.
     problem: str
-    differences: "tuple[tuple[str, object, object], ...]"
+    differences: tuple[tuple[str, object, object], ...]
     probability: str
 
 
-def scenario_rows(scenarios: ScenarioSet) -> "tuple[ScenarioRow, ...]":
+def scenario_rows(scenarios: ScenarioSet) -> tuple[ScenarioRow, ...]:
     """7.7.d, with 14.6 evaluated for each."""
     return tuple(
         ScenarioRow(
@@ -208,14 +224,14 @@ def scenario_rows(scenarios: ScenarioSet) -> "tuple[ScenarioRow, ...]":
                 ""
                 if scenario.probability is None
                 else f"{scenario.probability.value} ({scenario.probability.source}, "
-                     f"{scenario.probability.date})"
+                f"{scenario.probability.date})"
             ),
         )
         for scenario in scenarios.scenarios
     )
 
 
-def status_choices(assumption: Assumption) -> "tuple[Status, ...]":
+def status_choices(assumption: Assumption) -> tuple[Status, ...]:
     """The statuses this assumption may legally move to, for the form."""
     from .workflow import LEGAL_TRANSITIONS
 

@@ -71,3 +71,132 @@ jobs:
           print(f"{ran} accessibility test(s) actually ran")
           sys.exit(0 if ran > 0 else 1)
           PY
+
+  # Item 152 / specification 20.20: "Complete dependency and vulnerability
+  # scans before production release." Run on every commit rather than before a
+  # release, because a vulnerability disclosed today is in the tree today, and
+  # a gate that only runs at release time reports it at the worst moment.
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install pip-audit
+
+      - name: Audit the dependency tree
+        # pip-audit queries the Python Packaging Advisory Database, and this
+        # audits THIS PROJECT'S declared requirements and everything they pull
+        # in -- a transitive dependency is as present as a direct one.
+        #
+        # Scoped to the requirements files rather than `--strict` over the
+        # whole environment, which sweeps in whatever the base image ships:
+        # the first run failed on `python-apt`, an Ubuntu system package that
+        # is not on PyPI and cannot be audited. The claim worth making is that
+        # this project's dependencies carry no known vulnerability, not that
+        # the runner's operating system does not.
+        run: |
+          python -m pip_audit --strict --progress-spinner off \
+            -r requirements.txt -r requirements-dev.txt
+
+      - name: Check for a source PDF or a secret in the tree
+        # Item 166 and 20.4. Written here rather than left to a release
+        # checklist: a secret committed today is compromised from that commit,
+        # and finding it at release time is finding it too late.
+        run: python -m apps.api.app.security.repository_scan
+
+  # Items 154 and 155. Its own job rather than a step in `test`, so a lint
+  # failure and a test failure are distinguishable at a glance and neither
+  # hides the other.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Lint (item 154)
+        # Rules and exclusions are in pyproject.toml, each with its reason.
+        run: python -m ruff check .
+
+      - name: Formatting (item 154)
+        # `--diff` rather than `--check`: a failure prints what it would
+        # change, which is the difference between a red job and an actionable
+        # one.
+        run: python -m ruff format --diff .
+
+      - name: Type check (item 155)
+        # Strict over model/, the arithmetic core. Checked but not strict over
+        # apps/api/app, which sits on untyped third-party libraries -- see the
+        # note in pyproject.toml.
+        run: python -m mypy
+
+  # Item 168. The report is a generated artefact, and one committed once and
+  # never regenerated is worse than none: it reads as current. This job
+  # regenerates it and fails when the committed copy has drifted, which is how
+  # the test count in README.md stopped being wrong three times in one day.
+  #
+  # `--fast` skips the two browser suites, which have their own job above. The
+  # report then reports them NOT RUN, and a NOT RUN row blocks its verdict --
+  # so this job checks the drift, and the `accessibility` job checks the
+  # browser, and neither pretends to be the other.
+  release-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Regenerate the release-readiness report
+        # Non-zero is expected under --fast, because two suites are NOT RUN.
+        # What must not change is the committed report's content.
+        run: |
+          python -m apps.api.app.verification.report --fast \
+            --out /tmp/release-readiness.md || true
+
+      - name: Fail if the committed report has drifted
+        run: |
+          python - <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          def rows(text):
+              # The generated-at line and the timings differ every run and are
+              # not drift. Everything else is.
+              text = re.sub(r"Generated at: `[^`]+`", "", text)
+              text = re.sub(r"\| [\d.]+ \|$", "|", text, flags=re.MULTILINE)
+              return [line for line in text.splitlines() if line.startswith("| 22.")]
+
+          committed = rows(Path("docs/release-readiness.md").read_text())
+          fresh = rows(Path("/tmp/release-readiness.md").read_text())
+          if committed != fresh:
+              print("docs/release-readiness.md has drifted from the suite.")
+              print("Regenerate it: python3 -m apps.api.app.verification.report "
+                    "--out docs/release-readiness.md")
+              sys.exit(1)
+          print(f"{len(committed)} Section 22 row(s) match the committed report")
+          PY

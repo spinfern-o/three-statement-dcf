@@ -32,7 +32,7 @@ INTANGIBLES_REASON = (
 
 LEASES_REASON = (
     "13.5 asks for lease additions, payments, interest, current/non-current "
-    "reclassification and the ending liability, \"when material and disclosed\". "
+    'reclassification and the ending liability, "when material and disclosed". '
     "The chart has no lease liability or right-of-use asset line, and the "
     "movements it wants are disclosed in the lease footnote's maturity table "
     "rather than on the face of the statements. Nothing here can distinguish a "
@@ -54,16 +54,17 @@ SHARE_COUNT_REASON = (
 
 def _unavailable(key: str, title: str, rule: str, reason: str) -> Schedule:
     return Schedule(
-        key=key, title=title, rule=rule,
-        availability=Availability.UNAVAILABLE, reason=reason,
+        key=key,
+        title=title,
+        rule=rule,
+        availability=Availability.UNAVAILABLE,
+        reason=reason,
     )
 
 
 def intangibles_schedule() -> Schedule:
     """Item 71 / 13.3."""
-    return _unavailable(
-        "intangibles", "Intangibles and amortization", "13.3", INTANGIBLES_REASON
-    )
+    return _unavailable("intangibles", "Intangibles and amortization", "13.3", INTANGIBLES_REASON)
 
 
 def lease_schedule() -> Schedule:
@@ -73,6 +74,4 @@ def lease_schedule() -> Schedule:
 
 def share_count_schedule() -> Schedule:
     """The half of item 75 / 13.7 the chart cannot carry."""
-    return _unavailable(
-        "share_count", "Share count and dilution", "13.7", SHARE_COUNT_REASON
-    )
+    return _unavailable("share_count", "Share count and dilution", "13.7", SHARE_COUNT_REASON)

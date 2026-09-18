@@ -98,9 +98,7 @@ class RollForwardSchedule(Schedule):
     years: tuple[RollForwardYear, ...] = ()
 
 
-def _line(
-    ledgers: dict, movement: Movement, year: str
-) -> ScheduleLine:
+def _line(ledgers: dict, movement: Movement, year: str) -> ScheduleLine:
     ledger: Ledger = ledgers[movement.statement]
     value = ledger.get(movement.account, year)
     if value is None:
@@ -220,14 +218,13 @@ def build_rollforward(
     parts = []
     if absent_movements:
         parts.append(
-            "the filing reports no " + ", ".join(absent_movements).lower()
+            "the filing reports no "
+            + ", ".join(absent_movements).lower()
             + ", so any such movement sits in the unexplained difference rather "
             "than being plugged in"
         )
     if years_without_opening:
-        parts.append(
-            "no opening balance for " + ", ".join(years_without_opening)
-        )
+        parts.append("no opening balance for " + ", ".join(years_without_opening))
 
     return RollForwardSchedule(
         key=key,
@@ -400,8 +397,7 @@ RETAINED_EARNINGS_MOVEMENTS = (
         multiplier=1,
         label="Dividends",
         basis=(
-            "cash flow statement `dividends`, stored negative as an outflow and "
-            "added as it stands"
+            "cash flow statement `dividends`, stored negative as an outflow and added as it stands"
         ),
     ),
 )

@@ -37,6 +37,7 @@ CONTRACT = D("0.0001")
 
 # --- 16.11: the three conventions -------------------------------------------
 
+
 def test_year_end_is_the_engines_own_convention():
     """STEP 29: t = 1, 2, 3, counting from the last actual year."""
     schedule = build_schedule(YEARS, Timing.YEAR_END)
@@ -46,9 +47,7 @@ def test_year_end_is_the_engines_own_convention():
 
 def test_mid_year_puts_the_average_pound_halfway_through_the_year():
     schedule = build_schedule(YEARS, Timing.MID_YEAR)
-    assert list(schedule.fractions) == [
-        D("0.5"), D("1.5"), D("2.5"), D("3.5"), D("4.5")
-    ]
+    assert list(schedule.fractions) == [D("0.5"), D("1.5"), D("2.5"), D("3.5"), D("4.5")]
 
 
 def test_mid_year_raises_every_present_value():
@@ -69,7 +68,7 @@ def test_the_terminal_value_uses_the_same_convention_as_the_flows():
         assert schedule.terminal == schedule.fractions[-1]
 
 
-def test_every_convention_describes_itself(): 
+def test_every_convention_describes_itself():
     """16.11 asks that the choice be DOCUMENTED, not merely made."""
     for timing in Timing:
         assert len(timing.description.split()) >= 15
@@ -79,11 +78,14 @@ def test_every_convention_describes_itself():
 
 # --- 16.12: the exact time fraction -----------------------------------------
 
+
 def test_the_exact_fraction_counts_real_days():
     """A June 30 valuation is 184 days from a December 31 year end."""
     schedule = build_schedule(
-        ("2026E",), Timing.EXACT_DATE,
-        valuation_date=date(2026, 6, 30), fiscal_year_end=date(2025, 12, 31),
+        ("2026E",),
+        Timing.EXACT_DATE,
+        valuation_date=date(2026, 6, 30),
+        fiscal_year_end=date(2025, 12, 31),
     )
     assert schedule.fractions[0] == D(184) / DAYS_IN_YEAR
 
@@ -92,8 +94,10 @@ def test_a_leap_day_inside_the_span_is_counted():
     """2028 is a leap year, so the third year is one day further out than
     three times the first would suggest."""
     schedule = build_schedule(
-        ("2026E", "2027E", "2028E"), Timing.EXACT_DATE,
-        valuation_date=date(2026, 6, 30), fiscal_year_end=date(2025, 12, 31),
+        ("2026E", "2027E", "2028E"),
+        Timing.EXACT_DATE,
+        valuation_date=date(2026, 6, 30),
+        fiscal_year_end=date(2025, 12, 31),
     )
     first, second, third = schedule.fractions
     assert (second - first) * DAYS_IN_YEAR == D(365)
@@ -102,8 +106,10 @@ def test_a_leap_day_inside_the_span_is_counted():
 
 def test_a_non_december_fiscal_year_end_is_honoured():
     schedule = build_schedule(
-        ("2026E",), Timing.EXACT_DATE,
-        valuation_date=date(2026, 1, 1), fiscal_year_end=date(2025, 6, 30),
+        ("2026E",),
+        Timing.EXACT_DATE,
+        valuation_date=date(2026, 1, 1),
+        fiscal_year_end=date(2025, 6, 30),
     )
     assert schedule.fractions[0] == D((date(2026, 6, 30) - date(2026, 1, 1)).days) / DAYS_IN_YEAR
 
@@ -111,8 +117,10 @@ def test_a_non_december_fiscal_year_end_is_honoured():
 def test_a_february_29_year_end_falls_back_in_a_common_year():
     """Refusing would mean a model that cannot value a leap-day filer."""
     schedule = build_schedule(
-        ("2026E", "2028E"), Timing.EXACT_DATE,
-        valuation_date=date(2025, 12, 31), fiscal_year_end=date(2024, 2, 29),
+        ("2026E", "2028E"),
+        Timing.EXACT_DATE,
+        valuation_date=date(2025, 12, 31),
+        fiscal_year_end=date(2024, 2, 29),
     )
     assert schedule.fractions[0] > 0
     assert "2026-02-28" in schedule.basis
@@ -123,8 +131,10 @@ def test_a_cash_flow_before_the_valuation_date_is_refused():
     """A negative fraction would COMPOUND a cash flow rather than discount it."""
     with pytest.raises(ProvenanceError, match="BEFORE the valuation date"):
         build_schedule(
-            ("2026E",), Timing.EXACT_DATE,
-            valuation_date=date(2027, 1, 1), fiscal_year_end=date(2025, 12, 31),
+            ("2026E",),
+            Timing.EXACT_DATE,
+            valuation_date=date(2027, 1, 1),
+            fiscal_year_end=date(2025, 12, 31),
         )
 
 
@@ -136,8 +146,10 @@ def test_the_exact_convention_needs_a_date_to_count_from():
 def test_the_basis_names_every_cash_flow_date():
     """16.11: documented. A reader must be able to check the arithmetic."""
     schedule = build_schedule(
-        ("2026E", "2027E"), Timing.EXACT_DATE,
-        valuation_date=date(2026, 6, 30), fiscal_year_end=date(2025, 12, 31),
+        ("2026E", "2027E"),
+        Timing.EXACT_DATE,
+        valuation_date=date(2026, 6, 30),
+        fiscal_year_end=date(2025, 12, 31),
     )
     assert "2026-06-30" in schedule.basis
     assert "2026-12-31" in schedule.basis and "2027-12-31" in schedule.basis
@@ -145,6 +157,7 @@ def test_the_basis_names_every_cash_flow_date():
 
 
 # --- 16.13: the precision policy --------------------------------------------
+
 
 @pytest.mark.parametrize("rate", ["0", "0.01", "0.09", "0.35", "1.5"])
 def test_an_integer_exponent_is_exactly_the_multiplicative_result(rate):
@@ -209,6 +222,7 @@ def test_a_zero_fraction_discounts_by_nothing():
 
 
 # --- the year-end path must not have moved ----------------------------------
+
 
 def test_adopting_the_option_did_not_move_the_default(loaded, valuation):
     """Claim 1, on the real fixture model rather than in the abstract."""

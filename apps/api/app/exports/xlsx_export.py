@@ -53,7 +53,7 @@ from openpyxl.utils import get_column_letter
 
 from .csv_export import neutralize
 from .gather import gather
-from .tables import CALCULATED, Cell, ExportModel, Table
+from .tables import Cell, ExportModel, Table
 
 #: 21.2's convention, stated once. Blue is the modelling world's "somebody
 #: typed this"; black is "the model computed it".
@@ -66,14 +66,20 @@ INEXACT_COLOUR = "FF8A4B00"
 SHEET_NAME_LIMIT = 31
 
 LEGEND = (
-    ("Hardcode (blue)", "A figure somebody supplied: reported by the filing, or entered as an assumption."),
+    (
+        "Hardcode (blue)",
+        "A figure somebody supplied: reported by the filing, or entered as an assumption.",
+    ),
     ("Calculated (black)", "A figure this model computed from others."),
-    ("Inexact (brown, noted)", "The exact value needs more precision than a spreadsheet number holds. The cell note carries it in full."),
+    (
+        "Inexact (brown, noted)",
+        "The exact value needs more precision than a spreadsheet number holds. The cell note carries it in full.",
+    ),
     ("Empty with a note", "No value exists. Absent is not zero (rule 1.3), and the note says why."),
 )
 
 
-def _styles(workbook: Workbook) -> "dict[str, NamedStyle]":
+def _styles(workbook: Workbook) -> dict[str, NamedStyle]:
     """Named styles, so the distinction survives without colour."""
     made = {}
     for name, colour in (
@@ -123,7 +129,7 @@ def survives_the_workbook(value: Decimal) -> bool:
     number we had.
     """
     try:
-        written = "%.*g" % (WORKBOOK_DIGITS, float(value))
+        written = f"{float(value):.{WORKBOOK_DIGITS}g}"
         return Decimal(repr(float(written))) == value
     except (OverflowError, ValueError):
         return False
@@ -209,7 +215,8 @@ def build_workbook(model: ExportModel) -> Workbook:
         cover.cell(row=row + offset, column=2, value=meaning)
     note_row = row + len(LEGEND) + 2
     cover.cell(
-        row=note_row, column=1,
+        row=note_row,
+        column=1,
         value=(
             f"{inexact} cell(s) hold a value a spreadsheet number cannot "
             "represent exactly. Each is styled Inexact and carries its exact "
@@ -218,6 +225,18 @@ def build_workbook(model: ExportModel) -> Workbook:
     )
     cover.cell(row=note_row + 1, column=1, value=f"Model version: {model.version_id}")
     cover.cell(row=note_row + 2, column=1, value=f"Generated at: {model.generated_at}")
+
+    # Section 25 and 20.19: the disclaimer and the model limitations belong in
+    # the export, not only in the report. A workbook is the artefact that gets
+    # forwarded, and it is the one most likely to be read on its own.
+    limits_row = note_row + 4
+    cover.cell(
+        row=limits_row, column=1, value="What this model does not say (Section 25, 20.19)"
+    ).font = Font(bold=True)
+    for offset, line in enumerate(model.limitations, start=1):
+        cover.cell(row=limits_row + offset, column=1, value=line).alignment = Alignment(
+            wrap_text=True, vertical="top"
+        )
     cover.column_dimensions["A"].width = 34
     cover.column_dimensions["B"].width = 80
     return workbook

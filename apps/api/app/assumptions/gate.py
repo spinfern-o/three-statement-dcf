@@ -20,14 +20,12 @@ from .scenarios import ScenarioSet
 from .workflow import GateResult
 
 
-def evaluate(
-    scenarios: ScenarioSet, scenario_id: str, periods: "tuple[str, ...]"
-) -> GateResult:
+def evaluate(scenarios: ScenarioSet, scenario_id: str, periods: tuple[str, ...]) -> GateResult:
     """14.1 for one scenario across its forecast periods."""
-    missing: "list[str]" = []
-    unresolved: "list[tuple[str, str]]" = []
-    ambiguous: "list[str]" = []
-    self_reviewed: "list[str]" = []
+    missing: list[str] = []
+    unresolved: list[tuple[str, str]] = []
+    ambiguous: list[str] = []
+    self_reviewed: list[str] = []
 
     for period in periods:
         resolved = scenarios.resolve(scenario_id, period=period)
@@ -44,9 +42,7 @@ def evaluate(
                 continue
             assumption = resolved[supplied[0]].assumption
             if assumption.status.blocks_calculation:
-                unresolved.append(
-                    (f"{assumption.code} for {period}", assumption.status.value)
-                )
+                unresolved.append((f"{assumption.code} for {period}", assumption.status.value))
             elif assumption.is_self_reviewed:
                 self_reviewed.append(f"{assumption.code} for {period}")
 

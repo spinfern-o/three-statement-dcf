@@ -11,7 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .numeric import D, PrecisionError as _PrecisionError
+from .numeric import D
+from .numeric import PrecisionError as _PrecisionError
 
 
 class ProvenanceError(ValueError):
@@ -88,5 +89,7 @@ def require(value: object, what: str, step: str) -> object:
     """
 
     if value is None:
-        raise ProvenanceError(f"{what} is required by {step} and was not provided. Supply it or stop.")
+        raise ProvenanceError(
+            f"{what} is required by {step} and was not provided. Supply it or stop."
+        )
     return value

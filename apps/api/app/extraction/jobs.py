@@ -39,10 +39,10 @@ The same reasoning is why every terminal state is terminal.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Callable
 
 from ..core.errors import IllegalTransition
 
@@ -58,9 +58,7 @@ class JobState(str, Enum):
     FAILED = "failed"
 
 
-TERMINAL: frozenset[JobState] = frozenset(
-    {JobState.EXTRACTED, JobState.REFUSED, JobState.FAILED}
-)
+TERMINAL: frozenset[JobState] = frozenset({JobState.EXTRACTED, JobState.REFUSED, JobState.FAILED})
 
 #: The legal transition graph. Every non-terminal state may refuse or fail,
 #: because a rule can say no at any point and a parser can raise at any point.
@@ -144,7 +142,7 @@ class ExtractionJob:
     refusal_code: str | None = None
 
     @classmethod
-    def start(cls, *, job_id: str | None = None) -> "ExtractionJob":
+    def start(cls, *, job_id: str | None = None) -> ExtractionJob:
         return cls(id=job_id or f"job-{uuid.uuid4().hex[:12]}", state=JobState.RECEIVED)
 
     @property
@@ -159,7 +157,7 @@ class ExtractionJob:
         clock: Callable[[], datetime] = utc_now,
         document_id: str | None = None,
         refusal_code: str | None = None,
-    ) -> "ExtractionJob":
+    ) -> ExtractionJob:
         """Move to `to_state`, or raise `IllegalTransition`.
 
         The reason is required. A state change with no stated reason is exactly

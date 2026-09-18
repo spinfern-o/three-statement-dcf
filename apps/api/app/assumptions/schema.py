@@ -115,14 +115,12 @@ class Evidence:
     #: Publication or observation date, ISO 8601. 14.4.g.
     date: str = ""
     #: For a historical driver: the periods it was measured over.
-    measured_over: "tuple[str, ...]" = ()
+    measured_over: tuple[str, ...] = ()
 
     def describe(self) -> str:
         parts = []
         if self.document_id:
-            parts.append(
-                f"{self.document_id} p.{self.page}" if self.page else self.document_id
-            )
+            parts.append(f"{self.document_id} p.{self.page}" if self.page else self.document_id)
         if self.url:
             parts.append(self.url)
         if self.measured_over:
@@ -148,7 +146,7 @@ class Assumption:
     value: Decimal
     unit: str
     # c. Applicable period(s). Empty means every forecast period.
-    periods: "tuple[str, ...]" = ()
+    periods: tuple[str, ...] = ()
     # d. Applicable scenario.
     scenario_id: str = "base"
     # e. Source type.
@@ -174,9 +172,7 @@ class Assumption:
             raise AssumptionError("an assumption needs a code (14.4.a)")
         if not self.name.strip():
             raise AssumptionError(f"{self.code}: an assumption needs a clear name (14.4.a)")
-        object.__setattr__(
-            self, "value", D(self.value, what=f"assumption {self.code!r} value")
-        )
+        object.__setattr__(self, "value", D(self.value, what=f"assumption {self.code!r} value"))
         try:
             unit_for(self.unit)
         except UnitError as exc:
@@ -186,8 +182,7 @@ class Assumption:
             ) from None
         if not isinstance(self.source_type, SourceType):
             raise AssumptionError(
-                f"{self.code}: source type must be one of "
-                f"{[s.value for s in SourceType]} (14.3)"
+                f"{self.code}: source type must be one of {[s.value for s in SourceType]} (14.3)"
             )
         if not isinstance(self.status, Status):
             raise AssumptionError(
@@ -220,8 +215,7 @@ class Assumption:
             )
         elif kind is SourceType.COMPANY_GUIDANCE:
             need(
-                (bool(evidence.document_id) and evidence.page is not None)
-                or bool(evidence.url),
+                (bool(evidence.document_id) and evidence.page is not None) or bool(evidence.url),
                 "a document and page, or a URL, are required",
                 "Guidance is a thing a company said somewhere on a date.",
             )
@@ -232,8 +226,12 @@ class Assumption:
                 "to be current (14.4.g).",
             )
         elif kind is SourceType.EXTERNAL_MARKET_DATA:
-            need(bool(evidence.url), "a URL is required", "2.5's market assumptions "
-                 "must be reproducible, and a number with no source is not.")
+            need(
+                bool(evidence.url),
+                "a URL is required",
+                "2.5's market assumptions "
+                "must be reproducible, and a number with no source is not.",
+            )
             need(
                 bool(evidence.date),
                 "an observation date is required",
@@ -258,7 +256,7 @@ class Assumption:
 
     # --- reading ------------------------------------------------------------
     @property
-    def key(self) -> "tuple[str, str, tuple[str, ...]]":
+    def key(self) -> tuple[str, str, tuple[str, ...]]:
         return (self.scenario_id, self.code, self.periods)
 
     @property
@@ -289,7 +287,7 @@ class Assumption:
             f"[{self.status.value}]"
         )
 
-    def with_status(self, status: Status, reviewer: str = "") -> "Assumption":
+    def with_status(self, status: Status, reviewer: str = "") -> Assumption:
         return replace(
             self,
             status=status,
@@ -297,7 +295,7 @@ class Assumption:
             updated_at=_now(),
         )
 
-    def with_value(self, value) -> "Assumption":
+    def with_value(self, value) -> Assumption:
         return replace(self, value=value, updated_at=_now())
 
 

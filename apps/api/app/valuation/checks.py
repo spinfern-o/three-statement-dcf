@@ -63,10 +63,7 @@ class TerminalShare:
     def describe(self) -> str:
         if self.share is None:
             return self.reason or "the terminal share could not be computed"
-        text = (
-            f"The terminal value is {self.percent}% of enterprise value "
-            f"(16.21)."
-        )
+        text = f"The terminal value is {self.percent}% of enterprise value (16.21)."
         if not self.is_above_threshold:
             return text
         return text + (
@@ -87,7 +84,8 @@ def terminal_share(
     share = valuation.valuation.tv_share_of_ev
     if share is None:
         return TerminalShare(
-            None, threshold,
+            None,
+            threshold,
             "enterprise value is zero, so the terminal share is undefined "
             "rather than infinite (4.12, 17.27)",
         )
@@ -128,10 +126,7 @@ class Headroom:
                 "perpetual-growth formula returns a negative or infinite value."
             )
         narrow = self.spread < Decimal("0.02")
-        text = (
-            f"WACC {self.wacc} exceeds terminal growth {self.growth} by "
-            f"{self.spread} (16.16)."
-        )
+        text = f"WACC {self.wacc} exceeds terminal growth {self.growth} by {self.spread} (16.16)."
         if narrow:
             text += (
                 " The spread is under two points, and the terminal value is "

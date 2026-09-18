@@ -57,8 +57,7 @@ def payload(model: ExportModel) -> dict:
         "generated_at": model.generated_at,
         "model_version": model.version_id,
         "model_version_components": [
-            {"component": name, "value": value}
-            for name, value in model.version_components
+            {"component": name, "value": value} for name, value in model.version_components
         ],
         "document_id": model.document_id,
         "company": model.company,

@@ -73,7 +73,7 @@ class ScheduleSet:
         raise KeyError(f"no schedule {key!r}; known: {[s.key for s in self.all]}")
 
     def describe(self) -> str:
-        counts = {a: 0 for a in Availability}
+        counts = dict.fromkeys(Availability, 0)
         for schedule in self.all:
             counts[schedule.availability] += 1
         return (

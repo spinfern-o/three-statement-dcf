@@ -67,7 +67,7 @@ class EngineInputs:
     #: STEP 2 keys with no page. Reported, never silently tolerated.
     source_map_gaps: tuple[str, ...]
 
-    def write(self, directory: "str | Path") -> tuple[Path, Path]:
+    def write(self, directory: str | Path) -> tuple[Path, Path]:
         target = Path(directory)
         target.mkdir(parents=True, exist_ok=True)
         profile = target / "company_profile.yaml"
@@ -101,10 +101,20 @@ def _confirmed(result: ExtractionResult, name: str) -> str:
 
 def _fiscal_year_end(value: str) -> str:
     """`12-31` -> `December 31`, which is what STEP 1 asks a human to write."""
-    months = (
-        "January February March April May June July August September "
-        "October November December"
-    ).split()
+    months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
     try:
         month, day = value.split("-")
         return f"{months[int(month) - 1]} {int(day)}"
@@ -112,7 +122,7 @@ def _fiscal_year_end(value: str) -> str:
         return value
 
 
-def _yaml_scalar(value: "str | int | None") -> str:
+def _yaml_scalar(value: str | int | None) -> str:
     if value is None:
         return ""
     text = str(value)
@@ -141,7 +151,7 @@ def build_engine_inputs(
     audited = _confirmed(result, "audited_status") == "audited"
     label = document_label(result)
 
-    pages = {key: None for key in REQUIRED_SOURCE_MAP_KEYS}
+    pages = dict.fromkeys(REQUIRED_SOURCE_MAP_KEYS)
     for bookmark in bookmarks(result):
         key = BOOKMARK_TO_SOURCE_MAP.get(bookmark.label)
         if key and pages.get(key) is None:
@@ -152,15 +162,20 @@ def build_engine_inputs(
     forecast = [f"{last_actual + n}E" for n in range(1, FORECAST_YEARS + 1)]
 
     profile = _profile_yaml(
-        name=name, period=f"FY{period_end[:4]}", year_end=year_end,
-        currency=currency, units=SCALE_TO_UNITS[scale], audited=audited,
-        document=label, pages=pages, historical=statements.years, forecast=forecast,
+        name=name,
+        period=f"FY{period_end[:4]}",
+        year_end=year_end,
+        currency=currency,
+        units=SCALE_TO_UNITS[scale],
+        audited=audited,
+        document=label,
+        pages=pages,
+        historical=statements.years,
+        forecast=forecast,
         gaps=gaps,
     )
     historical = _historical_yaml(statements, label)
-    return EngineInputs(
-        company_profile=profile, raw_historical=historical, source_map_gaps=gaps
-    )
+    return EngineInputs(company_profile=profile, raw_historical=historical, source_map_gaps=gaps)
 
 
 def _profile_yaml(**k) -> str:
@@ -225,10 +240,7 @@ def _historical_yaml(built: BuiltStatements, document: str) -> str:
 
     for block, statement, order in STATEMENT_BLOCKS:
         ledger = built.ledgers[statement]
-        present = [
-            code for code in order
-            if any(ledger.has(code, year) for year in built.years)
-        ]
+        present = [code for code in order if any(ledger.has(code, year) for year in built.years)]
         lines.append("")
         lines.append(f"{block}:")
         if not present:

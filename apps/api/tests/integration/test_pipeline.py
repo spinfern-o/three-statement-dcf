@@ -28,8 +28,8 @@ from apps.api.tests.conftest import (
     TRUNCATED,
 )
 
-
 # --- refusals ---------------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "fixture, code",
@@ -64,6 +64,7 @@ def test_a_refused_upload_still_has_a_job_history(ingest_fixture):
 
 # --- the accepted path ------------------------------------------------------
 
+
 def test_the_statements_fixture_extracts(extracted):
     assert extracted.document.page_count == 3
     assert extracted.document.extraction_status is JobState.EXTRACTED
@@ -80,9 +81,7 @@ def test_a_mixed_page_is_extracted_and_the_gap_recorded(ingest_fixture):
     assert outcome.accepted
     result = outcome.result
     assert result.document.pages[0].kind is PageKind.MIXED
-    assert all(
-        ReasonCode.IMAGE_REGION_NOT_EXTRACTED in f.reason_codes for f in result.facts
-    )
+    assert all(ReasonCode.IMAGE_REGION_NOT_EXTRACTED in f.reason_codes for f in result.facts)
 
 
 def test_every_fact_has_a_page_and_a_box(extracted):
@@ -141,6 +140,7 @@ def test_column_periods_are_resolved(extracted):
 
 # --- rule 1.5, on a real page -----------------------------------------------
 
+
 def _fact(result, label, period):
     for f in result.facts:
         if f.raw_label == label and f.period_label == period:
@@ -168,6 +168,7 @@ def test_a_footnote_marker_does_not_change_the_number(extracted):
 
 
 # --- 10.13 and 10.35 --------------------------------------------------------
+
 
 def test_everything_is_blocked_until_the_metadata_is_confirmed(extracted):
     assert len(extracted.facts_needing_review) == len(extracted.facts)
@@ -239,6 +240,7 @@ def test_a_correction_replaces_the_detected_value(extracted):
 
 # --- the EU fixture ---------------------------------------------------------
 
+
 def test_the_same_machinery_reads_a_comma_decimal_filing(ingest_fixture):
     outcome = ingest_fixture(EU_LOCALE)
     assert outcome.accepted
@@ -246,11 +248,7 @@ def test_the_same_machinery_reads_a_comma_decimal_filing(ingest_fixture):
     assert result.document.metadata.fields["number_locale"].value == "comma_decimal"
     confirmed = confirm_metadata(
         result,
-        {
-            name: None
-            for name, f in result.document.metadata.fields.items()
-            if f.value is not None
-        },
+        {name: None for name, f in result.document.metadata.fields.items() if f.value is not None},
         actor="owner",
         reason="German filing, confirmed",
     )
@@ -259,6 +257,7 @@ def test_the_same_machinery_reads_a_comma_decimal_filing(ingest_fixture):
 
 
 # --- 10.3, 10.2, item 38 ----------------------------------------------------
+
 
 def test_a_duplicate_upload_is_refused(ingest_fixture, repository):
     first = ingest_fixture(STATEMENTS)
@@ -297,6 +296,7 @@ def test_item_38_the_uploaded_pdf_is_unchanged(ingest_fixture, store):
 
 
 # --- persistence ------------------------------------------------------------
+
 
 def test_records_round_trip_through_storage(extracted, repository):
     repository.save(extracted)

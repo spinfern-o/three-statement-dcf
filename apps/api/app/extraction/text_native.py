@@ -51,15 +51,15 @@ from dataclasses import replace
 
 import pymupdf
 
+from model.numeric import D
+
+from ..core.config import DEFAULT_REVIEW_THRESHOLD
 from .geometry import BoundingBox
 from .metadata import DetectedMetadata
 from .pages import PageKind, PageProfile
-from ..core.config import DEFAULT_REVIEW_THRESHOLD
 from .parsing import NumberLocale, SignSource, parse_reported_value
 from .reasons import EvidenceCheck, ReasonCode, score_confidence
 from .records import RawCell, RawTable, ReportedFact, Scope, SourceLocation
-
-from model.numeric import D
 
 #: How far above a table to look for its caption.
 CAPTION_REACH = 70
@@ -69,7 +69,9 @@ _DATE_LABEL = re.compile(
     r"(?i)((?:19|20)\d{2})\s*$"  # any label ending in a year: "December 31, 2025"
 )
 #: Labels that name a basis rule 1.7 forbids mixing with an annual column.
-_OTHER_BASIS = re.compile(r"(?i)\b(?:Q[1-4]|quarter|three\s+months|six\s+months|nine\s+months|YTD|TTM|LTM|interim)\b")
+_OTHER_BASIS = re.compile(
+    r"(?i)\b(?:Q[1-4]|quarter|three\s+months|six\s+months|nine\s+months|YTD|TTM|LTM|interim)\b"
+)
 
 _SCOPE_WORDS = (
     (re.compile(r"(?i)\bconsolidated\b|\bkonzern"), Scope.CONSOLIDATED),
@@ -99,7 +101,7 @@ def normalize_period_label(text: str) -> tuple[str | None, bool]:
     return None, False
 
 
-def _caption_for(page: "pymupdf.Page", box: BoundingBox) -> str:
+def _caption_for(page: pymupdf.Page, box: BoundingBox) -> str:
     """The nearest text above a table, used for 10.23's scope detection."""
     lines: list[tuple[float, str]] = []
     for block in page.get_text("dict")["blocks"]:
@@ -122,8 +124,8 @@ def _scope_from(caption: str) -> Scope:
 
 
 def extract_tables(
-    doc: "pymupdf.Document",
-    profiles: "tuple[PageProfile, ...]",
+    doc: pymupdf.Document,
+    profiles: tuple[PageProfile, ...],
     *,
     document_id: str,
 ) -> tuple[RawTable, ...]:
@@ -205,8 +207,10 @@ def _read_row_labels(page, table, rows, header_row) -> tuple[str, ...]:
             labels.append("")
             continue
         rect = pymupdf.Rect(
-            min(b[0] for b in boxes), min(b[1] for b in boxes),
-            max(b[2] for b in boxes), max(b[3] for b in boxes),
+            min(b[0] for b in boxes),
+            min(b[1] for b in boxes),
+            max(b[2] for b in boxes),
+            max(b[3] for b in boxes),
         )
         labels.append(" ".join(page.get_textbox(rect).split()))
     return tuple(labels)
@@ -239,7 +243,8 @@ def _repeated_headers(rows, header_row: int | None) -> tuple[int, ...]:
         return ()
     header = [(c or "").strip() for c in rows[header_row]]
     return tuple(
-        i for i, row in enumerate(rows)
+        i
+        for i, row in enumerate(rows)
         if i != header_row and [(c or "").strip() for c in row] == header
     )
 
@@ -266,8 +271,8 @@ def _mark_splits(tables: list[RawTable]) -> list[RawTable]:
 
 
 def build_facts(
-    tables: "tuple[RawTable, ...]",
-    profiles: "tuple[PageProfile, ...]",
+    tables: tuple[RawTable, ...],
+    profiles: tuple[PageProfile, ...],
     metadata: DetectedMetadata,
     *,
     document_id: str,
@@ -322,7 +327,7 @@ def build_facts(
     return tuple(locations), tuple(facts)
 
 
-def _row_label(table: RawTable, row: int, headers: dict) -> "tuple[str, BoundingBox | None]":
+def _row_label(table: RawTable, row: int, headers: dict) -> tuple[str, BoundingBox | None]:
     """The label read from the page, and the box the label columns occupy."""
     first_value_column = min(headers) if headers else 1
     label = table.row_labels[row] if row < len(table.row_labels) else ""
@@ -334,16 +339,24 @@ def _row_label(table: RawTable, row: int, headers: dict) -> "tuple[str, Bounding
     if not boxes:
         return label, None
     box = BoundingBox(
-        x0=min(b.x0 for b in boxes), y0=min(b.y0 for b in boxes),
-        x1=max(b.x1 for b in boxes), y1=max(b.y1 for b in boxes),
+        x0=min(b.x0 for b in boxes),
+        y0=min(b.y0 for b in boxes),
+        x1=max(b.x1 for b in boxes),
+        y1=max(b.y1 for b in boxes),
     )
     return label, box
 
 
 def _column_periods(table: RawTable) -> dict[int, tuple[str, bool]]:
     headers: dict[int, tuple[str, bool]] = {}
+    header_row = table.header_row
+    if header_row is None:
+        # No detected header row means no period columns to read. Returning
+        # empty says that; indexing with None would have raised on the first
+        # table whose header could not be found.
+        return headers
     for column in range(1, table.column_count):
-        cell = table.cell(table.header_row, column)
+        cell = table.cell(header_row, column)
         if cell is None:
             continue
         period, mixes = normalize_period_label(cell.text)
@@ -379,7 +392,7 @@ def _fact_from_cell(
     locale: NumberLocale,
     review_threshold,
 ) -> tuple[SourceLocation, ReportedFact]:
-    header_cell = table.cell(table.header_row, cell.column)
+    header_cell = None if table.header_row is None else table.cell(table.header_row, cell.column)
     location = SourceLocation.create(
         document_id=document_id,
         page_number=table.page_number,

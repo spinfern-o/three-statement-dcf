@@ -232,43 +232,55 @@ def build_three_statements(path: Path) -> None:
             y += 15
         return page
 
-    statement("CONSOLIDATED STATEMENTS OF OPERATIONS", [
-        ("Revenue", "1,250,000", "1,100,000"),
-        ("Cost of goods sold", "(750,000)", "(660,000)"),
-        ("Gross profit", "500,000", "440,000"),
-        ("Operating expenses", "(300,000)", "(270,000)"),
-        ("Operating income", "200,000", "170,000"),
-        ("Interest expense", "(18,000)", "(20,000)"),
-        ("Income before income taxes", "182,000", "150,000"),
-        ("Income tax expense", "(45,500)", "(37,500)"),
-        ("Net income", "136,500", "112,500"),
-    ], 305)
+    statement(
+        "CONSOLIDATED STATEMENTS OF OPERATIONS",
+        [
+            ("Revenue", "1,250,000", "1,100,000"),
+            ("Cost of goods sold", "(750,000)", "(660,000)"),
+            ("Gross profit", "500,000", "440,000"),
+            ("Operating expenses", "(300,000)", "(270,000)"),
+            ("Operating income", "200,000", "170,000"),
+            ("Interest expense", "(18,000)", "(20,000)"),
+            ("Income before income taxes", "182,000", "150,000"),
+            ("Income tax expense", "(45,500)", "(37,500)"),
+            ("Net income", "136,500", "112,500"),
+        ],
+        305,
+    )
 
-    statement("CONSOLIDATED BALANCE SHEETS", [
-        ("Cash and cash equivalents", "164,500", "142,000"),
-        ("Accounts receivable, net", "205,000", "180,500"),
-        ("Inventories", "160,000", "155,000"),
-        ("Property, plant and equipment, net", "620,000", "588,000"),
-        ("Total assets", "1,149,500", "1,065,500"),
-        ("Accounts payable", "130,000", "121,000"),
-        ("Long-term debt", "400,000", "425,000"),
-        ("Total liabilities", "530,000", "546,000"),
-        ("Common stock", "50,000", "50,000"),
-        ("Retained earnings", "569,500", "469,500"),
-        ("Total equity", "619,500", "519,500"),
-    ], 335)
+    statement(
+        "CONSOLIDATED BALANCE SHEETS",
+        [
+            ("Cash and cash equivalents", "164,500", "142,000"),
+            ("Accounts receivable, net", "205,000", "180,500"),
+            ("Inventories", "160,000", "155,000"),
+            ("Property, plant and equipment, net", "620,000", "588,000"),
+            ("Total assets", "1,149,500", "1,065,500"),
+            ("Accounts payable", "130,000", "121,000"),
+            ("Long-term debt", "400,000", "425,000"),
+            ("Total liabilities", "530,000", "546,000"),
+            ("Common stock", "50,000", "50,000"),
+            ("Retained earnings", "569,500", "469,500"),
+            ("Total equity", "619,500", "519,500"),
+        ],
+        335,
+    )
 
-    statement("CONSOLIDATED STATEMENTS OF CASH FLOWS", [
-        ("Net income", "136,500", "112,500"),
-        ("Depreciation and amortization", "75,000", "68,000"),
-        ("Changes in operating working capital", "(20,500)", "(15,000)"),
-        ("Net cash provided by operating activities", "191,000", "165,500"),
-        ("Purchases of property and equipment", "(107,000)", "(95,000)"),
-        ("Net cash used in investing activities", "(107,000)", "(95,000)"),
-        ("Repayments of long-term debt", "(25,000)", "(20,000)"),
-        ("Dividends paid", "(36,500)", "(30,000)"),
-        ("Net cash used in financing activities", "(61,500)", "(50,000)"),
-    ], 290)
+    statement(
+        "CONSOLIDATED STATEMENTS OF CASH FLOWS",
+        [
+            ("Net income", "136,500", "112,500"),
+            ("Depreciation and amortization", "75,000", "68,000"),
+            ("Changes in operating working capital", "(20,500)", "(15,000)"),
+            ("Net cash provided by operating activities", "191,000", "165,500"),
+            ("Purchases of property and equipment", "(107,000)", "(95,000)"),
+            ("Net cash used in investing activities", "(107,000)", "(95,000)"),
+            ("Repayments of long-term debt", "(25,000)", "(20,000)"),
+            ("Dividends paid", "(36,500)", "(30,000)"),
+            ("Net cash used in financing activities", "(61,500)", "(50,000)"),
+        ],
+        290,
+    )
 
     doc.set_metadata({**METADATA, "title": "Meridian Components Inc. - Annual Report 2025"})
     doc.subset_fonts(verbose=False)
@@ -389,14 +401,15 @@ def build_encrypted(path: Path) -> None:
 
 def build_non_pdf(path: Path) -> None:
     """A `.pdf` that is not one. 10.1 refuses it by signature, not extension."""
-    path.write_bytes(b"GIF89a\x01\x00\x01\x00\x00\xff\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00;")
+    path.write_bytes(
+        b"GIF89a\x01\x00\x01\x00\x00\xff\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00;"
+    )
 
 
 def build_truncated(path: Path, source: Path) -> None:
     """A complete PDF with its tail removed. Refused as incomplete (ING-010-02)."""
     data = source.read_bytes()
     path.write_bytes(data[: int(len(data) * 0.6)])
-
 
 
 def build_forecastable(path: Path) -> None:
@@ -448,48 +461,60 @@ def build_forecastable(path: Path) -> None:
             y += 15
         return page
 
-    statement("CONSOLIDATED STATEMENTS OF OPERATIONS", [
-        ("Revenue", "2,000,000", "1,800,000"),
-        ("Cost of goods sold", "(1,200,000)", "(1,080,000)"),
-        ("Gross profit", "800,000", "720,000"),
-        ("Operating expenses", "(480,000)", "(432,000)"),
-        ("Operating income", "320,000", "288,000"),
-        ("Interest expense", "(24,000)", "(26,000)"),
-        ("Income before income taxes", "296,000", "262,000"),
-        ("Income tax expense", "(74,000)", "(65,500)"),
-        ("Net income", "222,000", "196,500"),
-    ], 305)
+    statement(
+        "CONSOLIDATED STATEMENTS OF OPERATIONS",
+        [
+            ("Revenue", "2,000,000", "1,800,000"),
+            ("Cost of goods sold", "(1,200,000)", "(1,080,000)"),
+            ("Gross profit", "800,000", "720,000"),
+            ("Operating expenses", "(480,000)", "(432,000)"),
+            ("Operating income", "320,000", "288,000"),
+            ("Interest expense", "(24,000)", "(26,000)"),
+            ("Income before income taxes", "296,000", "262,000"),
+            ("Income tax expense", "(74,000)", "(65,500)"),
+            ("Net income", "222,000", "196,500"),
+        ],
+        305,
+    )
 
-    statement("CONSOLIDATED BALANCE SHEETS", [
-        ("Cash and cash equivalents", "180,000", "164,000"),
-        ("Accounts receivable, net", "320,000", "290,000"),
-        ("Inventories", "240,000", "225,000"),
-        ("Other current assets", "40,000", "36,000"),
-        ("Property, plant and equipment, net", "900,000", "850,000"),
-        ("Other non-current assets", "60,000", "55,000"),
-        ("Total assets", "1,740,000", "1,620,000"),
-        ("Accounts payable", "200,000", "185,000"),
-        ("Other current liabilities", "90,000", "82,000"),
-        ("Long-term debt", "550,000", "600,000"),
-        ("Other non-current liabilities", "70,000", "65,000"),
-        ("Total liabilities", "910,000", "932,000"),
-        ("Common stock", "100,000", "100,000"),
-        ("Retained earnings", "730,000", "588,000"),
-        ("Total equity", "830,000", "688,000"),
-    ], 395)
+    statement(
+        "CONSOLIDATED BALANCE SHEETS",
+        [
+            ("Cash and cash equivalents", "180,000", "164,000"),
+            ("Accounts receivable, net", "320,000", "290,000"),
+            ("Inventories", "240,000", "225,000"),
+            ("Other current assets", "40,000", "36,000"),
+            ("Property, plant and equipment, net", "900,000", "850,000"),
+            ("Other non-current assets", "60,000", "55,000"),
+            ("Total assets", "1,740,000", "1,620,000"),
+            ("Accounts payable", "200,000", "185,000"),
+            ("Other current liabilities", "90,000", "82,000"),
+            ("Long-term debt", "550,000", "600,000"),
+            ("Other non-current liabilities", "70,000", "65,000"),
+            ("Total liabilities", "910,000", "932,000"),
+            ("Common stock", "100,000", "100,000"),
+            ("Retained earnings", "730,000", "588,000"),
+            ("Total equity", "830,000", "688,000"),
+        ],
+        395,
+    )
 
-    statement("CONSOLIDATED STATEMENTS OF CASH FLOWS", [
-        ("Net income", "222,000", "196,500"),
-        ("Depreciation and amortization", "120,000", "110,000"),
-        ("Changes in operating working capital", "(26,000)", "(18,000)"),
-        ("Net cash provided by operating activities", "316,000", "288,500"),
-        ("Purchases of property and equipment", "(170,000)", "(150,000)"),
-        ("Net cash used in investing activities", "(170,000)", "(150,000)"),
-        ("Repayments of long-term debt", "(50,000)", "(40,000)"),
-        ("Dividends paid", "(80,000)", "(70,000)"),
-        ("Net cash used in financing activities", "(130,000)", "(110,000)"),
-        ("Net increase in cash", "16,000", "28,500"),
-    ], 320)
+    statement(
+        "CONSOLIDATED STATEMENTS OF CASH FLOWS",
+        [
+            ("Net income", "222,000", "196,500"),
+            ("Depreciation and amortization", "120,000", "110,000"),
+            ("Changes in operating working capital", "(26,000)", "(18,000)"),
+            ("Net cash provided by operating activities", "316,000", "288,500"),
+            ("Purchases of property and equipment", "(170,000)", "(150,000)"),
+            ("Net cash used in investing activities", "(170,000)", "(150,000)"),
+            ("Repayments of long-term debt", "(50,000)", "(40,000)"),
+            ("Dividends paid", "(80,000)", "(70,000)"),
+            ("Net cash used in financing activities", "(130,000)", "(110,000)"),
+            ("Net increase in cash", "16,000", "28,500"),
+        ],
+        320,
+    )
 
     _finish(doc, path)
 

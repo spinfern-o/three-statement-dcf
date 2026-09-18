@@ -60,6 +60,7 @@ def _is_safe_char(ch: str) -> bool:
         return True
     return unicodedata.category(ch)[0] in {"L", "N", "M"}
 
+
 #: Stored files are read-only to their owner and everyone else.
 STORED_MODE = 0o444
 
@@ -91,8 +92,7 @@ def sanitize_filename(original: str) -> str:
     if not name or name in {".", ".."}:
         raise IngestionRefusal(
             UNSAFE_FILENAME,
-            f"the filename {original!r} has no characters left after "
-            f"sanitization (20.11)",
+            f"the filename {original!r} has no characters left after sanitization (20.11)",
         )
     return name
 

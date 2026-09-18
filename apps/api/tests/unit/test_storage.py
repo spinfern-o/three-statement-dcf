@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
 from apps.api.app.core.errors import IngestionRefusal
@@ -58,7 +59,10 @@ def test_filenames_are_sanitized(name, expected):
 
 def test_non_ascii_filenames_survive():
     """A filing named in another script is not less legitimate."""
-    assert sanitize_filename("Jahresabschluss \u00fcber 2025.pdf") == "Jahresabschluss \u00fcber 2025.pdf"
+    assert (
+        sanitize_filename("Jahresabschluss \u00fcber 2025.pdf")
+        == "Jahresabschluss \u00fcber 2025.pdf"
+    )
 
 
 def test_long_filenames_are_truncated_but_keep_their_suffix():

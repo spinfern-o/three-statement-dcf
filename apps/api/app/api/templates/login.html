@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Sign in &middot; {{ product_name }}{% endblock %}
+{% block context %}Sign in{% endblock %}
+
+{% block body %}
+<main id="main" class="layout">
+  <section class="card" style="max-width:34rem" aria-labelledby="signin-heading">
+    <h1 id="signin-heading">Sign in</h1>
+
+    {% if error %}
+    {# 6.6.f: the error summary is the first thing after the heading, and it is
+       announced. It never says which half was wrong. #}
+    <div class="notice notice-error" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <p class="small muted">
+      This application holds a filing that has not been released. Decision
+      2.2.c requires a credential in front of it.
+    </p>
+
+    <form method="post" action="/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      <p>
+        <label for="password">Password</label><br>
+        <input type="password" id="password" name="password"
+               autocomplete="current-password" required
+               style="width:100%;max-width:24rem">
+      </p>
+      <p><button type="submit">Sign in</button></p>
+    </form>
+
+    <p class="small muted">
+      Five attempts in five minutes, then a wait (20.14). A successful sign-in
+      clears the count, so somebody else&rsquo;s guessing cannot lock you out.
+    </p>
+  </section>
+</main>
+{% endblock %}

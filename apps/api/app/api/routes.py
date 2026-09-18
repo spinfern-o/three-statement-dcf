@@ -15,51 +15,21 @@ is *supposed* to fail -- so it is presented as an answer, not as a crash.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+from model.accounts import Statement
 from model.numeric import D, PrecisionError
 
-from ..extraction.records import confirm_metadata
-from ..mapping.actions import (
-    approve_all,
-    approve_fact_mapping,
-    combine_facts,
-    map_fact,
-    propose_all,
-    proposals_for,
-    reject_mapping,
-    split_fact,
-    why_no_proposal,
-)
-from ..mapping.chart import CHART
-from model.accounts import Statement
-from ..mapping.checks import all_findings, apply_findings
-from ..mapping.normalized import normalize, periods as ledger_periods, statement_of_fact
-from ..mapping.sets import MappingError
 from ..assumptions.gate import evaluate as evaluate_gate
-from ..dashboard.cards import STATUS_LEGEND, portfolio_cards
-from ..diagnostics.audit import Filters, choices as audit_choices, filter_events
-from ..diagnostics.benchmark import Report as BenchmarkReport
-from ..diagnostics.lineage import trace, traceable_lines
-from ..diagnostics.release import checklist, readiness
-from ..diagnostics.run import evaluate as run_diagnostics
-from ..dashboard.charts import line_chart
-from ..exports.csv_export import DICTIONARY, neutralized_cells, table_to_csv
-from ..exports.gather import gather
-from ..exports.json_export import schema_json, to_json
-from ..exports.pdf_export import to_bytes as pdf_bytes
-from ..exports.schema import SCHEMA_VERSION
-from ..exports.xlsx_export import to_bytes as xlsx_bytes
-from ..dashboard.navigation import nav_items
-from ..dashboard.standing import standing_for
 from ..assumptions.impact import preview as preview_change
 from ..assumptions.proposals import propose_from_schedules, unproposable
+from ..assumptions.scenarios import BASE, ScenarioError, ScenarioSet
 from ..assumptions.schema import AssumptionError, Status
-from ..assumptions.scenarios import BASE, ScenarioError
 from ..assumptions.store import ScenarioStore
 from ..assumptions.views import (
     optional_rows,
@@ -68,31 +38,91 @@ from ..assumptions.views import (
     status_choices,
 )
 from ..assumptions.workflow import WorkflowError, transition
-from ..forecast.build import ForecastError, build_scenario_forecast
+from ..dashboard.cards import STATUS_LEGEND, portfolio_cards
+from ..dashboard.charts import line_chart
+from ..dashboard.navigation import nav_items
+from ..dashboard.standing import standing_for
+from ..dashboard.status import Standing
+from ..diagnostics.audit import Filters, filter_events
+from ..diagnostics.audit import choices as audit_choices
+from ..diagnostics.benchmark import Report as BenchmarkReport
+from ..diagnostics.lineage import trace, traceable_lines
+from ..diagnostics.release import checklist, readiness
+from ..diagnostics.run import evaluate as run_diagnostics
+from ..exports.csv_export import DICTIONARY, neutralized_cells, table_to_csv
+from ..exports.gather import gather
+from ..exports.json_export import schema_json, to_json
+from ..exports.pdf_export import to_bytes as pdf_bytes
+from ..exports.schema import SCHEMA_VERSION
+from ..exports.xlsx_export import to_bytes as xlsx_bytes
+from ..extraction.records import ExtractionResult, SourceDocument, confirm_metadata
+from ..forecast.build import ForecastError, build_scenario_forecast, forecast_ledger
 from ..forecast.checks import check_every_scenario
 from ..forecast.views import columns as forecast_columns
-from ..forecast.views import comparison, driver_rows as forecast_driver_rows
-from ..forecast.build import forecast_ledger
+from ..forecast.views import comparison
+from ..forecast.views import driver_rows as forecast_driver_rows
 from ..forecast.views import statement_rows as forecast_statement_rows
 from ..formula.catalog import derivation_formulas, ledger_environment
 from ..formula.graph import DependencyGraph
-from ..valuation.build import ValuationError, build_scenario_valuation
-from ..valuation.checks import EXIT_MULTIPLE_STATUS, headroom, terminal_share
-from ..valuation.inputs import LEASE_LIABILITIES_NOTE
-from ..valuation.sensitivity import build_grid
-from ..valuation.views import flow_rows
 from ..formula.views import formula_report
+from ..mapping.actions import (
+    approve_all,
+    approve_fact_mapping,
+    combine_facts,
+    map_fact,
+    proposals_for,
+    propose_all,
+    reject_mapping,
+    split_fact,
+    why_no_proposal,
+)
+from ..mapping.chart import CHART
+from ..mapping.checks import all_findings, apply_findings
+from ..mapping.normalized import normalize, statement_of_fact
+from ..mapping.normalized import periods as ledger_periods
+from ..mapping.sets import MappingError
+from ..review.actions import (
+    ACCEPT,
+    CORRECT,
+    REJECT,
+    ReviewError,
+    accept_fact,
+    correct_fact,
+    reject_fact,
+)
+from ..review.progress import review_progress, verification_gates
 from ..schedules.build import build_schedules
 from ..schedules.checks import run_schedule_checks
 from ..schedules.checks import summarize as summarize_schedule_checks
 from ..schedules.views import driver_rows, working_capital_rows
-from ..review.actions import ACCEPT, CORRECT, REJECT, ReviewError, accept_fact, correct_fact, reject_fact
+from ..security.authorization import NOT_FOUND, require_access, visible
+from ..security.guard import safe_next
+from ..security.logging import security_event
+from ..security.ratelimit import RateLimited
+from ..security.retention import RETENTION, DeletionRefused, delete_permanently
+from ..security.scanning import scan_state
+from ..security.sessions import (
+    clear_cookie as clear_session_cookie,
+)
+from ..security.sessions import (
+    is_secure_request,
+)
+from ..security.sessions import (
+    issue as issue_session,
+)
+from ..security.sessions import (
+    set_cookie as set_session_cookie,
+)
 from ..statements.build import BuildError, build_statements
 from ..statements.checks import run_historical_checks, summarize
 from ..statements.export import ExportError, build_engine_inputs
 from ..statements.reported import citations, reported_strings
 from ..statements.views import equity_statement_status, statement_view
-from ..review.progress import review_progress, verification_gates
+from ..valuation.build import ValuationError, build_scenario_valuation
+from ..valuation.checks import EXIT_MULTIPLE_STATUS, headroom, terminal_share
+from ..valuation.inputs import LEASE_LIABILITIES_NOTE
+from ..valuation.sensitivity import build_grid
+from ..valuation.views import flow_rows
 from .bookmarks import bookmarks, unmapped_statements
 from .rendering import render_page
 
@@ -122,6 +152,13 @@ class _Shell:
             nav_items(document_id, current=_current_section(request.url.path)),
         )
         context.setdefault("context_units", _context_units(context))
+        # 20.12: every POST form needs this session's token, and a template
+        # that has to be passed it is a template somebody will forget. The
+        # guard put it on the request before any route ran.
+        context.setdefault(
+            "csrf_token",
+            (getattr(request.state, "guard", None) and request.state.guard.csrf_token) or "",
+        )
         return self.templates.TemplateResponse(
             request=request, name=name, context=context, **kwargs
         )
@@ -170,10 +207,24 @@ def _store(request: Request):
 
 
 def _load(request: Request, document_id: str):
+    """One document, after 20.7's check. The only way a route reads one.
+
+    The authorization check lives here rather than in each route because every
+    document route already comes through this function, and a check a route has
+    to remember is a check a route will one day not have. Item 146 is one line
+    in one place for exactly that reason.
+
+    Both failures return the same 404 with the same text. Distinguishing "does
+    not exist" from "not yours" tells a prober which document identifiers are
+    real, one request at a time -- and an identifier here belongs to a filing
+    nobody has released.
+    """
     try:
-        return _repository(request).load_result(document_id)
+        result = _repository(request).load_result(document_id)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"no document {document_id}") from None
+        raise HTTPException(status_code=404, detail=NOT_FOUND) from None
+    require_access(result, _actor(request))
+    return result
 
 
 def _back(document_id: str, page: int, **flash) -> RedirectResponse:
@@ -185,19 +236,32 @@ def _back(document_id: str, page: int, **flash) -> RedirectResponse:
 
 
 @router.get("/health")
-def health() -> dict:
-    """Phase 1 item 14. Liveness only -- it asserts nothing about the data."""
-    return {"status": "ok"}
+def health(request: Request) -> dict:
+    """Phase 1 item 14, and Phase 17 item 180.
+
+    Liveness, plus the three versions 180 requires a deployment record: the
+    commit, the export schema version and the formula fingerprint. It asserts
+    nothing about the data, and deliberately carries none: this endpoint is
+    public (see `guard.PUBLIC`), so a company name or a document id here would
+    be a filing detail served without a credential.
+
+    A commit is not a secret. It is a revision of a private repository, and
+    knowing it tells an unauthenticated reader nothing they could not learn by
+    being given access -- while not knowing it makes item 180 unanswerable for
+    whoever is holding two exports that disagree.
+    """
+    info = request.app.state.build_info
+    return {"status": "ok", **info.as_dict()}
 
 
 @dataclass(frozen=True)
 class _Model:
     """One row of the 7.1 portfolio."""
 
-    document: object
-    standing: object
-    result: object
-    scenarios: object = None
+    document: SourceDocument
+    standing: Standing
+    result: ExtractionResult
+    scenarios: ScenarioSet | None = None
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -213,10 +277,16 @@ def index(request: Request):
     repository = _repository(request)
     store = _scenario_store(request)
 
+    actor = _actor(request)
     models = []
-    for document_id in repository.document_ids():
-        result = repository.load_result(document_id)
-        scenarios = store.load(document_id, owner=_actor(request))
+    # 20.7 again: a portfolio that lists a model the reader cannot open tells
+    # them it exists, which is the same leak the 404 above avoids.
+    for result in visible(
+        [repository.load_result(document_id) for document_id in repository.document_ids()],
+        actor,
+    ):
+        document_id = result.document.id
+        scenarios = store.load(document_id, owner=actor)
         models.append(
             _Model(
                 document=result.document,
@@ -229,7 +299,8 @@ def index(request: Request):
 
     chart, chart_document_id = _portfolio_chart(models)
     return _templates(request).TemplateResponse(
-        request=request, name="index.html",
+        request=request,
+        name="index.html",
         context={
             "models": models,
             "cards": portfolio_cards(tuple((m.document, m.standing) for m in models)),
@@ -270,10 +341,13 @@ def _revenue_series(result, scenarios=None):
         return None
 
     income = built.ledgers[Statement.INCOME]
-    points = [
-        (year, income.get("revenue", year))
-        for year in built.years
-        if income.get("revenue", year) is not None
+    # Annotated, because the comprehension's own type is
+    # list[tuple[str, Decimal | None]] -- the `is not None` filter narrows the
+    # values but not the inferred element type.
+    points: list[tuple[str, Decimal]] = [
+        (year, value)
+        for year, value in ((y, income.get("revenue", y)) for y in built.years)
+        if value is not None
     ]
     if len(points) < 2:
         return None
@@ -286,9 +360,11 @@ def _revenue_series(result, scenarios=None):
         if forecast is not None:
             projected = forecast_ledger(forecast, Statement.INCOME)
             points += [
-                (year, projected.get("revenue", year))
-                for year in forecast.periods.forecast
-                if projected.get("revenue", year) is not None
+                (year, value)
+                for year, value in (
+                    (y, projected.get("revenue", y)) for y in forecast.periods.forecast
+                )
+                if value is not None
             ]
 
     return line_chart("Revenue", tuple(points), _units_for(result))
@@ -322,9 +398,7 @@ def chart_csv(request: Request, document_id: str):
     return Response(
         content=series.csv,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="{document_id}-revenue.csv"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{document_id}-revenue.csv"'},
     )
 
 
@@ -357,9 +431,7 @@ def source_room(request: Request, document_id: str, page: int, error: str = "", 
         for fact in result.facts
         if (loc := result.location(fact.source_location_id)) and loc.page_number == page
     ]
-    geometry = next(
-        (p.geometry for p in result.document.pages if p.page_number == page), None
-    )
+    geometry = next((p.geometry for p in result.document.pages if p.page_number == page), None)
     profile = next((p for p in result.document.pages if p.page_number == page), None)
 
     return _templates(request).TemplateResponse(
@@ -422,16 +494,17 @@ def confirm(
                 result, {field: replacement}, actor=_actor(request), reason=reason
             )
         else:
-            detected = {
+            # Annotated: every value here is None -- "accept what was
+            # detected" -- and an inferred dict[str, None] is not the
+            # dict[str, str | None] `confirm_metadata` takes.
+            detected: dict[str, str | None] = {
                 name: None
                 for name, f in result.document.metadata.fields.items()
                 if f.value is not None and not f.confirmed
             }
             if not detected:
                 raise ReviewError("every detected field is already confirmed")
-            updated = confirm_metadata(
-                result, detected, actor=_actor(request), reason=reason
-            )
+            updated = confirm_metadata(result, detected, actor=_actor(request), reason=reason)
     except (ReviewError, ValueError, KeyError) as exc:
         return _back(document_id, page, error=str(exc))
 
@@ -567,8 +640,12 @@ def decide_mapping(
             updated = map_fact(result, fact_id, canonical_code, actor=actor, note=note)
         elif action == "split":
             updated = split_fact(
-                result, fact_id, _parse_allocation(allocation),
-                basis=basis, actor=actor, note=note,
+                result,
+                fact_id,
+                _parse_allocation(allocation),
+                basis=basis,
+                actor=actor,
+                note=note,
             )
         elif action == "reject":
             updated = reject_mapping(result, fact_id, actor=actor, note=note)
@@ -583,7 +660,7 @@ def decide_mapping(
     return _mapping_back(document_id, ok=f"Recorded: {action}.")
 
 
-def _parse_allocation(text: str) -> "list[tuple[str, str]]":
+def _parse_allocation(text: str) -> list[tuple[str, str]]:
     """`code = amount` per line. Refuses anything it cannot read."""
     allocations = []
     for number, line in enumerate(text.splitlines(), start=1):
@@ -607,7 +684,7 @@ def combine(
     document_id: str,
     canonical_code: str = Form(...),
     note: str = Form(""),
-    fact_ids: "list[str]" = Form(default=[]),
+    fact_ids: list[str] = Form(default=[]),
 ):
     """Item 53, 11.5. Several raw lines onto one canonical line."""
     result = _load(request, document_id)
@@ -618,9 +695,7 @@ def combine(
     except (MappingError, KeyError) as exc:
         return _mapping_back(document_id, error=str(exc))
     _repository(request).save(apply_findings(updated))
-    return _mapping_back(
-        document_id, ok=f"Combined {len(fact_ids)} line(s) into {canonical_code}."
-    )
+    return _mapping_back(document_id, ok=f"Combined {len(fact_ids)} line(s) into {canonical_code}.")
 
 
 @router.post("/documents/{document_id}/mapping/approve-all")
@@ -672,10 +747,15 @@ def statements(request: Request, document_id: str, error: str = "", ok: str = ""
         built = build_statements(result, strict=False)
     except BuildError as exc:
         return _templates(request).TemplateResponse(
-            request=request, name="statements.html",
+            request=request,
+            name="statements.html",
             context={
-                "document": result.document, "result": result, "built": None,
-                "blocked": str(exc), "error": error, "ok": ok,
+                "document": result.document,
+                "result": result,
+                "built": None,
+                "blocked": str(exc),
+                "error": error,
+                "ok": ok,
                 "equity_note": equity_statement_status(),
             },
         )
@@ -700,7 +780,8 @@ def statements(request: Request, document_id: str, error: str = "", ok: str = ""
         export_error = str(exc)
 
     return _templates(request).TemplateResponse(
-        request=request, name="statements.html",
+        request=request,
+        name="statements.html",
         context={
             "document": result.document,
             "result": result,
@@ -743,10 +824,15 @@ def schedules(request: Request, document_id: str, error: str = "", ok: str = "")
         built = build_statements(result, strict=False)
     except BuildError as exc:
         return _templates(request).TemplateResponse(
-            request=request, name="schedules.html",
+            request=request,
+            name="schedules.html",
             context={
-                "document": result.document, "result": result, "schedules": None,
-                "blocked": str(exc), "error": error, "ok": ok,
+                "document": result.document,
+                "result": result,
+                "schedules": None,
+                "blocked": str(exc),
+                "error": error,
+                "ok": ok,
             },
         )
 
@@ -754,7 +840,8 @@ def schedules(request: Request, document_id: str, error: str = "", ok: str = "")
     checks = run_schedule_checks(schedule_set)
 
     return _templates(request).TemplateResponse(
-        request=request, name="schedules.html",
+        request=request,
+        name="schedules.html",
         context={
             "document": result.document,
             "result": result,
@@ -773,6 +860,7 @@ def schedules(request: Request, document_id: str, error: str = "", ok: str = "")
 
 # --- items 78-88: the formula engine screen (18.10, 18.11) ------------------
 
+
 @router.get("/documents/{document_id}/formulas", response_class=HTMLResponse)
 def formulas(request: Request, document_id: str, error: str = ""):
     """Section 18's two "provide" clauses, provided.
@@ -787,15 +875,20 @@ def formulas(request: Request, document_id: str, error: str = ""):
         built = build_statements(result, strict=False)
     except BuildError as exc:
         return _templates(request).TemplateResponse(
-            request=request, name="formulas.html",
+            request=request,
+            name="formulas.html",
             context={
-                "document": result.document, "result": result, "report": None,
-                "blocked": str(exc), "error": error,
+                "document": result.document,
+                "result": result,
+                "report": None,
+                "blocked": str(exc),
+                "error": error,
             },
         )
 
     return _templates(request).TemplateResponse(
-        request=request, name="formulas.html",
+        request=request,
+        name="formulas.html",
         context={
             "document": result.document,
             "result": result,
@@ -808,10 +901,11 @@ def formulas(request: Request, document_id: str, error: str = ""):
 
 # --- items 89-96: the assumptions screen (7.7) ------------------------------
 
+
 #: The forecast periods this system plans for. `export.py` already fixes five
 #: (FORECAST_YEARS), and the gate has to ask about each one separately: a
 #: driver scoped to 2026E alone is missing from the other four.
-def _forecast_periods(built) -> "tuple[str, ...]":
+def _forecast_periods(built) -> tuple[str, ...]:
     from ..statements.export import FORECAST_YEARS
 
     last = int(built.years[-1][:4]) if built.years else 0
@@ -824,9 +918,7 @@ def _scenario_store(request: Request) -> ScenarioStore:
 
 def _assumptions_back(document_id: str, scenario_id: str, **flash) -> RedirectResponse:
     query = urlencode({"scenario_id": scenario_id, **{k: v for k, v in flash.items() if v}})
-    return RedirectResponse(
-        f"/documents/{document_id}/assumptions?{query}", status_code=303
-    )
+    return RedirectResponse(f"/documents/{document_id}/assumptions?{query}", status_code=303)
 
 
 def _assumptions_context(request: Request, document_id: str, scenario_id: str):
@@ -851,10 +943,15 @@ def assumptions(
     result, built, blocked = _assumptions_context(request, document_id, scenario_id)
     if blocked:
         return _templates(request).TemplateResponse(
-            request=request, name="assumptions.html",
+            request=request,
+            name="assumptions.html",
             context={
-                "document": result.document, "result": result, "blocked": blocked,
-                "error": error, "ok": ok, "scenario_id": scenario_id,
+                "document": result.document,
+                "result": result,
+                "blocked": blocked,
+                "error": error,
+                "ok": ok,
+                "scenario_id": scenario_id,
             },
         )
 
@@ -862,13 +959,12 @@ def assumptions(
     periods = _forecast_periods(built)
     rows = required_rows(scenarios, scenario_id)
     # The status form needs the legal moves for each row's own assumption.
-    rows = tuple(
-        _with_statuses(row) for row in rows
-    )
+    rows = tuple(_with_statuses(row) for row in rows)
     schedules = build_schedules(built)
 
     return _templates(request).TemplateResponse(
-        request=request, name="assumptions.html",
+        request=request,
+        name="assumptions.html",
         context={
             "document": result.document,
             "result": result,
@@ -884,7 +980,8 @@ def assumptions(
             "periods": periods,
             "editable_codes": sorted(scenarios.resolve(scenario_id)),
             "impact": request.app.state.last_impact.pop(document_id, None)
-            if hasattr(request.app.state, "last_impact") else None,
+            if hasattr(request.app.state, "last_impact")
+            else None,
             "error": error,
             "ok": ok,
         },
@@ -916,17 +1013,16 @@ def accept_proposal(
     code: str = Form(...),
 ):
     """7.7.a: take a measured historical driver into the scenario, as a Draft."""
-    result, built, blocked = _assumptions_context(request, document_id, scenario_id)
+    _result, built, blocked = _assumptions_context(request, document_id, scenario_id)
     if blocked:
         return _assumptions_back(document_id, scenario_id, error=blocked)
 
-    proposals = propose_from_schedules(
-        build_schedules(built), owner=_actor(request)
-    )
+    proposals = propose_from_schedules(build_schedules(built), owner=_actor(request))
     match = next((p for p in proposals if p.assumption.code == code), None)
     if match is None:
         return _assumptions_back(
-            document_id, scenario_id,
+            document_id,
+            scenario_id,
             error=f"{code!r} is not a driver the schedules measured.",
         )
 
@@ -935,14 +1031,13 @@ def accept_proposal(
     try:
         from dataclasses import replace
 
-        scenarios = scenarios.with_assumption(
-            replace(match.assumption, scenario_id=scenario_id)
-        )
+        scenarios = scenarios.with_assumption(replace(match.assumption, scenario_id=scenario_id))
     except (AssumptionError, ScenarioError) as exc:
         return _assumptions_back(document_id, scenario_id, error=str(exc))
     store.save(document_id, scenarios)
     return _assumptions_back(
-        document_id, scenario_id,
+        document_id,
+        scenario_id,
         ok=f"{code} added as a Draft. It cannot be forecast on until reviewed (14.1).",
     )
 
@@ -963,21 +1058,23 @@ def change_status(
     resolved = scenarios.resolve(scenario_id).get(code)
     if resolved is None or resolved.from_scenario != scenario_id:
         return _assumptions_back(
-            document_id, scenario_id,
+            document_id,
+            scenario_id,
             error=f"{code!r} is not an assumption {scenario_id!r} holds of its own.",
         )
     try:
         moved, _change = transition(
-            resolved.assumption, Status(to),
-            actor=_actor(request), reason=reason, reviewer=reviewer,
+            resolved.assumption,
+            Status(to),
+            actor=_actor(request),
+            reason=reason,
+            reviewer=reviewer,
         )
     except (WorkflowError, ValueError) as exc:
         return _assumptions_back(document_id, scenario_id, error=str(exc))
 
     store.save(document_id, scenarios.with_assumption(moved))
-    return _assumptions_back(
-        document_id, scenario_id, ok=f"{code} is now {moved.status.value}."
-    )
+    return _assumptions_back(document_id, scenario_id, ok=f"{code} is now {moved.status.value}.")
 
 
 @router.post("/documents/{document_id}/assumptions/preview")
@@ -993,7 +1090,7 @@ def preview_assumption(
     The impact is held for exactly one render and then dropped. Storing it
     would make it a saved thing, which is the opposite of what 14.8 asks for.
     """
-    result, built, blocked = _assumptions_context(request, document_id, scenario_id)
+    _result, built, blocked = _assumptions_context(request, document_id, scenario_id)
     if blocked:
         return _assumptions_back(document_id, scenario_id, error=blocked)
 
@@ -1054,14 +1151,13 @@ def forecast(request: Request, document_id: str, scenario_id: str = BASE, error:
 
     chosen = next((f for f in forecasts if f.scenario_id == scenario_id), None)
     if chosen is None:
-        reason = not_built.get(
-            scenario_id, f"scenario {scenario_id!r} has no forecast yet"
-        )
+        reason = not_built.get(scenario_id, f"scenario {scenario_id!r} has no forecast yet")
         return _forecast_blocked(request, result, reason, scenario_id, error)
 
     readiness = check_every_scenario(tuple(forecasts), not_built)
     return _templates(request).TemplateResponse(
-        request=request, name="forecast.html",
+        request=request,
+        name="forecast.html",
         context={
             "document": result.document,
             "result": result,
@@ -1082,8 +1178,11 @@ def forecast(request: Request, document_id: str, scenario_id: str = BASE, error:
             "readiness": readiness,
             "comparison_code": COMPARISON_CODE,
             "comparison_rows": comparison(
-                tuple(forecasts), Statement.INCOME, COMPARISON_CODE,
-                readiness=readiness, scenarios=scenarios,
+                tuple(forecasts),
+                Statement.INCOME,
+                COMPARISON_CODE,
+                readiness=readiness,
+                scenarios=scenarios,
             )
             if len(forecasts) > 1
             else (),
@@ -1094,15 +1193,20 @@ def forecast(request: Request, document_id: str, scenario_id: str = BASE, error:
 
 def _forecast_blocked(request, result, reason: str, scenario_id: str, error: str):
     return _templates(request).TemplateResponse(
-        request=request, name="forecast.html",
+        request=request,
+        name="forecast.html",
         context={
-            "document": result.document, "result": result, "blocked": reason,
-            "scenario_id": scenario_id, "error": error,
+            "document": result.document,
+            "result": result,
+            "blocked": reason,
+            "scenario_id": scenario_id,
+            "error": error,
         },
     )
 
 
 # --- items 109-120: the DCF valuation screen (7.9) --------------------------
+
 
 @router.get("/documents/{document_id}/valuation", response_class=HTMLResponse)
 def valuation(request: Request, document_id: str, scenario_id: str = BASE, error: str = ""):
@@ -1116,10 +1220,14 @@ def valuation(request: Request, document_id: str, scenario_id: str = BASE, error
 
     def blocked(reason: str):
         return _templates(request).TemplateResponse(
-            request=request, name="valuation.html",
+            request=request,
+            name="valuation.html",
             context={
-                "document": result.document, "result": result, "blocked": reason,
-                "scenario_id": scenario_id, "error": error,
+                "document": result.document,
+                "result": result,
+                "blocked": reason,
+                "scenario_id": scenario_id,
+                "error": error,
             },
         )
 
@@ -1136,7 +1244,8 @@ def valuation(request: Request, document_id: str, scenario_id: str = BASE, error
         return blocked(str(exc))
 
     return _templates(request).TemplateResponse(
-        request=request, name="valuation.html",
+        request=request,
+        name="valuation.html",
         context={
             "document": result.document,
             "result": result,
@@ -1155,6 +1264,7 @@ def valuation(request: Request, document_id: str, scenario_id: str = BASE, error
 
 
 # --- items 131-137: the diagnostics screen (7.10) ---------------------------
+
 
 @router.get("/documents/{document_id}/diagnostics", response_class=HTMLResponse)
 def diagnostics(
@@ -1188,9 +1298,7 @@ def diagnostics(
     traceable = traceable_lines(built)
     trace_code, trace_period = _trace_target(code, traceable)
     lineage = (
-        trace(result, built, trace_code, trace_period)
-        if trace_code and built is not None
-        else None
+        trace(result, built, trace_code, trace_period) if trace_code and built is not None else None
     )
 
     log = filter_events(
@@ -1203,7 +1311,8 @@ def diagnostics(
     dependents = graph.dependents()
 
     return _templates(request).TemplateResponse(
-        request=request, name="diagnostics.html",
+        request=request,
+        name="diagnostics.html",
         context={
             "document": result.document,
             "result": result,
@@ -1236,7 +1345,7 @@ def diagnostics(
     )
 
 
-def _trace_target(raw: str, traceable) -> "tuple[str, str]":
+def _trace_target(raw: str, traceable) -> tuple[str, str]:
     """Which line the lineage panel is showing.
 
     Defaults to the first traceable line rather than to nothing: a panel that
@@ -1259,25 +1368,33 @@ def _trace_target(raw: str, traceable) -> "tuple[str, str]":
 #: that already exist elsewhere rather than being built twice.
 DOWNLOADS = (
     (
-        "workbook", "Full model workbook (.xlsx)", "7.11.a",
+        "workbook",
+        "Full model workbook (.xlsx)",
+        "7.11.a",
         "All sixteen tabs 21.1 lists. Hardcodes and calculated figures are "
         "distinguishable by named style as well as by colour (21.2), and any "
         "value a spreadsheet number cannot hold exactly carries its exact "
         "value in a cell note.",
     ),
     (
-        "report", "PDF valuation report (.pdf)", "7.11.b",
+        "report",
+        "PDF valuation report (.pdf)",
+        "7.11.b",
         "21.6's nine sections: valuation date, source coverage, assumptions, "
         "forecast, DCF, sensitivities, checks, limitations and model version.",
     ),
     (
-        "json", "Normalized data (.json)", "7.11.c",
+        "json",
+        "Normalized data (.json)",
+        "7.11.c",
         "Every table, validated against a published versioned schema on the "
         "way out (21.5). Numbers are decimal strings, because a JSON number is "
         "a float to most parsers and would lose the exact value.",
     ),
     (
-        "csv", "Normalized data (.csv, one file per table)", "7.11.c",
+        "csv",
+        "Normalized data (.csv, one file per table)",
+        "7.11.c",
         "Each table as its own CSV, with the data-dictionary reference in its "
         "header (21.4). A text cell a spreadsheet would run as a formula is "
         "neutralized; a negative number is not.",
@@ -1300,7 +1417,7 @@ def _download_name(model, extension: str) -> str:
     """
     stem = (model.company or model.document_id).replace(" ", "-")
     safe = "".join(c for c in stem if c.isalnum() or c in "-_")[:48] or "model"
-    return f"{safe}-{model.scenario_id}-{model.version_id[5:5 + 12]}.{extension}"
+    return f"{safe}-{model.scenario_id}-{model.version_id[5 : 5 + 12]}.{extension}"
 
 
 @router.get("/documents/{document_id}/exports", response_class=HTMLResponse)
@@ -1309,7 +1426,8 @@ def exports(request: Request, document_id: str, scenario_id: str = BASE):
     model = _export_model(request, document_id, scenario_id)
     result = _load(request, document_id)
     return _templates(request).TemplateResponse(
-        request=request, name="exports.html",
+        request=request,
+        name="exports.html",
         context={
             "document": result.document,
             "result": result,
@@ -1330,10 +1448,7 @@ def export_json_download(request: Request, document_id: str, scenario_id: str = 
     return Response(
         content=to_json(model),
         media_type="application/json",
-        headers={
-            "Content-Disposition":
-                f'attachment; filename="{_download_name(model, "json")}"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{_download_name(model, "json")}"'},
     )
 
 
@@ -1345,21 +1460,18 @@ def export_schema(request: Request, document_id: str):
 
 
 @router.get("/documents/{document_id}/exports/{table_name}.csv")
-def export_table_csv(
-    request: Request, document_id: str, table_name: str, scenario_id: str = BASE
-):
+def export_table_csv(request: Request, document_id: str, table_name: str, scenario_id: str = BASE):
     model = _export_model(request, document_id, scenario_id)
     try:
         table = model.table(table_name)
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"no table {table_name!r}")
+        raise HTTPException(status_code=404, detail=f"no table {table_name!r}") from None
     return Response(
         content=table_to_csv(model, table),
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition":
-                f'attachment; filename="{table_name}-'
-                f'{model.version_id[5:5 + 12]}.csv"'
+            "Content-Disposition": f'attachment; filename="{table_name}-'
+            f'{model.version_id[5 : 5 + 12]}.csv"'
         },
     )
 
@@ -1369,13 +1481,8 @@ def export_workbook(request: Request, document_id: str, scenario_id: str = BASE)
     model = _export_model(request, document_id, scenario_id)
     return Response(
         content=xlsx_bytes(model),
-        media_type=(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
-        headers={
-            "Content-Disposition":
-                f'attachment; filename="{_download_name(model, "xlsx")}"'
-        },
+        media_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        headers={"Content-Disposition": f'attachment; filename="{_download_name(model, "xlsx")}"'},
     )
 
 
@@ -1385,8 +1492,155 @@ def export_report(request: Request, document_id: str, scenario_id: str = BASE):
     return Response(
         content=pdf_bytes(model),
         media_type="application/pdf",
-        headers={
-            "Content-Disposition":
-                f'attachment; filename="{_download_name(model, "pdf")}"'
+        headers={"Content-Disposition": f'attachment; filename="{_download_name(model, "pdf")}"'},
+    )
+
+
+# --- items 145, 146: the credential, the session, and the way out ----------
+
+
+@router.get("/login", response_class=HTMLResponse)
+def login_form(request: Request, next: str = "/", error: str = ""):
+    """2.2.c's credential prompt.
+
+    A plain form. There is no JavaScript anywhere in this application, so
+    there is no client-side validation to disagree with the server's, and no
+    fetch that could leave the password in a console.
+    """
+    if request.app.state.credential is None:
+        return RedirectResponse("/", status_code=303)
+    if request.state.guard.session is not None:
+        return RedirectResponse(safe_next(next), status_code=303)
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={
+            "next": safe_next(next),
+            "error": error,
+            "csrf_token": request.state.guard.csrf_token,
+            "nav_items": (),
+            "context_units": "",
+            "current_section": "",
         },
     )
+
+
+@router.post("/login")
+def sign_in(
+    request: Request,
+    password: str = Form(""),
+    next: str = Form("/"),
+    csrf_token: str = Form(""),
+):
+    """Verify the credential, or refuse in a way that says nothing extra.
+
+    The failure message never distinguishes "no credential configured" from
+    "wrong password", and the rate limit is keyed on the client address so one
+    browser cannot spend another's budget.
+    """
+    state = request.app.state
+    if state.credential is None:
+        return RedirectResponse("/", status_code=303)
+
+    client = request.client.host if request.client else "unknown"
+    try:
+        state.limiters.authentication.check(client)
+    except RateLimited as exc:
+        return HTMLResponse(
+            f"<h1>Too many attempts</h1><p>{exc}</p>",
+            status_code=429,
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+
+    if not state.credential.verify(password):
+        security_event(
+            "authentication.failed",
+            actor=client,
+            detail="the supplied password did not verify",
+        )
+        return RedirectResponse(
+            f"/login?next={quote(safe_next(next), safe='')}"
+            f"&error={quote('That password was not accepted.')}",
+            status_code=303,
+        )
+
+    state.limiters.authentication.clear(client)
+    cookie, _ = issue_session(state.signing_key)
+    response = RedirectResponse(safe_next(next), status_code=303)
+    set_session_cookie(
+        response,
+        cookie,
+        secure=is_secure_request(request.url.scheme, request.url.hostname),
+    )
+    security_event("authentication.succeeded", actor=client, detail="session issued")
+    return response
+
+
+@router.post("/logout")
+def sign_out(request: Request, csrf_token: str = Form("")):
+    """End the session. A POST, because a GET that logs you out can be a link."""
+    response = RedirectResponse("/login", status_code=303)
+    clear_session_cookie(response)
+    security_event("authentication.ended", actor=_actor(request), detail="signed out")
+    return response
+
+
+# --- items 150, 151: retention, permanent deletion, and the backup -----------
+
+
+@router.get("/documents/{document_id}/settings", response_class=HTMLResponse)
+def settings(request: Request, document_id: str, error: str = "", ok: str = ""):
+    """7.12 Settings, for one model: policies, retention and deletion."""
+    result = _load(request, document_id)
+    return _templates(request).TemplateResponse(
+        request=request,
+        name="settings.html",
+        context={
+            "document": result.document,
+            "result": result,
+            "retention": RETENTION,
+            "scan": scan_state(request.app.state.storage_root, result),
+            "error": error,
+            "ok": ok,
+        },
+    )
+
+
+@router.post("/documents/{document_id}/delete")
+def delete_document(
+    request: Request,
+    document_id: str,
+    confirm_filename: str = Form(""),
+    reason: str = Form(""),
+    csrf_token: str = Form(""),
+):
+    """2.6.c's permanent deletion, behind 20.18's confirmation.
+
+    The confirmation is the filename typed back, not a button. A button is the
+    same gesture whatever it is attached to, and the gesture is what muscle
+    memory performs.
+    """
+    result = _load(request, document_id)
+    try:
+        stone = delete_permanently(
+            result,
+            request.app.state.storage_root,
+            actor=_actor(request),
+            reason=reason,
+            typed_filename=confirm_filename,
+            store=_store(request),
+            repository=_repository(request),
+        )
+    except DeletionRefused as exc:
+        return RedirectResponse(
+            f"/documents/{document_id}/settings?error={quote(str(exc))}",
+            status_code=303,
+        )
+    security_event(
+        "document.deleted",
+        actor=_actor(request),
+        outcome="deleted",
+        document_id=document_id,
+        detail=stone.reason,
+    )
+    return RedirectResponse(f"/?ok={quote(stone.describe())}", status_code=303)

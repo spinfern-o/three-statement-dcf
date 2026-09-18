@@ -130,9 +130,9 @@ class Schedule:
     reconciliation 13.8 requires for every period.
     """
 
-    key: str          # "working_capital", "ppe", ...
-    title: str        # "Working capital"
-    rule: str         # "13.1"
+    key: str  # "working_capital", "ppe", ...
+    title: str  # "Working capital"
+    rule: str  # "13.1"
     availability: Availability
     #: Why, when availability is not AVAILABLE. Required in that case.
     reason: str = ""

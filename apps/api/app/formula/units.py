@@ -93,9 +93,7 @@ CURRENCY_PER_SHARE = _unit("currency_per_share", currency=1, shares=-1)
 
 UNITS = {
     unit.name: unit
-    for unit in (
-        CURRENCY, SHARES, DAYS, YEARS, RATIO, MULTIPLE, PERCENT, CURRENCY_PER_SHARE
-    )
+    for unit in (CURRENCY, SHARES, DAYS, YEARS, RATIO, MULTIPLE, PERCENT, CURRENCY_PER_SHARE)
 }
 
 #: Dimensionless units that a formula may multiply by. `percent` is absent on
@@ -113,11 +111,11 @@ def unit_for(name: str) -> Unit:
     return UNITS[name]
 
 
-def _combine(left: Unit, right: Unit, sign: int) -> "tuple[int, ...]":
+def _combine(left: Unit, right: Unit, sign: int) -> tuple[int, ...]:
     return tuple(a + sign * b for a, b in zip(left.exponents, right.exponents))
 
 
-def _named(exponents: "tuple[int, ...]") -> Unit:
+def _named(exponents: tuple[int, ...]) -> Unit:
     """The declared unit with these exponents, or an anonymous one.
 
     An anonymous unit is not an error by itself -- an intermediate result in a
@@ -127,9 +125,7 @@ def _named(exponents: "tuple[int, ...]") -> Unit:
     for unit in UNITS.values():
         if unit.exponents == exponents and unit.name not in ("multiple", "percent"):
             return unit
-    parts = [
-        f"{d}^{e}" for d, e in zip(DIMENSIONS, exponents) if e
-    ]
+    parts = [f"{d}^{e}" for d, e in zip(DIMENSIONS, exponents) if e]
     return Unit("(" + " ".join(parts) + ")" if parts else "(dimensionless)", exponents)
 
 

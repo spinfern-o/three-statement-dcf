@@ -34,8 +34,12 @@ D = Decimal
 
 def formula(code, target, expression, unit="currency", version=1):
     return FormulaDefinition(
-        code=code, target=target, expression=expression, output_unit=unit,
-        version=version, definition=f"{target} as {expression}",
+        code=code,
+        target=target,
+        expression=expression,
+        output_unit=unit,
+        version=version,
+        definition=f"{target} as {expression}",
     )
 
 
@@ -44,6 +48,7 @@ def money(**values):
 
 
 # --- item 82: units (18.12) -------------------------------------------------
+
 
 def test_currency_and_shares_cannot_be_added():
     with pytest.raises(u.UnitError, match="cannot add"):
@@ -108,6 +113,7 @@ def test_an_undeclared_unit_name_is_refused():
 
 # --- items 81, 83: evaluation and its refusals ------------------------------
 
+
 def test_a_missing_input_is_not_zero():
     """18.14, stated as the difference it makes."""
     with pytest.raises(MissingInput, match="It is not zero"):
@@ -137,7 +143,9 @@ def test_a_negative_exponent_on_zero_is_a_division_by_zero():
 
 def test_the_trace_carries_the_formula_and_the_exact_inputs():
     """18.10 and 18.11, which is what makes a calculated cell reviewable."""
-    result = evaluate("(revenue - cogs) / revenue", money(revenue="1250000", cogs="750000"), u.RATIO)
+    result = evaluate(
+        "(revenue - cogs) / revenue", money(revenue="1250000", cogs="750000"), u.RATIO
+    )
     assert result.formula == "((revenue - cogs) / revenue)"
     assert result.substituted == "((1,250,000 - 750,000) / 1,250,000)"
     assert result.inputs == {"revenue": D("1250000"), "cogs": D("750000")}
@@ -175,11 +183,13 @@ def test_the_environment_is_a_mapping_not_an_object():
 
 # --- items 79, 80: the graph ------------------------------------------------
 
-CHAIN = FormulaSet((
-    formula("A", "gross_profit", "revenue - cogs"),
-    formula("B", "ebit", "gross_profit - operating_expenses"),
-    formula("C", "pretax", "ebit - interest_expense"),
-))
+CHAIN = FormulaSet(
+    (
+        formula("A", "gross_profit", "revenue - cogs"),
+        formula("B", "ebit", "gross_profit - operating_expenses"),
+        formula("C", "pretax", "ebit - interest_expense"),
+    )
+)
 
 
 def test_the_order_puts_every_formula_after_what_it_reads():
@@ -189,9 +199,7 @@ def test_the_order_puts_every_formula_after_what_it_reads():
 
 def test_the_order_is_deterministic_across_runs():
     """18.7 needs it: an order that varies makes a fingerprint vary."""
-    wide = FormulaSet(tuple(
-        formula(f"C{i}", f"t{i}", "revenue - cogs") for i in range(12)
-    ))
+    wide = FormulaSet(tuple(formula(f"C{i}", f"t{i}", "revenue - cogs") for i in range(12)))
     orders = {DependencyGraph(wide).order() for _ in range(5)}
     assert len(orders) == 1
 
@@ -204,11 +212,13 @@ def test_required_inputs_are_what_the_graph_does_not_produce():
 
 def test_a_cycle_is_named_before_anything_is_evaluated():
     """18.6. The three-statement circularity, which is not hypothetical."""
-    circular = FormulaSet((
-        formula("A", "interest_expense", "debt * rate"),
-        formula("B", "net_income", "ebit - interest_expense"),
-        formula("C", "debt", "opening_debt + net_income"),
-    ))
+    circular = FormulaSet(
+        (
+            formula("A", "interest_expense", "debt * rate"),
+            formula("B", "net_income", "ebit - interest_expense"),
+            formula("C", "debt", "opening_debt + net_income"),
+        )
+    )
     with pytest.raises(CycleError) as caught:
         DependencyGraph(circular).order()
     message = str(caught.value)
@@ -233,15 +243,27 @@ def test_a_code_cannot_be_reused():
 
 # --- item 85: incremental recalculation (18.8) ------------------------------
 
+
 def test_only_the_descendants_of_a_change_are_recalculated():
-    first = calculate(CHAIN, money(
-        revenue="1250000", cogs="750000", operating_expenses="300000",
-        interest_expense="18000",
-    ))
-    second = recalculate(first, money(
-        revenue="1250000", cogs="750000", operating_expenses="310000",
-        interest_expense="18000",
-    ), ("operating_expenses",))
+    first = calculate(
+        CHAIN,
+        money(
+            revenue="1250000",
+            cogs="750000",
+            operating_expenses="300000",
+            interest_expense="18000",
+        ),
+    )
+    second = recalculate(
+        first,
+        money(
+            revenue="1250000",
+            cogs="750000",
+            operating_expenses="310000",
+            interest_expense="18000",
+        ),
+        ("operating_expenses",),
+    )
 
     assert second.recalculated == ("ebit", "pretax")
     assert second.carried_over == ("gross_profit",)
@@ -263,14 +285,16 @@ def test_recalculation_gives_the_same_answer_as_calculating_from_scratch():
     assert incremental.fingerprint == complete.fingerprint
 
 
-def test_the_prior_model_is_preserved(): 
+def test_the_prior_model_is_preserved():
     """18.9."""
-    first = calculate(CHAIN, money(
-        revenue="100", cogs="40", operating_expenses="30", interest_expense="5"
-    ))
-    second = recalculate(first, money(
-        revenue="200", cogs="40", operating_expenses="30", interest_expense="5"
-    ), ("revenue",))
+    first = calculate(
+        CHAIN, money(revenue="100", cogs="40", operating_expenses="30", interest_expense="5")
+    )
+    second = recalculate(
+        first,
+        money(revenue="200", cogs="40", operating_expenses="30", interest_expense="5"),
+        ("revenue",),
+    )
     assert second.previous is first
     assert second.version == 2
     assert first.value("gross_profit") == D(60), "the old model still reads as it did"
@@ -279,31 +303,36 @@ def test_the_prior_model_is_preserved():
 
 # --- item 84: fingerprints (18.7) -------------------------------------------
 
+
 def test_the_same_inputs_over_the_same_formulas_hash_the_same():
     inputs = dict(revenue="100", cogs="40", operating_expenses="30", interest_expense="5")
-    assert calculate(CHAIN, money(**inputs)).fingerprint == calculate(
-        CHAIN, money(**inputs)
-    ).fingerprint
+    assert (
+        calculate(CHAIN, money(**inputs)).fingerprint
+        == calculate(CHAIN, money(**inputs)).fingerprint
+    )
 
 
 def test_one_changed_input_changes_the_fingerprint():
     base = dict(revenue="100", cogs="40", operating_expenses="30", interest_expense="5")
     moved = dict(base, cogs="40.0000001")
-    assert calculate(CHAIN, money(**base)).fingerprint != calculate(
-        CHAIN, money(**moved)
-    ).fingerprint
+    assert (
+        calculate(CHAIN, money(**base)).fingerprint != calculate(CHAIN, money(**moved)).fingerprint
+    )
 
 
 def test_a_changed_formula_version_changes_the_fingerprint():
-    other = FormulaSet((
-        formula("A", "gross_profit", "revenue - cogs", version=2),
-        formula("B", "ebit", "gross_profit - operating_expenses"),
-        formula("C", "pretax", "ebit - interest_expense"),
-    ))
+    other = FormulaSet(
+        (
+            formula("A", "gross_profit", "revenue - cogs", version=2),
+            formula("B", "ebit", "gross_profit - operating_expenses"),
+            formula("C", "pretax", "ebit - interest_expense"),
+        )
+    )
     inputs = dict(revenue="100", cogs="40", operating_expenses="30", interest_expense="5")
-    assert calculate(CHAIN, money(**inputs)).fingerprint != calculate(
-        other, money(**inputs)
-    ).fingerprint
+    assert (
+        calculate(CHAIN, money(**inputs)).fingerprint
+        != calculate(other, money(**inputs)).fingerprint
+    )
 
 
 def test_trailing_zeros_are_a_different_calculation():
@@ -317,13 +346,18 @@ def test_reformatting_a_definition_does_not_change_the_fingerprint():
     """An editorial change must not make a stored calculation look stale."""
     a = formula("A", "x", "revenue - cogs")
     b = FormulaDefinition(
-        code="A", target="x", expression="revenue  -  cogs", output_unit="currency",
-        definition="a completely different sentence", rule="STEP 99",
+        code="A",
+        target="x",
+        expression="revenue  -  cogs",
+        output_unit="currency",
+        definition="a completely different sentence",
+        rule="STEP 99",
     )
     assert a.fingerprint == b.fingerprint
 
 
 # --- 18.14 through a whole model -------------------------------------------
+
 
 def test_an_uncomputable_cell_stays_absent_and_takes_its_dependents_with_it():
     """Not zero, and not a partial subtotal. The same rule as STEP 5."""
@@ -343,12 +377,17 @@ def test_strict_refuses_rather_than_reporting_a_gap():
 
 def test_a_unit_error_is_refused_even_when_gaps_are_tolerated():
     """A missing input is a fact about the filing; a unit error is a defect."""
-    broken = FormulaSet((
-        FormulaDefinition(
-            code="A", target="nonsense", expression="revenue * revenue",
-            output_unit="currency", definition="deliberately wrong",
-        ),
-    ))
+    broken = FormulaSet(
+        (
+            FormulaDefinition(
+                code="A",
+                target="nonsense",
+                expression="revenue * revenue",
+                output_unit="currency",
+                definition="deliberately wrong",
+            ),
+        )
+    )
     with pytest.raises(u.UnitError):
         calculate(broken, money(revenue="100"), strict=False)
 
@@ -361,12 +400,17 @@ def test_a_division_by_zero_is_a_data_state_not_a_defect():
     revenue has no gross margin. Not strict, that is reported with its reason;
     strict, it refuses, because an export must not move on a figure nobody has.
     """
-    margin = FormulaSet((
-        FormulaDefinition(
-            code="M", target="gross_margin", expression="gross_profit / revenue",
-            output_unit="ratio", definition="gross profit over revenue",
-        ),
-    ))
+    margin = FormulaSet(
+        (
+            FormulaDefinition(
+                code="M",
+                target="gross_margin",
+                expression="gross_profit / revenue",
+                output_unit="ratio",
+                definition="gross profit over revenue",
+            ),
+        )
+    )
     environment = money(gross_profit="0", revenue="0")
 
     tolerant = calculate(margin, environment, strict=False)

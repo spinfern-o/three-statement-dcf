@@ -141,69 +141,151 @@ BOTH = (StatementType.INCOME, StatementType.CASHFLOW)
 P, N, E = ExpectedSign.POSITIVE, ExpectedSign.NEGATIVE, ExpectedSign.EITHER
 CASH_, NONCASH, NOCASH = CashTag.CASH, CashTag.NON_CASH, CashTag.NOT_APPLICABLE
 OP, INV, FIN, NONOP, NOFLOW = (
-    FlowTag.OPERATING, FlowTag.INVESTING, FlowTag.FINANCING,
-    FlowTag.NON_OPERATING, FlowTag.NOT_APPLICABLE,
+    FlowTag.OPERATING,
+    FlowTag.INVESTING,
+    FlowTag.FINANCING,
+    FlowTag.NON_OPERATING,
+    FlowTag.NOT_APPLICABLE,
 )
 
 CHART: tuple[NormalizedLineItem, ...] = (
     # --- income statement -------------------------------------------------
-    _item(accounts.REVENUE, "Revenue", IS, P, NOCASH, OP, """
+    _item(
+        accounts.REVENUE,
+        "Revenue",
+        IS,
+        P,
+        NOCASH,
+        OP,
+        """
         Net sales or revenue from contracts with customers for the period,
         after returns, allowances and trade discounts, and before any expense.
         Interest income, investment income and gains on disposal are NOT
         revenue -- they belong in other income and expense. A filer reporting
         several revenue categories that sum to a total: map the total, or map
-        the categories as an aggregate and show the sum (11.5)."""),
-    _item(accounts.COGS, "Cost of goods sold", IS, P, NOCASH, OP, """
+        the categories as an aggregate and show the sum (11.5).""",
+    ),
+    _item(
+        accounts.COGS,
+        "Cost of goods sold",
+        IS,
+        P,
+        NOCASH,
+        OP,
+        """
         The cost of producing the goods or delivering the services sold in the
         period: direct materials, direct labour, and manufacturing or delivery
         overhead. Stored POSITIVE and subtracted. 'Cost of revenue' and 'cost
         of sales' are this line. Selling, general and administrative cost is
         NOT -- that is operating expenses. STEP 5 forbids inventing this line:
-        a filer that does not separate it has not reported it."""),
-    _item(accounts.GROSS_PROFIT, "Gross profit", IS, E, NOCASH, OP, """
+        a filer that does not separate it has not reported it.""",
+    ),
+    _item(
+        accounts.GROSS_PROFIT,
+        "Gross profit",
+        IS,
+        E,
+        NOCASH,
+        OP,
+        """
         Revenue less cost of goods sold. Map a REPORTED gross profit line here
         and it becomes a validation target (11.7), not an addend -- the engine
         derives the same figure from its components and compares the two
         without preferring either. Leave it absent if the filing does not
-        present it."""),
-    _item(accounts.OPERATING_EXPENSES, "Operating expenses", IS, P, NOCASH, OP, """
+        present it.""",
+    ),
+    _item(
+        accounts.OPERATING_EXPENSES,
+        "Operating expenses",
+        IS,
+        P,
+        NOCASH,
+        OP,
+        """
         Operating cost other than cost of goods sold: selling, general and
         administrative; research and development; marketing; and the
         restructuring or impairment charges the filer presents within
         operating income. Stored POSITIVE and subtracted. A filer presenting
         several such categories maps them as an aggregate (11.5), because the
-        chart has one line for all of them (12.1.d is not implemented)."""),
-    _item(accounts.EBIT, "Operating income (EBIT)", IS, E, NOCASH, OP, """
+        chart has one line for all of them (12.1.d is not implemented).""",
+    ),
+    _item(
+        accounts.EBIT,
+        "Operating income (EBIT)",
+        IS,
+        E,
+        NOCASH,
+        OP,
+        """
         Gross profit less operating expenses. Also labelled 'income from
         operations' or 'operating profit'. Excludes interest and tax. Where a
         filer presents an operating income that includes items this chart
         treats as non-operating, map the reported line and record the
-        difference in the note rather than adjusting it silently."""),
-    _item(accounts.INTEREST_EXPENSE, "Interest expense", IS, P, NOCASH, NONOP, """
+        difference in the note rather than adjusting it silently.""",
+    ),
+    _item(
+        accounts.INTEREST_EXPENSE,
+        "Interest expense",
+        IS,
+        P,
+        NOCASH,
+        NONOP,
+        """
         Interest and other financing cost on borrowings for the period, net of
         capitalised interest, as presented. Stored POSITIVE and subtracted.
         Interest INCOME belongs in other income and expense. Where the filer
         presents one net interest line, map the net figure here and record the
         netting in the note -- rule 1.8 is about not mixing bases silently,
-        and a netted line disclosed as netted is not a silent mix."""),
-    _item(accounts.OTHER_INCOME_EXPENSE, "Other income (expense), net", IS, E, NOCASH, NONOP, """
+        and a netted line disclosed as netted is not a silent mix.""",
+    ),
+    _item(
+        accounts.OTHER_INCOME_EXPENSE,
+        "Other income (expense), net",
+        IS,
+        E,
+        NOCASH,
+        NONOP,
+        """
         Non-operating income and expense presented between operating income
         and pre-tax income: interest income, foreign-exchange gains and
         losses, equity-method results, gains and losses on disposal. Signed as
         presented -- income positive, expense negative. This is a residual
         line: the engine will derive a subtotal without it, treating absence
-        as 'nothing else happened'."""),
-    _item(accounts.PRETAX_INCOME, "Income before income taxes", IS, E, NOCASH, NOFLOW, """
+        as 'nothing else happened'.""",
+    ),
+    _item(
+        accounts.PRETAX_INCOME,
+        "Income before income taxes",
+        IS,
+        E,
+        NOCASH,
+        NOFLOW,
+        """
         Operating income plus other income and expense, less interest expense.
-        A reported line maps here as a validation target (11.7)."""),
-    _item(accounts.TAXES, "Income tax expense", IS, P, NOCASH, NONOP, """
+        A reported line maps here as a validation target (11.7).""",
+    ),
+    _item(
+        accounts.TAXES,
+        "Income tax expense",
+        IS,
+        P,
+        NOCASH,
+        NONOP,
+        """
         Income tax expense for the period -- current and deferred combined as
         the filer presents them. Stored POSITIVE and subtracted. Payroll,
         sales, property and excise taxes are operating cost and are NOT this
         line; mapping a payroll tax line here understates the operating cost
-        base and inflates the effective tax rate the forecast uses."""),
-    _item(accounts.NET_INCOME, "Net income", BOTH, E, NOCASH, NOFLOW, """
+        base and inflates the effective tax rate the forecast uses.""",
+    ),
+    _item(
+        accounts.NET_INCOME,
+        "Net income",
+        BOTH,
+        E,
+        NOCASH,
+        NOFLOW,
+        """
         Profit after tax attributable to the reporting entity. Appears on both
         the income statement and as the first line of operating cash flow;
         that duplication is deliberate and is what the net-income linkage
@@ -211,180 +293,417 @@ CHART: tuple[NormalizedLineItem, ...] = (
         interests is presented separately, map the figure attributable to the
         PARENT and record the choice -- the equity bridge subtracts minority
         interest separately, and taking the consolidated figure here would
-        subtract it twice."""),
-
+        subtract it twice.""",
+    ),
     # --- balance sheet ----------------------------------------------------
-    _item(accounts.CASH, "Cash and cash equivalents", BS, P, NOCASH, NOFLOW, """
+    _item(
+        accounts.CASH,
+        "Cash and cash equivalents",
+        BS,
+        P,
+        NOCASH,
+        NOFLOW,
+        """
         Currency, demand deposits, and investments with an original maturity
         of three months or less. RESTRICTED cash and short-term investments
         with longer maturities are not this line -- map them to other current
         assets and say why. Cash is excluded from working capital by
         construction, which is why its flow tag is not applicable: the cash
         flow statement produces the ending balance, and the balance sheet
-        receives it."""),
-    _item(accounts.ACCOUNTS_RECEIVABLE, "Accounts receivable, net", BS, P, NOCASH, OP, """
+        receives it.""",
+    ),
+    _item(
+        accounts.ACCOUNTS_RECEIVABLE,
+        "Accounts receivable, net",
+        BS,
+        P,
+        NOCASH,
+        OP,
+        """
         Trade receivables from customers for goods delivered or services
         performed, net of the allowance for credit losses. Non-trade
         receivables -- tax refunds, amounts due from related parties -- belong
         in other current assets, because the days-sales-outstanding driver
         divides this line by revenue and a non-trade balance has no revenue
-        behind it."""),
-    _item(accounts.INVENTORY, "Inventories", BS, P, NOCASH, OP, """
+        behind it.""",
+    ),
+    _item(
+        accounts.INVENTORY,
+        "Inventories",
+        BS,
+        P,
+        NOCASH,
+        OP,
+        """
         Raw materials, work in progress and finished goods held for sale, at
         the lower of cost and net realisable value. The days-inventory driver
         divides this by cost of goods sold, so a filer with no separate cost
-        of goods sold line gives this driver nothing to work from."""),
-    _item(accounts.OTHER_CURRENT_ASSETS, "Other current assets", BS, P, NOCASH, OP, """
+        of goods sold line gives this driver nothing to work from.""",
+    ),
+    _item(
+        accounts.OTHER_CURRENT_ASSETS,
+        "Other current assets",
+        BS,
+        P,
+        NOCASH,
+        OP,
+        """
         Every current asset the chart does not name: prepaid expenses,
         contract assets, short-term investments, restricted cash, non-trade
         receivables, current deferred tax assets. Counted in operating working
-        capital."""),
-    _item(accounts.PPE_NET, "Property, plant and equipment, net", BS, P, NOCASH, INV, """
+        capital.""",
+    ),
+    _item(
+        accounts.PPE_NET,
+        "Property, plant and equipment, net",
+        BS,
+        P,
+        NOCASH,
+        INV,
+        """
         Property, plant and equipment at cost less accumulated depreciation.
         The PP&E schedule rolls this forward as opening + capex -
         depreciation, so a balance containing anything capex and depreciation
         do not touch will break that reconciliation. Right-of-use assets are a
         common such item: map them to other non-current assets and record the
-        choice."""),
-    _item(accounts.OTHER_NONCURRENT_ASSETS, "Other non-current assets", BS, P, NOCASH, INV, """
+        choice.""",
+    ),
+    _item(
+        accounts.OTHER_NONCURRENT_ASSETS,
+        "Other non-current assets",
+        BS,
+        P,
+        NOCASH,
+        INV,
+        """
         Every non-current asset the chart does not name: goodwill,
         intangibles, right-of-use assets, equity-method investments,
         non-current deferred tax assets. The chart has NO goodwill or
         intangibles line (12.2.e), so an entity with material goodwill needs
         the chart extended before its model means much. Record that on the
-        mapping rather than burying it here."""),
-    _item(accounts.TOTAL_ASSETS, "Total assets", BS, P, NOCASH, NOFLOW, """
+        mapping rather than burying it here.""",
+    ),
+    _item(
+        accounts.TOTAL_ASSETS,
+        "Total assets",
+        BS,
+        P,
+        NOCASH,
+        NOFLOW,
+        """
         The reported total. A validation target (11.7), never an addend: the
         balance check compares this against the sum of the asset lines and
-        reports the difference rather than plugging it."""),
-    _item(accounts.ACCOUNTS_PAYABLE, "Accounts payable", BS, P, NOCASH, OP, """
+        reports the difference rather than plugging it.""",
+    ),
+    _item(
+        accounts.ACCOUNTS_PAYABLE,
+        "Accounts payable",
+        BS,
+        P,
+        NOCASH,
+        OP,
+        """
         Trade payables to suppliers for goods and services received. Accrued
         expenses and accrued compensation belong in other current
-        liabilities."""),
-    _item(accounts.OTHER_CURRENT_LIABILITIES, "Other current liabilities", BS, P, NOCASH, OP, """
+        liabilities.""",
+    ),
+    _item(
+        accounts.OTHER_CURRENT_LIABILITIES,
+        "Other current liabilities",
+        BS,
+        P,
+        NOCASH,
+        OP,
+        """
         Every current liability the chart does not name: accrued compensation,
         accrued expenses, deferred revenue, current tax payable, the current
         portion of lease liabilities. The CURRENT PORTION OF LONG-TERM DEBT
         belongs in debt, not here -- it is interest-bearing, the equity bridge
         subtracts it, and leaving it in working capital both understates net
         debt and puts a financing movement inside the working-capital
-        driver."""),
-    _item(accounts.DEBT, "Debt", BS, P, NOCASH, FIN, """
+        driver.""",
+    ),
+    _item(
+        accounts.DEBT,
+        "Debt",
+        BS,
+        P,
+        NOCASH,
+        FIN,
+        """
         Interest-bearing borrowings, current and non-current combined: loans,
         notes, bonds, finance leases, and -- per decision 2.4.j -- disclosed
         lease liabilities. This is the line the enterprise-to-equity bridge
-        subtracts, so anything mapped here reduces equity value directly."""),
-    _item(accounts.OTHER_NONCURRENT_LIABILITIES, "Other non-current liabilities",
-          BS, P, NOCASH, NOFLOW, """
+        subtracts, so anything mapped here reduces equity value directly.""",
+    ),
+    _item(
+        accounts.OTHER_NONCURRENT_LIABILITIES,
+        "Other non-current liabilities",
+        BS,
+        P,
+        NOCASH,
+        NOFLOW,
+        """
         Every non-current liability the chart does not name: deferred tax
         liabilities, pension and post-retirement obligations, provisions,
         non-current deferred revenue. Not counted in working capital and not
         counted as debt -- if an item here is interest-bearing it belongs in
-        debt instead."""),
-    _item(accounts.TOTAL_LIABILITIES, "Total liabilities", BS, P, NOCASH, NOFLOW, """
+        debt instead.""",
+    ),
+    _item(
+        accounts.TOTAL_LIABILITIES,
+        "Total liabilities",
+        BS,
+        P,
+        NOCASH,
+        NOFLOW,
+        """
         The reported total of all liabilities, current and non-current. A
         validation target (11.7), never an addend: the check compares it
         against the sum of the mapped liability lines and reports the
         difference. Note that many filings present 'total liabilities and
         equity' instead, which is the balance-sheet footing and is NOT this
         line -- mapping that figure here overstates liabilities by the whole
-        of equity."""),
-    _item(accounts.COMMON_EQUITY, "Common equity", BS, E, NOCASH, FIN, """
+        of equity.""",
+    ),
+    _item(
+        accounts.COMMON_EQUITY,
+        "Common equity",
+        BS,
+        E,
+        NOCASH,
+        FIN,
+        """
         Contributed capital and every equity reserve other than retained
         earnings: common stock at par, additional paid-in capital, treasury
         stock (negative), accumulated other comprehensive income. Can be
-        negative where treasury stock exceeds contributed capital."""),
-    _item(accounts.RETAINED_EARNINGS, "Retained earnings", BS, E, NOCASH, FIN, """
+        negative where treasury stock exceeds contributed capital.""",
+    ),
+    _item(
+        accounts.RETAINED_EARNINGS,
+        "Retained earnings",
+        BS,
+        E,
+        NOCASH,
+        FIN,
+        """
         Cumulative profit retained: opening balance plus net income less
         dividends. The retained-earnings linkage check rolls this forward, so
         a balance that also absorbs items the chart routes elsewhere -- a
         treasury stock retirement, say -- will break that reconciliation and
-        should be recorded on the mapping."""),
-    _item(accounts.TOTAL_EQUITY, "Total equity", BS, E, NOCASH, NOFLOW, """
+        should be recorded on the mapping.""",
+    ),
+    _item(
+        accounts.TOTAL_EQUITY,
+        "Total equity",
+        BS,
+        E,
+        NOCASH,
+        NOFLOW,
+        """
         The reported total. A validation target (11.7), never an addend.
         Non-controlling interests presented within total equity are not in
         this chart's equity lines; record the treatment, because the equity
-        bridge subtracts minority interest separately."""),
-
+        bridge subtracts minority interest separately.""",
+    ),
     # --- cash flow statement ----------------------------------------------
-    _item(accounts.DEPRECIATION_AMORTIZATION, "Depreciation and amortisation",
-          CF, P, NONCASH, OP, """
+    _item(
+        accounts.DEPRECIATION_AMORTIZATION,
+        "Depreciation and amortisation",
+        CF,
+        P,
+        NONCASH,
+        OP,
+        """
         Depreciation of property, plant and equipment and amortisation of
         intangibles charged in the period, added back in operating cash flow
         because no cash left. STEP 19 forbids assuming this equals capex; they
         are independent lines and a model that ties them together has stopped
-        reading the filing."""),
-    _item(accounts.STOCK_BASED_COMP, "Stock-based compensation", CF, P, NONCASH, OP, """
+        reading the filing.""",
+    ),
+    _item(
+        accounts.STOCK_BASED_COMP,
+        "Stock-based compensation",
+        CF,
+        P,
+        NONCASH,
+        OP,
+        """
         Share-based payment expense recognised in the period and added back as
         non-cash. Decision 2.4.k: expensed in operating income, added back
         here, credited to common equity. It is NOT removed from free cash flow
         as a real cost -- that is a defensible alternative treatment and it is
-        not the reported one."""),
-    _item(accounts.CHANGE_IN_NWC, "Change in net working capital", CF, E, CASH_, OP, """
+        not the reported one.""",
+    ),
+    _item(
+        accounts.CHANGE_IN_NWC,
+        "Change in net working capital",
+        CF,
+        E,
+        CASH_,
+        OP,
+        """
         The period's movement in operating working capital -- receivables,
         inventory, other operating current assets, payables and other
         operating current liabilities -- as its CASH EFFECT: a source of cash
         positive, a use of cash negative. Cash and debt are excluded by
         construction. Where the filer presents each working-capital movement
-        on its own line, map them as an aggregate and show the sum."""),
-    _item(accounts.OTHER_OPERATING, "Other operating activities", CF, E, CASH_, OP, """
+        on its own line, map them as an aggregate and show the sum.""",
+    ),
+    _item(
+        accounts.OTHER_OPERATING,
+        "Other operating activities",
+        CF,
+        E,
+        CASH_,
+        OP,
+        """
         Every other operating item: deferred taxes, provisions, other non-cash
         adjustments, and operating items the filer presents separately. A
         residual line -- the engine derives operating cash flow without it,
-        treating absence as 'nothing else happened'."""),
-    _item(accounts.CFO, "Cash flow from operations", CF, E, CASH_, OP, """
+        treating absence as 'nothing else happened'.""",
+    ),
+    _item(
+        accounts.CFO,
+        "Cash flow from operations",
+        CF,
+        E,
+        CASH_,
+        OP,
+        """
         The reported subtotal. A validation target (11.7): the engine sums the
-        operating lines and compares."""),
-    _item(accounts.CAPEX, "Capital expenditure", CF, N, CASH_, INV, """
+        operating lines and compares.""",
+    ),
+    _item(
+        accounts.CAPEX,
+        "Capital expenditure",
+        CF,
+        N,
+        CASH_,
+        INV,
+        """
         Cash paid for property, plant, equipment and capitalised software.
         Stored NEGATIVE, because it is an outflow summed into investing cash
         flow. A filer presenting it as a positive 'purchases of property and
         equipment' has printed the magnitude; the sign convention is this
-        chart's, and the mapping records the flip."""),
-    _item(accounts.ACQUISITIONS, "Acquisitions, net of cash acquired", CF, N, CASH_, INV, """
+        chart's, and the mapping records the flip.""",
+    ),
+    _item(
+        accounts.ACQUISITIONS,
+        "Acquisitions, net of cash acquired",
+        CF,
+        N,
+        CASH_,
+        INV,
+        """
         Cash paid for business combinations, net of cash acquired. Stored
-        NEGATIVE. A residual line for derivation purposes."""),
-    _item(accounts.OTHER_INVESTING, "Other investing activities", CF, E, CASH_, INV, """
+        NEGATIVE. A residual line for derivation purposes.""",
+    ),
+    _item(
+        accounts.OTHER_INVESTING,
+        "Other investing activities",
+        CF,
+        E,
+        CASH_,
+        INV,
+        """
         Every other investing item: purchases and maturities of investments,
         proceeds from disposals, loans made and repaid. Signed as its cash
-        effect. A residual line."""),
-    _item(accounts.CFI, "Cash flow from investing", CF, E, CASH_, INV, """
+        effect. A residual line.""",
+    ),
+    _item(
+        accounts.CFI,
+        "Cash flow from investing",
+        CF,
+        E,
+        CASH_,
+        INV,
+        """
         The reported net cash used in or provided by investing activities. A
         validation target (11.7): the engine sums capital expenditure,
         acquisitions and other investing items and compares. Usually negative
         for a company that is investing; a positive figure means disposals or
-        maturing investments exceeded purchases, which is worth a note."""),
-    _item(accounts.DEBT_ISSUANCE, "Proceeds from borrowings", CF, P, CASH_, FIN, """
+        maturing investments exceeded purchases, which is worth a note.""",
+    ),
+    _item(
+        accounts.DEBT_ISSUANCE,
+        "Proceeds from borrowings",
+        CF,
+        P,
+        CASH_,
+        FIN,
+        """
         Cash received from new borrowings. POSITIVE. Where a filer presents
         one net movement in debt, map the net figure to issuance or repayment
         according to its sign and record the netting -- the debt schedule
         rolls forward on both lines and a netted figure in one of them is
-        still the right total."""),
-    _item(accounts.DEBT_REPAYMENT, "Repayment of borrowings", CF, N, CASH_, FIN, """
+        still the right total.""",
+    ),
+    _item(
+        accounts.DEBT_REPAYMENT,
+        "Repayment of borrowings",
+        CF,
+        N,
+        CASH_,
+        FIN,
+        """
         Cash paid to repay borrowings, including scheduled amortisation and
         early redemptions. Stored NEGATIVE. A filer presenting it as a
         positive 'repayments of long-term debt' has printed the magnitude;
         the sign convention is this chart's and the mapping records the flip.
         The debt schedule rolls the balance forward on this line and on
         proceeds, so a movement netted into one of them is still the right
-        total as long as the netting is recorded."""),
-    _item(accounts.SHARE_REPURCHASES, "Share repurchases", CF, N, CASH_, FIN, """
+        total as long as the netting is recorded.""",
+    ),
+    _item(
+        accounts.SHARE_REPURCHASES,
+        "Share repurchases",
+        CF,
+        N,
+        CASH_,
+        FIN,
+        """
         Cash paid to repurchase the entity's own shares. Stored NEGATIVE.
-        Reduces common equity, not retained earnings, in this chart."""),
-    _item(accounts.DIVIDENDS, "Dividends paid", CF, N, CASH_, FIN, """
+        Reduces common equity, not retained earnings, in this chart.""",
+    ),
+    _item(
+        accounts.DIVIDENDS,
+        "Dividends paid",
+        CF,
+        N,
+        CASH_,
+        FIN,
+        """
         Cash dividends paid to shareholders. Stored NEGATIVE. Reduces retained
-        earnings, which is what the retained-earnings linkage check tests."""),
-    _item(accounts.OTHER_FINANCING, "Other financing activities", CF, E, CASH_, FIN, """
+        earnings, which is what the retained-earnings linkage check tests.""",
+    ),
+    _item(
+        accounts.OTHER_FINANCING,
+        "Other financing activities",
+        CF,
+        E,
+        CASH_,
+        FIN,
+        """
         Every other financing item: proceeds from share issuance, principal
         payments on lease liabilities, distributions to non-controlling
-        interests. A residual line."""),
-    _item(accounts.CFF, "Cash flow from financing", CF, E, CASH_, FIN, """
+        interests. A residual line.""",
+    ),
+    _item(
+        accounts.CFF,
+        "Cash flow from financing",
+        CF,
+        E,
+        CASH_,
+        FIN,
+        """
         The reported net cash used in or provided by financing activities. A
         validation target (11.7): the engine sums borrowing proceeds and
         repayments, share repurchases, dividends and other financing items and
         compares. This is the third of the three subtotals in the cash
         roll-forward, so an error here surfaces as a balance sheet whose cash
-        does not close."""),
+        does not close.""",
+    ),
 )
 
 BY_CODE: dict[str, NormalizedLineItem] = {item.canonical_code: item for item in CHART}
@@ -414,10 +733,9 @@ def ancestors(code: str) -> frozenset[str]:
     while frontier:
         current = frontier.pop()
         for subtotal, (plus, minus) in accounts.DERIVED.items():
-            if current in plus or current in minus:
-                if subtotal not in found:
-                    found.add(subtotal)
-                    frontier.append(subtotal)
+            if (current in plus or current in minus) and subtotal not in found:
+                found.add(subtotal)
+                frontier.append(subtotal)
     return frozenset(found)
 
 

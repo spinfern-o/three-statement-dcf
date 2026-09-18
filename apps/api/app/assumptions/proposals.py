@@ -45,8 +45,13 @@ class Proposal:
 
 
 def _driver(
-    code: str, name: str, value: Decimal, unit: str, periods: "tuple[str, ...]",
-    rationale: str, owner: str,
+    code: str,
+    name: str,
+    value: Decimal,
+    unit: str,
+    periods: tuple[str, ...],
+    rationale: str,
+    owner: str,
 ) -> Assumption:
     return Assumption(
         code=code,
@@ -67,14 +72,14 @@ HOLDING_CONSTANT = (
 )
 
 
-def propose_from_schedules(schedules: ScheduleSet, owner: str) -> "tuple[Proposal, ...]":
+def propose_from_schedules(schedules: ScheduleSet, owner: str) -> tuple[Proposal, ...]:
     """Every forecast driver the historical schedules can measure.
 
     Only the periods that actually produced a figure are cited; a driver the
     filing does not support is not proposed at all, rather than proposed at
     zero.
     """
-    out: "list[Proposal]" = []
+    out: list[Proposal] = []
 
     # --- 13.1: the working-capital days drivers -----------------------------
     for name, code in (("DSO", "dso"), ("Inventory days", "inventory_days"), ("DPO", "dpo")):
@@ -93,10 +98,13 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> "tuple[Proposa
         out.append(
             Proposal(
                 assumption=_driver(
-                    code, name, driver.days, "days", measured,
+                    code,
+                    name,
+                    driver.days,
+                    "days",
+                    measured,
                     f"{name} was {driver.days} days at {latest.year} year end, on a "
-                    f"365-day convention over the full-year flow (13.1.e). "
-                    + HOLDING_CONSTANT,
+                    f"365-day convention over the full-year flow (13.1.e). " + HOLDING_CONSTANT,
                     owner,
                 ),
                 schedule="13.1",
@@ -109,17 +117,20 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> "tuple[Proposa
         )
 
     # --- 13.4: the interest rate, on the basis the forecast charges it ------
-    for row in schedules.interest:
-        rate = row.on(ENGINE_BASIS)
+    for interest_year in schedules.interest:
+        rate = interest_year.on(ENGINE_BASIS)
         if rate is None or rate.rate is None:
             continue
         out.append(
             Proposal(
                 assumption=_driver(
-                    "interest_rate_on_debt", "Interest rate on beginning debt",
-                    rate.rate, "ratio", (row.year,),
-                    f"Interest expense for {row.year} over BEGINNING debt -- the "
-                    f"balance at {row.prior_year} year end -- giving {rate.rate}. "
+                    "interest_rate_on_debt",
+                    "Interest rate on beginning debt",
+                    rate.rate,
+                    "ratio",
+                    (interest_year.year,),
+                    f"Interest expense for {interest_year.year} over BEGINNING debt -- the "
+                    f"balance at {interest_year.prior_year} year end -- giving {rate.rate}. "
                     "Beginning debt is the basis model/forecast.py charges "
                     "interest on (STEP 19), so this rate carries forward without "
                     "changing convention mid-model. " + HOLDING_CONSTANT,
@@ -142,7 +153,10 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> "tuple[Proposa
         out.append(
             Proposal(
                 assumption=_driver(
-                    "tax_rate", "Effective tax rate", usable[latest_year], "ratio",
+                    "tax_rate",
+                    "Effective tax rate",
+                    usable[latest_year],
+                    "ratio",
                     tuple(sorted(usable)),
                     f"The effective rate for {latest_year} was {usable[latest_year]}, "
                     "measured as tax expense over pretax income. STEP 16 requires "
@@ -161,12 +175,12 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> "tuple[Proposa
         )
 
     # --- 13.2: depreciation as a share of opening PP&E ----------------------
-    for row in schedules.ppe.years:
-        opening = row.beginning.value
+    for ppe_year in schedules.ppe.years:
+        opening = ppe_year.beginning.value
         depreciation = next(
             (
                 -line.value
-                for line in row.movements
+                for line in ppe_year.movements
                 if line.label.startswith("Depreciation") and line.value is not None
             ),
             None,
@@ -176,9 +190,12 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> "tuple[Proposa
         out.append(
             Proposal(
                 assumption=_driver(
-                    "depreciation_pct_beginning_ppe", "Depreciation on opening PP&E",
-                    depreciation / opening, "ratio", (row.year,),
-                    f"Depreciation of {depreciation:,} in {row.year} against "
+                    "depreciation_pct_beginning_ppe",
+                    "Depreciation on opening PP&E",
+                    depreciation / opening,
+                    "ratio",
+                    (ppe_year.year,),
+                    f"Depreciation of {depreciation:,} in {ppe_year.year} against "
                     f"opening PP&E of {opening:,}. STEP 18 forecasts depreciation "
                     "and CapEx separately, and neither may default to the other. "
                     + HOLDING_CONSTANT,
@@ -198,7 +215,7 @@ def propose_from_schedules(schedules: ScheduleSet, owner: str) -> "tuple[Proposa
     return tuple(out)
 
 
-def unproposable(schedules: ScheduleSet) -> "dict[str, str]":
+def unproposable(schedules: ScheduleSet) -> dict[str, str]:
     """Required drivers no schedule can measure, and why.
 
     Named so the screen does not simply omit them. Revenue growth is the
@@ -217,9 +234,7 @@ def unproposable(schedules: ScheduleSet) -> "dict[str, str]":
             "constant share of revenue, and a proposal is the fastest way to "
             "make that assumption without noticing."
         ),
-        "opex_pct_revenue / opex_amount": (
-            "The same as COGS, and for the same reason."
-        ),
+        "opex_pct_revenue / opex_amount": ("The same as COGS, and for the same reason."),
         "capex_pct_revenue / capex_amount": (
             "The PP&E schedule reports CapEx as an amount, not as a policy. "
             "Whether next year's CapEx follows revenue, follows a stated "

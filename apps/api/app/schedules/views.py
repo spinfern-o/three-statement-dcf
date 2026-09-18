@@ -24,7 +24,7 @@ class Row:
     absent_reason: str = ""
 
 
-def working_capital_rows(schedule: WorkingCapitalSchedule) -> "tuple[Row, ...]":
+def working_capital_rows(schedule: WorkingCapitalSchedule) -> tuple[Row, ...]:
     """One row per operating account, plus the two subtotals and NWC."""
     rows: list[Row] = []
 
@@ -73,10 +73,10 @@ class DriverRow:
     name: str
     numerator: str
     denominator: str
-    values: "tuple[Driver, ...]"
+    values: tuple[Driver, ...]
 
 
-def driver_rows(schedule: WorkingCapitalSchedule) -> "tuple[DriverRow, ...]":
+def driver_rows(schedule: WorkingCapitalSchedule) -> tuple[DriverRow, ...]:
     """One row per driver, across the periods, in the order 13.1.d lists them."""
     if not schedule.years:
         return ()

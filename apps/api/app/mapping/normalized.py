@@ -41,7 +41,12 @@ from .sets import FactMapping, MappingSet, MappingType, SignNormalization
 #: Which statement a table belongs to, from its caption. Used to tell a
 #: cross-statement duplicate (net income on both) from a double count.
 _STATEMENT_PATTERNS = (
-    (StatementType.INCOME, re.compile(r"(?i)statements?\s+of\s+(operations|income|profit)|income\s+statement|profit\s+and\s+loss|gewinn|verlustrechnung")),
+    (
+        StatementType.INCOME,
+        re.compile(
+            r"(?i)statements?\s+of\s+(operations|income|profit)|income\s+statement|profit\s+and\s+loss|gewinn|verlustrechnung"
+        ),
+    ),
     (StatementType.BALANCE, re.compile(r"(?i)balance\s+sheets?|financial\s+position|bilanz")),
     (StatementType.CASHFLOW, re.compile(r"(?i)cash\s+flows?|kapitalfluss")),
 )
@@ -115,7 +120,7 @@ def _contribution(fact: ReportedFact, mapping: FactMapping) -> Decimal | None:
 
 def normalize(
     result: ExtractionResult, mappings: MappingSet | None = None
-) -> "dict[tuple[str, str, StatementType], NormalizedValue]":
+) -> dict[tuple[str, str, StatementType], NormalizedValue]:
     """Build `(code, period, statement) -> NormalizedValue` from the mappings.
 
     Rejected mappings contribute nothing. A contributor with no parsed value
@@ -145,14 +150,8 @@ def normalize(
     ledger: dict = {}
     for (code, period, statement), pairs in grouped.items():
         contributions = [_contribution(fact, mapping) for fact, mapping in pairs]
-        unreadable = [
-            fact for (fact, _), value in zip(pairs, contributions) if value is None
-        ]
-        kind = (
-            MappingType.AGGREGATE
-            if len(pairs) > 1
-            else pairs[0][1].mapping_type
-        )
+        unreadable = [fact for (fact, _), value in zip(pairs, contributions) if value is None]
+        kind = MappingType.AGGREGATE if len(pairs) > 1 else pairs[0][1].mapping_type
 
         if unreadable:
             names = ", ".join(f"{f.raw_label!r} ({f.raw_value!r})" for f in unreadable)
@@ -175,7 +174,10 @@ def normalize(
             canonical_code=code,
             period_label=period,
             statement=statement,
-            value=sum(contributions[1:], contributions[0]),
+            # A narrowed list, because the `unreadable` guard above already
+            # returned for any absent contribution. Summing the unnarrowed one
+            # would add a None on the day that guard changes.
+            value=_total([c for c in contributions if c is not None]),
             contributors=tuple(f.id for f, _ in pairs),
             mapping_type=kind,
             approved=all(m.approved for _, m in pairs),
@@ -188,15 +190,14 @@ def periods(ledger: dict) -> tuple[str, ...]:
 
 
 def lookup(
-    ledger: dict, code: str, period: str, statement: "StatementType | None" = None
-) -> "NormalizedValue | None":
+    ledger: dict, code: str, period: str, statement: StatementType | None = None
+) -> NormalizedValue | None:
     """Fetch one value, resolving the statement when the code has only one."""
     if statement is None:
         item = line_item(code)
         if len(item.statement_types) != 1:
             raise KeyError(
-                f"{code} appears on {len(item.statement_types)} statements; say "
-                f"which one you mean"
+                f"{code} appears on {len(item.statement_types)} statements; say which one you mean"
             )
         statement = item.statement_types[0]
     return ledger.get((code, period, statement))
@@ -215,3 +216,14 @@ def describe(ledger: dict) -> str:
             flag = "" if value.approved else "  [mapping unapproved]"
             lines.append(f"    {code:30} {statement.value:9} {shown:>16}{flag}")
     return "\n".join(lines)
+
+
+def _total(values: list[Decimal]) -> Decimal:
+    """Sum, seeded with the first term rather than with an int.
+
+    `sum(values)` starts from `0`, an `int`, and 4.2 keeps this pipeline in
+    `Decimal` end to end.
+    """
+    if not values:
+        raise ValueError("a total over no contributions is not a total")
+    return sum(values[1:], values[0])

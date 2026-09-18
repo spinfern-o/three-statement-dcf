@@ -44,17 +44,26 @@ TIMING = "tests/test_timing.py"
 
 COVERAGE = (
     Coverage("revenue", PRECISION, "recomputed from the YAML with its own Decimal loader"),
-    Coverage("gross profit", CATALOG, "the formula engine's tree evaluation against Ledger._try_derive"),
     Coverage(
-        "EBITDA", "", "", compared=False,
+        "gross profit", CATALOG, "the formula engine's tree evaluation against Ledger._try_derive"
+    ),
+    Coverage(
+        "EBITDA",
+        "",
+        "",
+        compared=False,
         reason="the chart has no `ebitda` line (F-17), so there is nothing to compare",
     ),
     Coverage("EBIT", CATALOG, "the formula engine against the engine's derivation table"),
-    Coverage("EBT (pretax income)", CATALOG, "the formula engine against the engine's derivation table"),
+    Coverage(
+        "EBT (pretax income)", CATALOG, "the formula engine against the engine's derivation table"
+    ),
     Coverage("taxes", PRECISION, "rate x pretax, recomputed longhand"),
     Coverage("net income", CATALOG, "the formula engine against the engine's derivation table"),
     Coverage("total assets", CATALOG, "the formula engine against the engine's derivation table"),
-    Coverage("total liabilities", CATALOG, "the formula engine against the engine's derivation table"),
+    Coverage(
+        "total liabilities", CATALOG, "the formula engine against the engine's derivation table"
+    ),
     Coverage("equity", CATALOG, "the formula engine against the engine's derivation table"),
     Coverage("CFO", CATALOG, "the formula engine against the engine's derivation table"),
     Coverage("CFI", CATALOG, "the formula engine against the engine's derivation table"),
@@ -63,14 +72,23 @@ COVERAGE = (
     Coverage("NOPAT", VALUATION, "EBIT x (1 - tax), written out with built-in operators"),
     Coverage("change in NWC", VALUATION, "working capital read off the ledgers and differenced"),
     Coverage("FCFF", VALUATION, "NOPAT + D&A - CapEx - change in NWC, longhand"),
-    Coverage("discount factors", VALUATION, "1 / (1 + WACC)^t, with `**` rather than the engine's helper"),
+    Coverage(
+        "discount factors", VALUATION, "1 / (1 + WACC)^t, with `**` rather than the engine's helper"
+    ),
     Coverage("terminal value", VALUATION, "terminal FCFF / (WACC - g), longhand"),
-    Coverage("enterprise value", VALUATION, "the sum of present values plus the discounted terminal value"),
+    Coverage(
+        "enterprise value",
+        VALUATION,
+        "the sum of present values plus the discounted terminal value",
+    ),
     Coverage("equity value", VALUATION, "enterprise value plus cash less debt"),
     Coverage(
-        "implied value per share", "", "", compared=False,
+        "implied value per share",
+        "",
+        "",
+        compared=False,
         reason="no verified diluted share count exists, so 16.20 withholds the "
-               "figure and there is nothing to compare",
+        "figure and there is nothing to compare",
     ),
 )
 
@@ -87,15 +105,15 @@ EXTREMES = (
 
 @dataclass(frozen=True)
 class Report:
-    coverage: "tuple[Coverage, ...]" = COVERAGE
-    extremes: "tuple[tuple[str, str], ...]" = EXTREMES
+    coverage: tuple[Coverage, ...] = COVERAGE
+    extremes: tuple[tuple[str, str], ...] = EXTREMES
 
     @property
-    def compared(self) -> "tuple[Coverage, ...]":
+    def compared(self) -> tuple[Coverage, ...]:
         return tuple(c for c in self.coverage if c.compared)
 
     @property
-    def not_compared(self) -> "tuple[Coverage, ...]":
+    def not_compared(self) -> tuple[Coverage, ...]:
         return tuple(c for c in self.coverage if not c.compared)
 
     @property

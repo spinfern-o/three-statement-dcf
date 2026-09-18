@@ -155,6 +155,7 @@
             {% if row.assumption and row.from_scenario == scenario_id %}
             <form method="post"
                   action="/documents/{{ document.id }}/assumptions/{{ row.assumption.code }}/status">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="scenario_id" value="{{ scenario_id }}">
               <label class="small" for="to-{{ row.assumption.code }}">New status</label>
               <select id="to-{{ row.assumption.code }}" name="to">
@@ -212,6 +213,7 @@
           <td class="small">{{ proposal.caution }}</td>
           <td>
             <form method="post" action="/documents/{{ document.id }}/assumptions/accept">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="scenario_id" value="{{ scenario_id }}">
               <input type="hidden" name="code" value="{{ proposal.assumption.code }}">
               <button type="submit">Add as Draft</button>
@@ -256,6 +258,7 @@
       looked.
     </p>
     <form method="post" action="/documents/{{ document.id }}/assumptions/preview">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="scenario_id" value="{{ scenario_id }}">
       <label for="preview-code">Driver</label>
       <select id="preview-code" name="code">

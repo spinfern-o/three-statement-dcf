@@ -35,11 +35,9 @@ from .registry import FormulaDefinition, FormulaSet
 class CycleError(ValueError):
     """18.6. One or more cycles, named, before anything was evaluated."""
 
-    def __init__(self, cycles: "tuple[tuple[str, ...], ...]"):
+    def __init__(self, cycles: tuple[tuple[str, ...], ...]):
         self.cycles = cycles
-        drawn = "\n".join(
-            "    " + " -> ".join(cycle + (cycle[0],)) for cycle in cycles
-        )
+        drawn = "\n".join("    " + " -> ".join(cycle + (cycle[0],)) for cycle in cycles)
         super().__init__(
             f"{len(cycles)} circular dependenc"
             f"{'y' if len(cycles) == 1 else 'ies'} found before evaluation "
@@ -57,16 +55,16 @@ class DependencyGraph:
     formulas: FormulaSet
 
     @property
-    def targets(self) -> "frozenset[str]":
+    def targets(self) -> frozenset[str]:
         return frozenset(self.formulas.targets)
 
     @property
-    def edges(self) -> "dict[str, frozenset[str]]":
+    def edges(self) -> dict[str, frozenset[str]]:
         """target -> the references it needs, whether or not they are computed."""
         return {d.target: d.inputs for d in self.formulas}
 
     @property
-    def internal_edges(self) -> "dict[str, frozenset[str]]":
+    def internal_edges(self) -> dict[str, frozenset[str]]:
         """target -> the references that are themselves computed here.
 
         A reference to something the graph does not compute is a leaf: it must
@@ -77,35 +75,35 @@ class DependencyGraph:
         return {target: inputs & computed for target, inputs in self.edges.items()}
 
     @property
-    def required_inputs(self) -> "frozenset[str]":
+    def required_inputs(self) -> frozenset[str]:
         """Everything the graph needs and does not produce."""
         computed = self.targets
-        needed: "frozenset[str]" = frozenset()
+        needed: frozenset[str] = frozenset()
         for inputs in self.edges.values():
             needed |= inputs - computed
         return needed
 
-    def dependents(self) -> "dict[str, frozenset[str]]":
+    def dependents(self) -> dict[str, frozenset[str]]:
         """The reverse graph: reference -> the targets that read it."""
-        out: "dict[str, set[str]]" = {}
+        out: dict[str, set[str]] = {}
         for target, inputs in self.edges.items():
             for reference in inputs:
                 out.setdefault(reference, set()).add(target)
         return {key: frozenset(value) for key, value in out.items()}
 
     # --- 18.6: cycles, before anything runs ---------------------------------
-    def cycles(self) -> "tuple[tuple[str, ...], ...]":
+    def cycles(self) -> tuple[tuple[str, ...], ...]:
         """Every elementary cycle among the computed targets.
 
         Depth-first with an explicit stack, taking successors in sorted order,
         so the cycle reported for a given graph is the same on every run.
         """
         edges = self.internal_edges
-        found: "list[tuple[str, ...]]" = []
-        seen: "set[frozenset[str]]" = set()
-        visited: "set[str]" = set()
+        found: list[tuple[str, ...]] = []
+        seen: set[frozenset[str]] = set()
+        visited: set[str] = set()
 
-        def walk(node: str, path: "list[str]", on_path: "set[str]") -> None:
+        def walk(node: str, path: list[str], on_path: set[str]) -> None:
             path.append(node)
             on_path.add(node)
             # A target reads its inputs, so the arrow runs input -> target;
@@ -113,7 +111,7 @@ class DependencyGraph:
             # is reversed before reporting so a reader follows it forwards.
             for successor in sorted(edges.get(node, frozenset())):
                 if successor in on_path:
-                    cycle = tuple(reversed(path[path.index(successor):]))
+                    cycle = tuple(reversed(path[path.index(successor) :]))
                     key = frozenset(cycle)
                     if key not in seen:
                         seen.add(key)
@@ -134,7 +132,7 @@ class DependencyGraph:
         return tuple(found)
 
     # --- 18.5: the order to calculate in ------------------------------------
-    def order(self) -> "tuple[str, ...]":
+    def order(self) -> tuple[str, ...]:
         """A deterministic topological order, or `CycleError` naming the loops."""
         cycles = self.cycles()
         if cycles:
@@ -142,13 +140,10 @@ class DependencyGraph:
 
         edges = self.internal_edges
         remaining = dict(edges)
-        done: "list[str]" = []
-        satisfied: "set[str]" = set()
+        done: list[str] = []
+        satisfied: set[str] = set()
         while remaining:
-            ready = sorted(
-                target for target, inputs in remaining.items()
-                if inputs <= satisfied
-            )
+            ready = sorted(target for target, inputs in remaining.items() if inputs <= satisfied)
             if not ready:  # pragma: no cover - cycles() has already refused
                 raise CycleError((tuple(sorted(remaining)),))
             for target in ready:
@@ -158,7 +153,7 @@ class DependencyGraph:
         return tuple(done)
 
     # --- 18.8: what a change affects ----------------------------------------
-    def descendants(self, *changed: str) -> "frozenset[str]":
+    def descendants(self, *changed: str) -> frozenset[str]:
         """Every target that depends on one of `changed`, directly or not.
 
         This is what 18.8 means by "only affected descendants". The changed
@@ -168,7 +163,7 @@ class DependencyGraph:
         """
         dependents = self.dependents()
         frontier = list(changed)
-        affected: "set[str]" = set()
+        affected: set[str] = set()
         while frontier:
             node = frontier.pop()
             for dependent in dependents.get(node, frozenset()):
@@ -177,7 +172,7 @@ class DependencyGraph:
                     frontier.append(dependent)
         return frozenset(affected)
 
-    def order_for(self, targets: "frozenset[str]") -> "tuple[str, ...]":
+    def order_for(self, targets: frozenset[str]) -> tuple[str, ...]:
         """The full order, filtered to `targets`, so recalculation stays ordered."""
         return tuple(target for target in self.order() if target in targets)
 
@@ -187,13 +182,11 @@ class DependencyGraph:
             f"{len(self.required_inputs)} required input(s)"
         ]
         cycles = self.cycles()
-        lines.append(
-            "  no cycles" if not cycles else f"  {len(cycles)} CYCLE(S)"
-        )
+        lines.append("  no cycles" if not cycles else f"  {len(cycles)} CYCLE(S)")
         return "\n".join(lines)
 
 
-def definition_order(formulas: FormulaSet) -> "tuple[FormulaDefinition, ...]":
+def definition_order(formulas: FormulaSet) -> tuple[FormulaDefinition, ...]:
     """The set's definitions in the order 18.5 requires they be calculated."""
     graph = DependencyGraph(formulas)
     by_target = {d.target: d for d in formulas}

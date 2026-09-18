@@ -53,7 +53,7 @@ CALCULATION_CONTEXT = decimal.Context(
 assert CALCULATION_PRECISION >= MINIMUM_PRECISION, "violates specification 4.7"
 
 #: What `D()` will accept. Note the absence of `float`.
-Numeric = Union[str, int, Decimal]
+Numeric = Union[str, int, Decimal]  # noqa: UP007 - a runtime alias, not an annotation
 
 
 class PrecisionError(ValueError):
@@ -96,7 +96,9 @@ def D(value: Numeric, *, what: str = "value") -> Decimal:
         except InvalidOperation:
             raise PrecisionError(f"{what} is not a valid decimal number: {value!r}") from None
         if not result.is_finite():
-            raise PrecisionError(f"{what} is {text!r}, which cannot appear in a calculation (17.27)")
+            raise PrecisionError(
+                f"{what} is {text!r}, which cannot appear in a calculation (17.27)"
+            )
         return result
     raise PrecisionError(f"{what} has unsupported type {type(value).__name__}")
 
@@ -138,4 +140,4 @@ def power(base: Decimal, exponent: int) -> Decimal:
     if not isinstance(exponent, int) or isinstance(exponent, bool):
         raise PrecisionError(f"exponent must be an int, got {exponent!r}")
     with decimal.localcontext(CALCULATION_CONTEXT):
-        return base ** exponent
+        return base**exponent

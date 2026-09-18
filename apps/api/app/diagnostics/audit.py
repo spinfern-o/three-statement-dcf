@@ -20,6 +20,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from ..extraction.records import AuditEvent
+
 
 @dataclass(frozen=True)
 class Filters:
@@ -37,16 +39,27 @@ class Filters:
     @property
     def is_empty(self) -> bool:
         return not any(
-            (self.actor, self.action, self.entity_type, self.entity_id,
-             self.since, self.until, self.text)
+            (
+                self.actor,
+                self.action,
+                self.entity_type,
+                self.entity_id,
+                self.since,
+                self.until,
+                self.text,
+            )
         )
 
     def describe(self) -> str:
         parts = []
         for label, value in (
-            ("actor", self.actor), ("action", self.action),
-            ("entity type", self.entity_type), ("entity", self.entity_id),
-            ("since", self.since), ("until", self.until), ("text", self.text),
+            ("actor", self.actor),
+            ("action", self.action),
+            ("entity type", self.entity_type),
+            ("entity", self.entity_id),
+            ("since", self.since),
+            ("until", self.until),
+            ("text", self.text),
         ):
             if value:
                 parts.append(f"{label} {value!r}")
@@ -78,13 +91,13 @@ def _matches(event, filters: Filters) -> bool:
 
 @dataclass(frozen=True)
 class Log:
-    events: "tuple[object, ...]"
+    events: tuple[AuditEvent, ...]
     filters: Filters
     #: How many events exist before filtering, so a reader knows what was hidden.
     total: int
 
     @property
-    def actors(self) -> "tuple[str, ...]":
+    def actors(self) -> tuple[str, ...]:
         return tuple(sorted({e.actor for e in self.events}))
 
     @property
@@ -101,7 +114,7 @@ def filter_events(result, filters: Filters | None = None) -> Log:
     return Log(tuple(matching), filters, len(events))
 
 
-def choices(result) -> "dict[str, tuple[str, ...]]":
+def choices(result) -> dict[str, tuple[str, ...]]:
     """The values actually present, so the filter controls offer real options.
 
     A select populated from a fixed list offers filters that match nothing;

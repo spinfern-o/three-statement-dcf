@@ -43,6 +43,7 @@ def _fact(result, label, period="2025"):
 
 # --- item 46: a reason is not optional --------------------------------------
 
+
 @pytest.mark.parametrize("call", ["accept", "reject"])
 def test_a_decision_without_a_reason_is_refused(confirmed, call):
     fact = _fact(confirmed, "Revenue")
@@ -59,6 +60,7 @@ def test_a_correction_without_a_reason_is_refused(confirmed):
 
 
 # --- item 45: what each action does -----------------------------------------
+
 
 def test_accepting_records_the_decision_and_resolves_the_codes(confirmed):
     fact = _fact(confirmed, "Revenue")
@@ -92,14 +94,17 @@ def test_correcting_supplies_a_value_without_overwriting_the_evidence(confirmed)
     """10.25: the raw string and its parse are evidence, and evidence is not edited."""
     fact = _fact(confirmed, "Restructuring charges")
     after = correct_fact(
-        confirmed, fact.id, "0",
-        actor="owner", reason="the legend on page 2 defines the dash as nil",
+        confirmed,
+        fact.id,
+        "0",
+        actor="owner",
+        reason="the legend on page 2 defines the dash as nil",
     )
     updated = _fact(after, "Restructuring charges")
     assert updated.value == Decimal("0")
     assert updated.corrected_value == Decimal("0")
-    assert updated.parsed.value is None            # untouched
-    assert updated.raw_value == "—"           # untouched
+    assert updated.parsed.value is None  # untouched
+    assert updated.raw_value == "—"  # untouched
     assert updated.verification_status is FactVerificationState.CORRECTED
 
 
@@ -120,7 +125,9 @@ def test_a_float_correction_is_refused(confirmed):
 def test_rejecting_resolves_nothing(confirmed):
     """A rejected fact is out, not fixed. Its codes stand as the record."""
     fact = _fact(confirmed, "Goodwill")
-    after = reject_fact(confirmed, fact.id, actor="owner", reason="the filer does not report goodwill")
+    after = reject_fact(
+        confirmed, fact.id, actor="owner", reason="the filer does not report goodwill"
+    )
     updated = _fact(after, "Goodwill")
     assert updated.verification_status is FactVerificationState.REJECTED
     assert updated.resolutions == ()
@@ -138,6 +145,7 @@ def test_a_decision_can_be_changed_and_the_old_one_is_named(confirmed):
 
 # --- item 47: the audit log -------------------------------------------------
 
+
 def test_every_action_writes_an_audit_entry(confirmed):
     before = len(confirmed.audit)
     after = accept_fact(confirmed, _fact(confirmed, "Revenue").id, actor="owner", reason="checked")
@@ -154,6 +162,7 @@ def test_the_audit_entry_names_the_resolved_codes(confirmed):
 
 
 # --- item 48: progress, and what it must not claim --------------------------
+
 
 def test_progress_counts_what_is_done(confirmed):
     after = accept_fact(confirmed, _fact(confirmed, "Revenue").id, actor="owner", reason="checked")
@@ -201,6 +210,7 @@ def test_percent_decided_floors_rather_than_rounding_up(confirmed):
 
 # --- 10.35, the uncomfortable half ------------------------------------------
 
+
 def test_a_reparse_withdraws_an_acceptance_of_a_value_that_changed(extracted):
     """An acceptance is of a number. If the number changes, so must the acceptance."""
     from apps.api.app.extraction.records import DOCUMENT_CODES
@@ -210,7 +220,8 @@ def test_a_reparse_withdraws_an_acceptance_of_a_value_that_changed(extracted):
     partly = confirm_metadata(
         extracted,
         {"displayed_scale": None, "reporting_currency": None},
-        actor="owner", reason="page 1 states both",
+        actor="owner",
+        reason="page 1 states both",
     )
     fact = _fact(partly, "Revenue")
     assert not any(c in DOCUMENT_CODES for c in fact.blocking_codes)
@@ -219,8 +230,10 @@ def test_a_reparse_withdraws_an_acceptance_of_a_value_that_changed(extracted):
 
     # Now confirm the locale as comma-decimal, which reads 1,250,000 differently.
     reparsed = confirm_metadata(
-        accepted, {"number_locale": "comma_decimal"},
-        actor="owner", reason="testing the invalidation path",
+        accepted,
+        {"number_locale": "comma_decimal"},
+        actor="owner",
+        reason="testing the invalidation path",
     )
     updated = _fact(reparsed, "Revenue")
     assert updated.decision is None
@@ -233,8 +246,10 @@ def test_a_correction_survives_a_reparse(confirmed):
     fact = _fact(confirmed, "Restructuring charges")
     corrected = correct_fact(confirmed, fact.id, "0", actor="owner", reason="page 2 legend")
     after = confirm_metadata(
-        corrected, {"company_name": "Example Industries plc"},
-        actor="owner", reason="the cover prints it in capitals",
+        corrected,
+        {"company_name": "Example Industries plc"},
+        actor="owner",
+        reason="the cover prints it in capitals",
     )
     updated = _fact(after, "Restructuring charges")
     assert updated.value == Decimal("0")

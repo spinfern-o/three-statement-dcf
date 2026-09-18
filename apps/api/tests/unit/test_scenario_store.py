@@ -29,7 +29,10 @@ D = Decimal
 
 def assumption(code="dso", value="59.9", unit="days", **kwargs):
     defaults = dict(
-        code=code, name=code.upper(), value=D(value), unit=unit,
+        code=code,
+        name=code.upper(),
+        value=D(value),
+        unit=unit,
         source_type=SourceType.HISTORICAL_DRIVER,
         evidence=Evidence(measured_over=("2024A", "2025A")),
         rationale="measured from the 13.1 working-capital schedule",
@@ -43,9 +46,7 @@ def assumption(code="dso", value="59.9", unit="days", **kwargs):
 def populated():
     return (
         ScenarioSet((base_scenario("larry"),), (assumption(),))
-        .with_scenario(
-            Scenario(id="upside", name="Upside", parent_id=BASE, created_by="larry")
-        )
+        .with_scenario(Scenario(id="upside", name="Upside", parent_id=BASE, created_by="larry"))
         .override("upside", "dso", D("45"), owner="larry", rationale="collection programme")
     )
 
@@ -82,13 +83,17 @@ def test_lineage_survives_the_round_trip(populated):
 
 
 def test_a_sourced_probability_survives_the_round_trip():
-    original = ScenarioSet((
-        base_scenario(),
-        Scenario(
-            id="likely", name="Likely case", parent_id=BASE,
-            probability=Probability(D("0.6"), "internal forecast poll", "2026-09-01"),
-        ),
-    ))
+    original = ScenarioSet(
+        (
+            base_scenario(),
+            Scenario(
+                id="likely",
+                name="Likely case",
+                parent_id=BASE,
+                probability=Probability(D("0.6"), "internal forecast poll", "2026-09-01"),
+            ),
+        )
+    )
     restored = from_json(to_json(original))
     probability = restored.scenario("likely").probability
     assert probability.value == D("0.6")

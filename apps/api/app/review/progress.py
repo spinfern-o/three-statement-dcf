@@ -92,8 +92,7 @@ def verification_gates(fact: ReportedFact, result: ExtractionResult) -> tuple[Ga
             "reviewer",
             ""
             if metadata_confirmed
-            else "still unconfirmed: "
-            + ", ".join(document.metadata.unconfirmed_required),
+            else "still unconfirmed: " + ", ".join(document.metadata.unconfirmed_required),
         ),
         Gate(
             4,
@@ -117,9 +116,7 @@ def verification_gates(fact: ReportedFact, result: ExtractionResult) -> tuple[Ga
             "a reviewer accepted or corrected it, with the action in the audit log",
             decided,
             "reviewer",
-            ""
-            if decided
-            else f"current status: {fact.verification_status.value}",
+            "" if decided else f"current status: {fact.verification_status.value}",
         ),
         Gate(
             7,

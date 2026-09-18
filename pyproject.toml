@@ -1,0 +1,116 @@
+# Item 154 (formatting and linting) and item 155 (strict type checks).
+#
+# Both tools are configured here rather than accepted at their defaults,
+# because a default rule set on an existing codebase produces two bad outcomes:
+# a mass rewrite nobody reviewed, or a wall of ignores nobody reads. Every
+# selection and every exclusion below says what it is for.
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["var", "inputs"]
+
+[tool.ruff.lint]
+# Chosen for the errors that are real. F is pyflakes -- undefined names, unused
+# imports, the things that are bugs. B is bugbear, whose findings are mostly
+# genuine mistakes. I keeps imports sorted so a diff shows the change rather
+# than the reshuffle. UP, C4, SIM and RUF catch dead weight.
+# PERF is deliberately absent. Its findings here are all in cold paths -- a
+# report built once per request, a manifest built once per snapshot -- and
+# rewriting a readable loop into a comprehension to save microseconds nobody
+# measures is the kind of change that introduces a bug for no gain.
+select = ["F", "E", "W", "I", "B", "C4", "SIM", "UP", "RUF", "PIE"]
+
+ignore = [
+    # A decimal written as Decimal("0.055") rather than Decimal(0.055) is the
+    # point of this codebase, not verbosity: 4.2 stores decimals exactly, and
+    # model/numeric.py:D() REFUSES a float rather than converting one. Ruff's
+    # suggestion would turn a deliberate string into a float literal in the one
+    # place this repository exists to prevent that.
+    "FURB157",
+    # E501 is left to the formatter. A line two characters over is not a
+    # finding worth a reader's attention.
+    "E501",
+    # A blind `except BaseException` is exactly right in the sandbox child and
+    # in the report path: the job there is to report ANYTHING rather than let
+    # it escape. Both sites say so in a comment.
+    "BLE001",
+    # This repository writes prose in its docstrings and uses real em dashes,
+    # en dashes and typographic quotes in it. RUF001-003 flag those as
+    # confusable with ASCII, which is a rule for identifiers and for code that
+    # might be copied into a shell -- not for a paragraph explaining why a
+    # schedule cannot be built.
+    "RUF001", "RUF002", "RUF003",
+    # `zip(a, b)` here is always over sequences the code has just built to the
+    # same length, and several are checked for it a line earlier. Adding
+    # strict= to twenty call sites would be twenty places to get a boolean
+    # wrong for no error caught.
+    "B905",
+    # A chain of guard clauses, each returning False with its own condition on
+    # its own line, reads better than one compound boolean -- and it is how a
+    # reader adds the next filter without restructuring anything.
+    "SIM103", "SIM108",
+    # `dict(code=..., name=...)` reads as a record being built; `{"code": ...}`
+    # reads as a mapping being written. Both are fine and neither is a defect.
+    "C408",
+    # `existing + [new]` and `[*existing, new]` are the same operation. Not a
+    # finding worth a line in a diff.
+    "RUF005",
+    # B008 and RUF009 are false positives against two APIs this code is
+    # required to use as written. FastAPI's `Form(...)` in a parameter default
+    # IS the declaration -- moving it into the body means the framework never
+    # sees it. And `D("0.875")` as a dataclass default is the intent exactly:
+    # the value is an immutable Decimal, so a default_factory would allocate a
+    # new identical object per instance and buy nothing.
+    "B008", "RUF009",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert on values and shapes; an unused binding in a test is usually a
+# deliberate "this is what came back" and reads better than an underscore.
+"tests/**" = ["RUF059", "SIM117"]
+"apps/api/tests/**" = ["RUF059", "SIM117", "B017"]
+# The fixture generator writes PDFs by hand and reuses loop variables in
+# closures deliberately, one page at a time.
+"apps/api/tests/fixtures/build_fixtures.py" = ["B023"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["model", "apps"]
+
+# --- item 155 --------------------------------------------------------------
+#
+# `model/` is checked strictly and the rest is not, and that split is the
+# decision rather than a compromise.
+#
+# `model/` is the arithmetic: every Decimal, every guard, every refusal. A type
+# error there is a wrong number. It is also small, self-contained, and imports
+# nothing but the standard library, so strictness costs little and buys the
+# thing worth buying.
+#
+# `apps/api/` is a web application over untyped third-party libraries --
+# FastAPI's request objects, PyMuPDF's document model, openpyxl's cells. Making
+# it strict would mean annotating around those, and the annotations would be
+# guesses about libraries whose own types are incomplete. The result is a lot
+# of `Any` with a strict flag on top, which reads as checked and is not.
+[tool.mypy]
+python_version = "3.10"
+files = ["model", "apps/api/app"]
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# `model/` strictly. The flags are listed rather than set with `strict = true`,
+# because `strict` in a per-module override is applied more broadly than it
+# reads -- which is how this configuration first reported 397 errors across a
+# package it was not supposed to be checking strictly.
+module = ["model.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_any_generics = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true

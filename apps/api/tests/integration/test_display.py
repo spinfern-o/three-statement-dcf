@@ -34,7 +34,12 @@ def test_a_figure_displays_the_same_way_whatever_asks_for_it():
 
 def test_every_unit_kind_has_a_stated_precision():
     assert set(PLACES) == {
-        "currency", "percent", "ratio", "days", "integer", "factor",
+        "currency",
+        "percent",
+        "ratio",
+        "days",
+        "integer",
+        "factor",
     }
     for kind, places in PLACES.items():
         assert places >= 0, kind
@@ -69,6 +74,7 @@ def test_an_absent_value_is_an_em_dash_and_never_a_zero():
 
 
 # --- 4.19: every rounded value owes a tooltip -------------------------------
+
 
 def test_a_rounded_value_is_labelled_with_its_full_stored_value():
     value = Decimal("2873867.4410713814952939")
@@ -132,29 +138,29 @@ def test_every_screen_that_rounds_a_figure_labels_it(forecast_client, screen):
     no tooltip is owed -- asserting one there would be asserting that this
     filing has fractional cents, which it does not.
     """
-    page = forecast_client.get(
-        f"/documents/{forecast_client.document_id}{screen}"
-    ).text
+    page = forecast_client.get(f"/documents/{forecast_client.document_id}{screen}").text
     assert "Full stored value:" in page, f"{screen} rounds without a 4.19 tooltip"
     assert "(4.19)" in page
 
 
 @pytest.mark.parametrize(
     "screen",
-    ("/statements", "/schedules", "/formulas", "/assumptions", "/forecast",
-     "/valuation"),
+    ("/statements", "/schedules", "/formulas", "/assumptions", "/forecast", "/valuation"),
 )
-def test_no_screen_shows_a_rounded_figure_without_offering_its_tooltip(
-    forecast_client, screen
-):
+def test_no_screen_shows_a_rounded_figure_without_offering_its_tooltip(forecast_client, screen):
     """Structural, so a screen that happens not to round today stays covered.
 
     Every template printing a figure emits the tooltip conditionally beside it,
     so a value that later needs one gets one without anybody remembering.
     """
-    name = {"/statements": "statements", "/schedules": "schedules",
-            "/formulas": "formulas", "/assumptions": "assumptions",
-            "/forecast": "forecast", "/valuation": "valuation"}[screen]
+    name = {
+        "/statements": "statements",
+        "/schedules": "schedules",
+        "/formulas": "formulas",
+        "/assumptions": "assumptions",
+        "/forecast": "forecast",
+        "/valuation": "valuation",
+    }[screen]
     body = (TEMPLATES / f"{name}.html").read_text()
     printed = body.count("| money }}")
     labelled = body.count("| tooltip %}")
@@ -165,9 +171,7 @@ def test_no_screen_shows_a_rounded_figure_without_offering_its_tooltip(
 
 
 def test_the_tooltip_carries_digits_the_page_does_not_show(forecast_client):
-    page = forecast_client.get(
-        f"/documents/{forecast_client.document_id}/valuation"
-    ).text
+    page = forecast_client.get(f"/documents/{forecast_client.document_id}/valuation").text
     shown = re.findall(r"Full stored value: ([0-9.\-]+) \(4\.19\)", page)
     assert shown, "no 4.19 tooltip on the valuation screen"
     for value in shown:

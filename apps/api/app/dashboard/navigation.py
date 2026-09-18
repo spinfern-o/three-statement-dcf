@@ -48,6 +48,7 @@ SECTIONS = (
     ("Valuation", "valuation", "8"),
     ("Diagnostics", "diagnostics", "9"),
     ("Exports", "exports", "10"),
+    ("Settings", "settings", "11"),
 )
 
 #: The furthest status at which each section has something to show. A section
@@ -77,11 +78,13 @@ REASONS = {
 
 def nav_items(
     document_id: str | None, current: str = "", status: ModelStatus | None = None
-) -> "tuple[NavItem, ...]":
+) -> tuple[NavItem, ...]:
     """The left navigation for one model, or the portfolio when there is none."""
     items = [
         NavItem(
-            label="Portfolio", href="/", glyph="0",
+            label="Portfolio",
+            href="/",
+            glyph="0",
             current=(current == "portfolio"),
         )
     ]
@@ -90,9 +93,7 @@ def nav_items(
 
     for label, suffix, glyph in SECTIONS:
         needed = REQUIRES.get(label)
-        reachable = (
-            status is None or needed is None or status.rank >= needed.rank
-        )
+        reachable = status is None or needed is None or status.rank >= needed.rank
         items.append(
             NavItem(
                 label=label,

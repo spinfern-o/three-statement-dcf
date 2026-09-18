@@ -31,14 +31,21 @@ from decimal import Decimal
 
 from model import accounts
 from model.accounts import Statement
-from model.dcf import CostOfCapital, EquityBridge, FCFFYear, build_fcff, run_dcf
+from model.dcf import (
+    CostOfCapital,
+    EquityBridge,
+    FCFFYear,
+    Valuation,
+    build_fcff,
+    run_dcf,
+)
 from model.numeric import ZERO
 from model.provenance import ProvenanceError
 from model.timing import Schedule, Timing, build_schedule
 
 from ..assumptions.scenarios import ScenarioSet
 from ..forecast.build import ScenarioForecast, forecast_ledger
-from .inputs import BY_CODE, BRIDGE_INPUTS, MARKET_INPUTS, required_codes
+from .inputs import BRIDGE_INPUTS, BY_CODE, MARKET_INPUTS, required_codes
 
 
 class ValuationError(Exception):
@@ -67,14 +74,16 @@ class ScenarioValuation:
     """One scenario's valuation, and everything it rested on."""
 
     scenario_id: str
-    valuation: object          # model.dcf.Valuation
-    fcff_years: "tuple[FCFFYear, ...]"
+    #: The engine's own `Valuation`. Typed, for the same reason as
+    #: `ScenarioForecast.result`: a comment naming the type is not the type.
+    valuation: Valuation
+    fcff_years: tuple[FCFFYear, ...]
     cost_of_capital: CostOfCapital
     bridge: EquityBridge
     schedule: Schedule
-    inputs: "tuple[InputRecord, ...]"
+    inputs: tuple[InputRecord, ...]
     #: 16.19 lines taken as nil because nobody entered them.
-    assumed_nil: "tuple[str, ...]"
+    assumed_nil: tuple[str, ...]
     #: 16.20: why there is no per-share value, when there is none.
     per_share_status: str
     #: The calendar date this valuation counts from, when one was supplied.
@@ -82,7 +91,7 @@ class ScenarioValuation:
     #: last actual period rather than to a calendar -- and 21.6 asks the report
     #: for a valuation date, so the absence has to be reportable rather than
     #: guessed at from today.
-    valuation_date: "date | None" = None
+    valuation_date: date | None = None
 
     @property
     def has_per_share(self) -> bool:
@@ -97,15 +106,24 @@ def _record(code: str, item, resolved, assumed_nil: bool = False) -> InputRecord
     definition = BY_CODE[code]
     if assumed_nil:
         return InputRecord(
-            code=code, name=definition.name, value=ZERO, unit=definition.unit,
-            rule=definition.rule, source_type="(not addressed)",
+            code=code,
+            name=definition.name,
+            value=ZERO,
+            unit=definition.unit,
+            rule=definition.rule,
+            source_type="(not addressed)",
             evidence="taken as nil because nobody entered it",
-            rationale=definition.why_sourced, status="-", assumed_nil=True,
+            rationale=definition.why_sourced,
+            status="-",
+            assumed_nil=True,
         )
     assumption = resolved.assumption
     return InputRecord(
-        code=code, name=definition.name, value=assumption.value,
-        unit=definition.unit, rule=definition.rule,
+        code=code,
+        name=definition.name,
+        value=assumption.value,
+        unit=definition.unit,
+        rule=definition.rule,
         source_type=assumption.source_type.value,
         evidence=assumption.evidence.describe(),
         rationale=assumption.rationale,
@@ -156,7 +174,7 @@ def build_scenario_valuation(
 ) -> ScenarioValuation:
     """Items 109-118 for one scenario, by running the engine that implements them."""
     scenario_id = forecast.scenario_id
-    resolved, records, missing, unresolved, wrong_unit = _gather(scenarios, scenario_id)
+    _resolved, records, missing, unresolved, wrong_unit = _gather(scenarios, scenario_id)
 
     problems = []
     if missing:
@@ -177,10 +195,7 @@ def build_scenario_valuation(
 
     # 16.6-16.10. The engine's `sources` map keeps its own requirement
     # satisfied; the real evidence is the Section 14 record behind each row.
-    sources = {
-        record.code: f"{record.source_type}: {record.evidence}"
-        for record in records
-    }
+    sources = {record.code: f"{record.source_type}: {record.evidence}" for record in records}
     tax_rate = forecast.result.taxes.rate(forecast.periods.forecast[-1])
     cost_of_capital = CostOfCapital(
         risk_free_rate=_value(records, "risk_free_rate"),
@@ -218,8 +233,10 @@ def build_scenario_valuation(
 
     # 16.11-16.14: the timing convention, stated.
     schedule = build_schedule(
-        forecast.periods.forecast, timing,
-        valuation_date=valuation_date, fiscal_year_end=fiscal_year_end,
+        forecast.periods.forecast,
+        timing,
+        valuation_date=valuation_date,
+        fiscal_year_end=fiscal_year_end,
     )
 
     # 16.20: a per-share value ONLY when diluted shares are verified.
@@ -271,7 +288,7 @@ def build_scenario_valuation(
     )
 
 
-def missing_inputs(scenarios: ScenarioSet, scenario_id: str) -> "tuple[str, ...]":
+def missing_inputs(scenarios: ScenarioSet, scenario_id: str) -> tuple[str, ...]:
     """The required market inputs this scenario does not yet carry."""
     resolved = _resolved(scenarios, scenario_id)
     return tuple(sorted(required_codes() - set(resolved)))

@@ -59,11 +59,18 @@ def _rebuild(result):
 
 # --- what the filing supports, and what it does not -------------------------
 
+
 def test_every_section_13_schedule_is_present_or_explained(schedules):
     """Rule 1.14. Seven schedules asked for; none silently missing."""
     assert len(schedules.all) == 9  # 13.7 is split into three
     assert {s.rule for s in schedules.all} == {
-        "13.1", "13.2", "13.3", "13.4", "13.5", "13.6", "13.7"
+        "13.1",
+        "13.2",
+        "13.3",
+        "13.4",
+        "13.5",
+        "13.6",
+        "13.7",
     }
     for schedule in schedules.all:
         if schedule.availability is not Availability.AVAILABLE:
@@ -72,9 +79,7 @@ def test_every_section_13_schedule_is_present_or_explained(schedules):
 
 def test_the_three_the_chart_cannot_carry_say_so(schedules):
     """Items 71 and 73, and the share-count half of 75 (finding F-17)."""
-    assert {s.key for s in schedules.unavailable} == {
-        "intangibles", "leases", "share_count"
-    }
+    assert {s.key for s in schedules.unavailable} == {"intangibles", "leases", "share_count"}
     assert "goodwill" in schedules.by_key("intangibles").reason
     assert "right-of-use" in schedules.by_key("leases").reason
     assert "diluted" in schedules.by_key("share_count").reason
@@ -85,12 +90,15 @@ def test_an_unavailable_schedule_cannot_be_built_without_a_reason():
 
     with pytest.raises(ValueError, match="must say why"):
         Schedule(
-            key="x", title="X", rule="13.9",
+            key="x",
+            title="X",
+            rule="13.9",
             availability=Availability.UNAVAILABLE,
         )
 
 
 # --- item 69: working capital (13.1) ----------------------------------------
+
 
 def test_working_capital_is_the_operating_accounts_only(schedules):
     """13.1.c. Cash and debt are excluded by definition, not by judgement."""
@@ -110,12 +118,12 @@ def test_working_capital_is_the_operating_accounts_only(schedules):
 
 #: 13.1.d, computed by hand from the fixture: balance / flow x 365.
 GOLDEN_DRIVERS = {
-    ("2024A", "DSO"): "59.9",             # 180,500 / 1,100,000
+    ("2024A", "DSO"): "59.9",  # 180,500 / 1,100,000
     ("2024A", "Inventory days"): "85.7",  # 155,000 /   660,000
-    ("2024A", "DPO"): "66.9",             # 121,000 /   660,000
-    ("2025A", "DSO"): "59.9",             # 205,000 / 1,250,000
+    ("2024A", "DPO"): "66.9",  # 121,000 /   660,000
+    ("2025A", "DSO"): "59.9",  # 205,000 / 1,250,000
     ("2025A", "Inventory days"): "77.9",  # 160,000 /   750,000
-    ("2025A", "DPO"): "63.3",             # 130,000 /   750,000
+    ("2025A", "DPO"): "63.3",  # 130,000 /   750,000
 }
 
 
@@ -154,13 +162,18 @@ def test_the_change_in_working_capital_reconciles_to_the_cash_flow(schedules):
 #: Every roll-forward, as printed in the fixture. One period: the filing
 #: reports two years, and the first has no prior year to roll forward from.
 GOLDEN_ROLLFORWARDS = {
-    "ppe": ("588000", {"Capital expenditure": "107000",
-                       "Depreciation and amortization": "-75000"}, "620000"),
+    "ppe": (
+        "588000",
+        {"Capital expenditure": "107000", "Depreciation and amortization": "-75000"},
+        "620000",
+    ),
     "debt": ("425000", {"Borrowing": None, "Repayment": "-25000"}, "400000"),
-    "retained_earnings": ("469500", {"Net income": "136500",
-                                     "Dividends": "-36500"}, "569500"),
-    "common_equity": ("50000", {"Share repurchases": None,
-                                "Stock-based compensation": None}, "50000"),
+    "retained_earnings": ("469500", {"Net income": "136500", "Dividends": "-36500"}, "569500"),
+    "common_equity": (
+        "50000",
+        {"Share repurchases": None, "Stock-based compensation": None},
+        "50000",
+    ),
 }
 
 
@@ -222,6 +235,7 @@ def test_the_ppe_schedule_names_what_it_cannot_see(schedules):
 
 # --- item 74: tax (13.6) ----------------------------------------------------
 
+
 def test_the_effective_rate_is_exact(schedules):
     rates = {row.year: row.effective_rate for row in schedules.tax.years}
     assert rates == {"2024A": D("0.25"), "2025A": D("0.25")}
@@ -237,6 +251,7 @@ def test_the_tax_footnote_components_are_reported_missing(schedules):
 
 
 # --- 13.4's interest basis --------------------------------------------------
+
 
 def test_both_interest_bases_are_computed_and_the_engines_is_marked(schedules):
     """13.4: state whether interest uses beginning, ending or average debt."""
@@ -270,6 +285,7 @@ def test_the_engine_charges_interest_on_the_basis_this_schedule_reports():
 
 # --- item 76: the reconciliation checks (13.8) ------------------------------
 
+
 def test_every_schedule_check_passes_on_a_filing_that_ties(schedules):
     results = run_schedule_checks(schedules)
     assert summarize(results) == "7 passed, 0 failed, 0 skipped"
@@ -290,18 +306,21 @@ def test_an_unbuildable_schedule_skips_rather_than_passes(schedules):
     [
         # PP&E: overstate CapEx. The balance sheet is untouched, so the
         # schedule now explains more movement than the balance sheet shows.
-        ("Purchases of property and equipment", "2025", None, "-120000",
-         "PP&E and depreciation", "13,000"),
+        (
+            "Purchases of property and equipment",
+            "2025",
+            None,
+            "-120000",
+            "PP&E and depreciation",
+            "13,000",
+        ),
         # Debt: understate the repayment.
-        ("Repayments of long-term debt", "2025", None, "-10000",
-         "Debt and interest", "15,000"),
+        ("Repayments of long-term debt", "2025", None, "-10000", "Debt and interest", "15,000"),
         # Retained earnings: change the dividend.
-        ("Dividends paid", "2025", None, "-40000",
-         "Retained earnings", "-3,500"),
+        ("Dividends paid", "2025", None, "-40000", "Retained earnings", "-3,500"),
         # Working capital: move a receivable, which changes the balance-sheet
         # change in NWC without touching the cash flow statement's own line.
-        ("Accounts receivable, net", "2025", 3, "215000",
-         "Working capital", "-30,500"),
+        ("Accounts receivable, net", "2025", 3, "215000", "Working capital", "-30,500"),
     ],
 )
 def test_a_broken_schedule_is_reported_not_plugged(
@@ -338,6 +357,7 @@ def test_the_reported_balance_is_never_adjusted_to_match(three_statements):
 
 
 # --- item 77: the screen ----------------------------------------------------
+
 
 def test_the_working_capital_rows_do_not_recompute_anything(schedules):
     """The view reads the schedule; it does not do arithmetic of its own."""

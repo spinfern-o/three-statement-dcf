@@ -40,10 +40,10 @@ should show the failed conditions rather than the number alone.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import Iterable, Mapping
 
 from model.numeric import D
 
@@ -51,7 +51,14 @@ from model.numeric import D
 class ReasonCode(Enum):
     """Why a fact needs attention. `blocking` codes force review on their own."""
 
-    def __new__(cls, code: str, blocking: bool, rule: str, summary: str) -> "ReasonCode":
+    # Declared as class annotations as well as assigned in `__new__`. Without
+    # these, the attributes exist at runtime and nothing -- no checker, no
+    # editor, no reader of the class -- can see that they do.
+    blocking: bool
+    rule: str
+    summary: str
+
+    def __new__(cls, code: str, blocking: bool, rule: str, summary: str) -> ReasonCode:
         obj = object.__new__(cls)
         obj._value_ = code
         obj.blocking = blocking
@@ -93,7 +100,12 @@ class ReasonCode(Enum):
         "1.7, 10.19, 10.24",
         "the column's period cannot be resolved, or mixes bases",
     )
-    SUBTOTAL_MISMATCH = ("SUBTOTAL_MISMATCH", True, "10.30", "the fact fails a subtotal reconciliation")
+    SUBTOTAL_MISMATCH = (
+        "SUBTOTAL_MISMATCH",
+        True,
+        "10.30",
+        "the fact fails a subtotal reconciliation",
+    )
     CROSS_STATEMENT_MISMATCH = (
         "CROSS_STATEMENT_MISMATCH",
         True,
@@ -146,7 +158,12 @@ class ReasonCode(Enum):
     )
 
     # --- advisory: recorded and shown, not individually blocking -----------
-    OCR_DERIVED = ("OCR_DERIVED", False, "10.8", "the value came from OCR, not an embedded text layer")
+    OCR_DERIVED = (
+        "OCR_DERIVED",
+        False,
+        "10.8",
+        "the value came from OCR, not an embedded text layer",
+    )
     FOOTNOTE_MARKER_STRIPPED = (
         "FOOTNOTE_MARKER_STRIPPED",
         False,
@@ -178,7 +195,12 @@ class ReasonCode(Enum):
         "1.8",
         "the fact is an adjusted or non-GAAP figure and must not be mixed with reported ones",
     )
-    RESTATED_VALUE = ("RESTATED_VALUE", False, "10.20, 10.21", "the fact comes from a restated column")
+    RESTATED_VALUE = (
+        "RESTATED_VALUE",
+        False,
+        "10.20, 10.21",
+        "the fact comes from a restated column",
+    )
     # Added in Phase 3; see the module note and docs/source-policy.md.
     IMAGE_REGION_NOT_EXTRACTED = (
         "IMAGE_REGION_NOT_EXTRACTED",
@@ -214,7 +236,9 @@ class EvidenceCheck(str, Enum):
     ROW_LABEL = "the row carries a non-empty label in the company's own wording"
     COLUMN_PERIOD = "the column header resolves to one unambiguous period"
     PARSED = "the deterministic parser produced a value"
-    SIGN_EXPLICIT = "the sign follows from digits, a sign character or parentheses, with no conflict"
+    SIGN_EXPLICIT = (
+        "the sign follows from digits, a sign character or parentheses, with no conflict"
+    )
     CLEAN_NUMERIC = "no footnote marker had to be stripped from the numeric string"
     TABLE_INTACT = "the source table neither split across a page break nor repeated its header"
 

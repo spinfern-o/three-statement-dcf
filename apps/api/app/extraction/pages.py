@@ -57,7 +57,7 @@ class PageProfile:
         return self.geometry.page_number
 
 
-def profile_page(page: "pymupdf.Page", *, min_chars: int) -> PageProfile:
+def profile_page(page: pymupdf.Page, *, min_chars: int) -> PageProfile:
     """Classify one page by what it actually carries."""
     geometry = PageGeometry(
         page_number=page.number + 1,
@@ -94,7 +94,7 @@ def profile_page(page: "pymupdf.Page", *, min_chars: int) -> PageProfile:
     )
 
 
-def classify_pages(doc: "pymupdf.Document", *, min_chars: int) -> tuple[PageProfile, ...]:
+def classify_pages(doc: pymupdf.Document, *, min_chars: int) -> tuple[PageProfile, ...]:
     """Classify every page, and apply decision 2.3.c.
 
     Refuses the document when any page is image-only, naming the pages. Refuses

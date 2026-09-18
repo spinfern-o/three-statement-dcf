@@ -8,7 +8,7 @@ Two documents govern this repository, and they are different things:
 | Document | What it is | Status |
 |---|---|---|
 | [`three_statement_model_to_dcf_step_by_step.txt`](three_statement_model_to_dcf_step_by_step.txt) | The 37-step modelling workflow | **Implemented** |
-| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–14 of 17** |
+| [`docs/website-build-spec.md`](docs/website-build-spec.md) | The specification for a web application around it | **Phases 2–16 of 17** |
 
 ## Status, stated plainly
 
@@ -24,7 +24,7 @@ Two documents govern this repository, and they are different things:
    UNCONFIRMED state, and a deterministic parser that refuses every ambiguous
    cell rather than guessing.
 3. **The review and mapping application** (`review_server.py`) —
-   specification Phases 4 to 14, items 39–144. A browser interface showing
+   specification Phases 4 to 15, items 39–153. A browser interface showing
    the PDF page beside the values read from it, with every extracted number
    boxed on the page it came from; accept / correct / reject actions that each
    require a written reason; a mapping screen that carries each reported line
@@ -145,7 +145,85 @@ the trip. Each carries its exact value in a cell note, is styled `Inexact`, and
 is counted on the cover tab — rather than being rounded away where nobody
 would notice.
 
-1186 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+**There is a credential in front of it now.** Decision 2.2.c has required one
+since Phase 2 and it went unimplemented for ten phases, mitigated only by
+binding to localhost. Phase 15 built it — a password hashed with `scrypt` from
+the standard library, a signed session cookie expiring absolutely eight hours
+after sign-in, a CSRF token on every state-changing request, rate-limited
+sign-ins — and turned the mitigation into a refusal: the server will not bind
+anywhere but loopback without a credential configured. Without one it serves
+locally and says so on every page, because a reviewer who cannot tell whether
+the thing in front of them is protected will assume it is.
+
+**The security layer says what it does not do.** PDF parsing runs in a child
+process under memory, CPU and time limits, which contains a crash or a runaway
+allocation and is explicitly *not* a boundary against code execution. Uploads
+are scanned only if a scanner is configured, and with none the result is
+recorded as "not scanned" — never as clean. The rate limiters are per process
+and say so. The backup archive is not encrypted by the process that writes it,
+and its own manifest says so. All of it is in
+[`docs/incident-response.md`](docs/incident-response.md), before an incident
+rather than after, because a procedure that does not name its gaps is read as a
+guarantee it never made.
+
+**An untested backup is not a backup**, so the restore test is the deliverable:
+a snapshot carries a manifest of every file's SHA-256, and verifying it restores
+into a scratch directory and re-hashes everything. A tar that extracts proves
+the tar is well-formed, not that the bytes inside it are the bytes that went in.
+That verification runs in CI on every commit rather than quarterly on a
+calendar.
+
+**The release-readiness report is generated, not written.** Item 168 asks for
+PASS/FAIL evidence, and a file somebody typed is a claim about the code rather
+than evidence about it. Every row in
+[`docs/release-readiness.md`](docs/release-readiness.md) is the result of
+running something, with the command printed beside it, and the generator exits
+non-zero unless every gate passed — a skipped gate blocks the verdict, because
+a check that did not run has not passed.
+
+It found three real things on its first run, including a stale test count in
+this file. CI regenerates it and fails when the committed copy has drifted.
+
+**This is the one place the 0.0001% claim can be made.** 4.20 permits it only
+once the benchmark suite passes *and* the report names the exact dataset and
+formulas. A web process cannot observe the test suite, so the in-app panel
+reports coverage and says the result is not observed; a report generator runs
+the suite, so it names the dataset, lists all twenty-two of 4.16's outputs, and
+reports the contract **UNPROVEN** when the benchmark did not pass rather than
+carrying the claim forward.
+
+**A READY verdict is not permission to deploy**, and the report says so: Phase
+17 item 169 requires the target, the access level and the data policy to be
+confirmed first.
+
+**Every response now carries its security headers, and the strictest CSP
+available is simply true here.** Item 175 had nothing to verify: the
+application was sending none. `script-src 'none'` and `default-src 'none'` are
+not aspirations but consequences of shipping no JavaScript (deviation F-14),
+and `test_no_template_contains_a_script_tag` is the test the claim rests on.
+They are sent from the application rather than the proxy, so a proxy
+misconfiguration cannot drop them, and the middleware sits *after* the guard so
+the guard's own refusals carry them too. `Strict-Transport-Security` is sent
+only on an HTTPS request, because over plaintext it is ignored by the browser
+and merely makes a `curl -I` look compliant.
+
+**The smoke test never authenticates.** Item 179 wants production smoke tests
+that do not expose private data, and the two halves pull against each other: a
+test that logs in proves more, but holds a credential and prints filing
+details from a monitoring job. `python3 -m apps.api.app.verification.smoke
+https://host` cannot reach a filing, so it cannot expose one. Its sixteen
+checks are about the shape of a correct deployment — that the process answers,
+names its own commit, is not running from a modified tree (item 178), refuses
+an unauthenticated request, leaks nothing in the refusal, and carries all six
+headers on it.
+
+**`/health` names the code that produced a figure** (item 180): the commit, the
+export schema version and the formula fingerprint, read at startup rather than
+baked in by a script somebody has to remember to run. A deployment from a dirty
+tree reports its commit as `-dirty`, because that deployment is not the version
+the suite passed and the value itself should say so.
+
+1367 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -160,10 +238,15 @@ there was no mapping stage; Phase 5 built one. The application still evaluates
 all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
 
-**What does not exist yet:** the rest of the website. No database, no
-diagnostics or lineage screens, no exports. Phases 13 to 17 of the
-specification, in other words — all of them presentations of, or projections from, numbers this
-stage now certifies.
+**What does not exist yet: a deployment.** Every one of the specification's
+180 items that is code is built. What is left is Phase 17's decisions —
+item 169's target, access level and data policy, and item 177's release
+approval — and they are the owner's, not the implementing agent's.
+[`docs/deployment.md`](docs/deployment.md) is the runbook, and §6 is the list
+of questions it cannot answer for itself. The one piece of infrastructure that
+is still missing is PostgreSQL: specification 3.2.d asks for it and storage is
+JSON files on a filesystem, which is recorded as finding F-36 rather than
+glossed.
 
 **The calculation path uses exact decimal arithmetic.** Specification rules
 1.15 and 4.4 prohibit binary floating point here, so the engine runs on
@@ -548,13 +631,49 @@ Exports (specification Phase 14, items 138–144):
 | `apps/api/app/exports/pdf_export.py` | 141 | 21.6's nine sections, drawn with the PDF library already here |
 | `apps/api/app/api/templates/exports.html` | — | The 7.11 screen |
 
+Security and operations (specification Phase 15, items 145–153):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/security/credentials.py` | 145 | A password hashed with `hashlib.scrypt`, held in the environment |
+| `apps/api/app/security/sessions.py` | 145 | A signed cookie with an absolute eight-hour life |
+| `apps/api/app/security/guard.py` | 145 | The middleware that defaults to closed, and replays the body |
+| `apps/api/app/security/csrf.py` | — | 20.12's token, derived from the session rather than stored |
+| `apps/api/app/security/authorization.py` | 146 | 20.7, where "not yours" answers exactly like "does not exist" |
+| `apps/api/app/security/sandbox.py` | 147 | PDF parsing in a child process, and what that does not buy |
+| `apps/api/app/security/scanning.py` | 147 | 20.9's hook, reporting "not scanned" rather than "clean" |
+| `apps/api/app/security/ratelimit.py` | 148 | 20.14, by window and by concurrency |
+| `apps/api/app/security/logging.py` | 149 | Identifiers, never values, redacted on the way out |
+| `apps/api/app/security/backup.py` | 150 | A snapshot, and the restore that re-hashes every byte |
+| `apps/api/app/security/retention.py` | 151 | 2.6.c's deletion, behind 20.18, leaving a tombstone |
+| `apps/api/app/security/repository_scan.py` | 152 | No source PDF and no secret in Git, checked in CI |
+| [`docs/incident-response.md`](docs/incident-response.md) | 153 | What to do, and what this system does not defend against |
+
+Final verification (specification Phase 16, items 154–168):
+
+| Path | Item | What it does |
+|---|---|---|
+| `pyproject.toml` | 154, 155 | Ruff and mypy, with a reason beside every rule and every exclusion |
+| `apps/api/app/verification/plan.py` | 156–162 | Section 22's fifty-five clauses, mapped onto the tests that cover them |
+| `apps/api/app/verification/report.py` | 168 | The release-readiness report: every row the result of running something |
+| [`docs/release-readiness.md`](docs/release-readiness.md) | 168 | Its output, regenerated in CI so it cannot go stale |
+
+Deployment (specification Phase 17, items 169–180):
+
+| Path | Item | What it does |
+|---|---|---|
+| `apps/api/app/security/headers.py` | 175 | Every security header, from the application so a proxy cannot drop them |
+| `apps/api/app/verification/build_info.py` | 178, 180 | The commit, the schema version and the formula fingerprint, on `/health` |
+| `apps/api/app/verification/smoke.py` | 172, 179 | Sixteen checks that never authenticate, so they cannot expose a filing |
+| [`docs/deployment.md`](docs/deployment.md) | 169–180 | The runbook, and §6: the four items only the owner can answer |
+
 Documentation:
 
 | Path | What it is |
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-25 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-36 |
 
 Specification Phase 2 contract documents. These are **definitions for the
 website, not descriptions of the engine** — each one states plainly where the

@@ -64,9 +64,17 @@ class TaxScheduleView(Schedule):
     #: 13.6 components this filing's face statements cannot supply.
     missing_components: tuple[str, ...] = ()
 
-    def usable_rates(self) -> "dict[str, Decimal]":
+    def usable_rates(self) -> dict[str, Decimal]:
         """Year -> effective rate, for the years STEP 16 could actually use."""
-        return {y.year: y.effective_rate for y in self.years if y.usable_as_assumption}
+        # The `is not None` is redundant with `usable_as_assumption` at
+        # runtime and is not redundant to a reader or a checker: nothing in
+        # the property's name says the rate is present, and the day the two
+        # come apart this dict would hold a None as a rate.
+        return {
+            y.year: y.effective_rate
+            for y in self.years
+            if y.usable_as_assumption and y.effective_rate is not None
+        }
 
 
 #: 13.6's list, minus the one line the face of an income statement carries.
@@ -79,7 +87,7 @@ FOOTNOTE_COMPONENTS = (
 )
 
 
-def _rate(pretax: Decimal | None, tax: Decimal | None) -> "tuple[Decimal | None, str]":
+def _rate(pretax: Decimal | None, tax: Decimal | None) -> tuple[Decimal | None, str]:
     if pretax is None or tax is None:
         missing = " and ".join(
             name
@@ -98,7 +106,7 @@ def _rate(pretax: Decimal | None, tax: Decimal | None) -> "tuple[Decimal | None,
     return rate, ""
 
 
-def tax_schedule(ledgers: dict, years: "tuple[str, ...]") -> TaxScheduleView:
+def tax_schedule(ledgers: dict, years: tuple[str, ...]) -> TaxScheduleView:
     """13.6, as far as the face of the income statement reaches."""
     income: Ledger = ledgers[Statement.INCOME]
 

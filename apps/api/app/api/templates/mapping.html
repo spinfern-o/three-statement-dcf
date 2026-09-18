@@ -36,9 +36,11 @@
     </ul>
     <div class="actions" style="margin-top:var(--space-4)">
       <form method="post" action="/documents/{{ document.id }}/mapping/propose">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit">Propose mappings</button>
       </form>
       <form method="post" action="/documents/{{ document.id }}/mapping/approve-all" class="decide" style="grid-template-columns: minmax(0,1fr) auto">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="field">
           <label for="approve-all-note">Note for approving everything <span aria-hidden="true">*</span></label>
           <input type="text" id="approve-all-note" name="note" required autocomplete="off">
@@ -76,6 +78,7 @@
   <section class="card" aria-labelledby="rows-heading">
     <h2 id="rows-heading">Reported lines</h2>
     <form method="post" action="/documents/{{ document.id }}/mapping/combine">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="table-scroll" tabindex="0" role="region"
            aria-label="Table">
       <table>
@@ -241,7 +244,8 @@
        into three forms would give a screen reader three copies of each label. #}
     {% for row in rows %}
     <form id="decide-{{ row.fact.id }}" method="post"
-          action="/documents/{{ document.id }}/mapping/facts/{{ row.fact.id }}"></form>
+          action="/documents/{{ document.id }}/mapping/facts/{{ row.fact.id }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"></form>
     {% endfor %}
   </section>
 
