@@ -308,12 +308,22 @@ def documentation_claims() -> list[Outcome]:
         f"README says {claimed.group(1) if claimed else '(nothing)'}, pytest collects {actual}",
     )
 
-    # The phase range. Every phase updates it and one phase will forget.
-    phases = re.search(r"\*\*Phases 2.(\d+) of 17\*\*", readme)
+    # The phase range. The comment here read "every phase updates it and one
+    # phase will forget" -- and one did: the README said "Phases 2-16 of 17"
+    # after Phase 17 shipped. The check passed anyway, because it asserted the
+    # range was STATED rather than that it was right. That is the same shape as
+    # F-38 one level milder: a claim verified for presence instead of truth.
+    #
+    # Every phase of the specification is now built, so the end of the range is
+    # 17. A later specification revision that adds a phase will fail this row,
+    # which is the correct outcome: the README would then be wrong.
+    phases = re.search(r"\*\*Phases 2.(\d+) of (\d+)\*\*", readme)
     row(
-        "README's phase range is stated",
-        phases is not None,
-        f"README says phases 2-{phases.group(1)} of 17" if phases else "no phase range found",
+        "README's phase range matches what is built",
+        phases is not None and phases.group(1) == "17" and phases.group(2) == "17",
+        f"README says phases 2-{phases.group(1)} of {phases.group(2)}"
+        if phases
+        else "no phase range found",
     )
 
     # F-4's count, which moved in Phase 13 and is cited in three documents.

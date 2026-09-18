@@ -482,3 +482,90 @@ def test_a_failed_login_is_logged_and_the_password_is_not(guarded):
 def test_every_redaction_pattern_is_exercised_by_a_test():
     """So a pattern added without a test is a test failure, not a silent gap."""
     assert len(PATTERNS) == 5
+
+
+# --- 20.16: private data must not leave in an application error -------------
+
+
+LEAKY = "balance differs by 123456789 for ACME HOLDINGS 2025"
+
+
+def _app_that_raises(tmp_path, exception):
+    """An application with one route that raises mid-request."""
+    app = create_app(tmp_path)
+
+    @app.get("/__raises")
+    def _raises():
+        raise exception
+
+    return app
+
+
+def test_an_unhandled_engine_error_does_not_reach_the_response(tmp_path):
+    """20.16, and the reason it holds is worth pinning rather than assuming.
+
+    The engine's exceptions are deliberately informative -- `Ledger.require`
+    names the account and year, the balance check reports the delta -- which is
+    right for a CLI run by the data's owner and is most of what makes the tool
+    usable. Several of those messages carry figures off the filing.
+
+    What stops them crossing the HTTP boundary is that the application runs
+    with `debug` off, so Starlette's default handler returns a bare
+    "Internal Server Error". That is a property of a setting, and a setting can
+    be changed by somebody debugging a problem who then forgets. This test is
+    what makes that change fail here rather than in production.
+    """
+    from starlette.testclient import TestClient
+
+    from model.provenance import ProvenanceError
+
+    app = _app_that_raises(tmp_path, ProvenanceError(LEAKY))
+    assert app.debug is False, "debug on would print the traceback, and the figures in it"
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.get("/__raises")
+
+    assert response.status_code == 500
+    assert LEAKY not in response.text
+    assert "123456789" not in response.text
+    assert "ACME" not in response.text
+    assert "Traceback" not in response.text
+
+
+def test_the_same_holds_for_a_build_error(tmp_path):
+    """The exception class a route is most likely to let escape."""
+    from starlette.testclient import TestClient
+
+    from apps.api.app.statements.build import BuildError
+
+    client = TestClient(
+        _app_that_raises(tmp_path, BuildError(LEAKY)), raise_server_exceptions=False
+    )
+    response = client.get("/__raises")
+
+    assert response.status_code == 500
+    assert "123456789" not in response.text
+
+
+def test_a_handled_error_is_shown_only_to_the_owner_of_that_document(guarded):
+    """Why the informative messages ARE rendered, and why that is not 20.16.
+
+    Routes catch `BuildError` and render `str(exc)` into the page, figures and
+    all. That is not a leak: `authorization.require_access` runs before the
+    build, so the only reader who reaches it is the document's owner, looking
+    at figures from the filing they are already reviewing.
+
+    The guard is what makes that true, so this asserts the guard rather than
+    the message: an unauthenticated request never reaches a route that could
+    build anything.
+    """
+    response = guarded.get("/documents/doc-anything/statements", follow_redirects=False)
+    assert response.status_code in (303, 401, 404)
+    assert "123456789" not in response.text
+
+    # And a document that DOES exist answers the same way to an
+    # unauthenticated reader, so the refusal cannot be used to probe which
+    # identifiers are real (20.7).
+    real = guarded.get(f"/documents/{guarded.document_id}/statements", follow_redirects=False)
+    assert real.status_code == response.status_code
+    assert real.text == response.text
