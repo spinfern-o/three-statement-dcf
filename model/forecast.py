@@ -119,6 +119,62 @@ def _optional(assumptions: Assumptions, name: str, year: str, default: Decimal =
     return assumptions.get(name, year) if assumptions.has(name, year) else default
 
 
+def _total(balance: Ledger, accounts: tuple[str, ...], year: str) -> Decimal:
+    """Sum the accounts of one section that this forecast actually set.
+
+    An absent account contributes nothing rather than a zero (rule 1.3): a
+    company with no goodwill has none, and `_carry_forward` leaves it absent
+    rather than writing zero into every forecast year.
+    """
+    total = D(0)
+    for account in accounts:
+        value = balance.get(account, year)
+        if value is not None:
+            total += value
+    return total
+
+
+#: 12.2.e, 12.2.i and 12.2.k. Balances that exist on the historical balance
+#: sheet and that **no assumption in this model drives**.
+#:
+#: Each is held at its last reported value, with that said in the basis string
+#: rather than left for a reader to infer from a flat line. Holding a balance
+#: flat is a forecast decision, and STEP 10 forbids hiding one inside a
+#: formula; it is the defensible default here because the alternatives are
+#: worse. Growing goodwill means forecasting acquisitions the company has not
+#: announced. Amortizing intangibles needs the 13.3 schedule, which needs an
+#: amortization line separate from depreciation -- available now, but a
+#: schedule rather than a carry-forward. Running leases down needs a payment
+#: schedule (13.5). Growing minority interest means forecasting the
+#: subsidiaries' earnings separately from the parent's.
+#:
+#: **Absent stays absent** (rule 1.3). A company with no goodwill has none to
+#: project, and writing a zero here would turn "does not have it" into "has
+#: zero of it" for every forecast year.
+CARRIED_FORWARD = (
+    A.GOODWILL,
+    A.INTANGIBLES,
+    A.LEASE_LIABILITIES,
+    A.MINORITY_INTEREST,
+)
+
+
+def _carry_forward(
+    historical_balance: Ledger, balance: Ledger, year: str, last_actual: str
+) -> None:
+    """Hold each `CARRIED_FORWARD` balance at its last reported value."""
+    for account in CARRIED_FORWARD:
+        opening = historical_balance.get(account, last_actual)
+        if opening is None:
+            continue
+        balance.set_forecast(
+            account,
+            year,
+            opening,
+            f"held at the {last_actual} balance: no assumption in this model drives it",
+        )
+
+
 def build_forecast(
     periods: Periods,
     historical_income: Ledger,
@@ -379,6 +435,7 @@ def build_forecast(
             A.OTHER_CURRENT_ASSETS, year, other_ca, "other_current_assets_pct_revenue"
         )
         balance.set_forecast(A.PPE_NET, year, ending_ppe, "from PP&E schedule (STEP 18)")
+        _carry_forward(historical_balance, balance, year, last_actual)
         balance.set_forecast(
             A.OTHER_NONCURRENT_ASSETS, year, ending_other_nca, "prior balance less other_investing"
         )
@@ -402,9 +459,16 @@ def build_forecast(
             A.RETAINED_EARNINGS, year, ending_re, "from retained earnings schedule (STEP 8)"
         )
 
-        assets = ending_cash + ar + inventory + other_ca + ending_ppe + ending_other_nca
-        liabilities = ap + other_cl + ending_debt + ending_other_ncl
-        equity = ending_common + ending_re
+        # Summed FROM THE CHART rather than by hand. The hand-written version
+        # was `ending_cash + ar + inventory + ...`, which was correct for the
+        # accounts that existed when it was written and silently wrong the
+        # moment 12.2.e's goodwill was added to `ASSET_ACCOUNTS`: the line was
+        # forecast, and left out of the total, so A = L + E broke by exactly
+        # the goodwill. A total that reads its own membership cannot drift
+        # from the chart.
+        assets = _total(balance, A.ASSET_ACCOUNTS, year)
+        liabilities = _total(balance, A.LIABILITY_ACCOUNTS, year)
+        equity = _total(balance, A.EQUITY_ACCOUNTS, year)
         balance.set_derived(A.TOTAL_ASSETS, year, assets, "sum of asset accounts")
         balance.set_derived(A.TOTAL_LIABILITIES, year, liabilities, "sum of liability accounts")
         balance.set_derived(A.TOTAL_EQUITY, year, equity, "sum of equity accounts")

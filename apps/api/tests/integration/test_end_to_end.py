@@ -153,10 +153,17 @@ def test_step_e_propose_and_approve_the_mappings(client, document_id):
     )
     assert "Approved" in approved.text
 
-    # 11.11: the traps the proposer refuses stay unmapped, and the screen says
-    # which. An approve-all that silently mapped them would pass this step and
-    # put a wrong figure in the statements.
-    assert "no proposal" in approved.text.lower() or "unmapped" in approved.text.lower()
+    # 11.11 used to be asserted here through the fixture's one trap label,
+    # "Net increase in cash". 12.3.m gave the chart a line for it (F-17), so
+    # this filing now maps completely and there is no trap left on it to
+    # observe. The refusal itself is asserted where it can be exercised
+    # directly -- `test_the_traps_are_refused_with_a_reason` in
+    # tests/unit/test_proposals.py -- rather than asserted here against a
+    # fixture that no longer contains one.
+    #
+    # What this step can still say is that approving mapped everything it
+    # should have, which is the other half of the same requirement.
+    assert "Approved" in approved.text
 
 
 # --- 22.5.f: resolve the historical checks ----------------------------------

@@ -636,7 +636,95 @@ so `test_chart.py` asserts the two cannot gain or lose an account
 independently, and that the expected-sign and working-capital tags agree with
 the conventions the engine states in prose.
 
-### F-17 — OPEN. The chart is short of Section 12, and mapping makes it visible
+### F-17 — RESOLVED. The chart now carries every line Section 12 names
+
+Eleven phases open. The chart lacked `goodwill`, `intangibles`,
+`lease_liabilities`, `minority_interest`, `ebitda`, interest income separate
+from interest expense, operating expense by disclosed category, the D&A split,
+disposals, share issuance, `fx_effect_on_cash` and `net_change_in_cash`. Every
+one of them now exists, with a definition saying what it is and what it is not.
+[`data-dictionary.md`](data-dictionary.md) carries the line-by-line table;
+what follows is what building it cost and taught.
+
+**A "when applicable" line is optional, and that is only safe because
+something reconciles over it.** 12.2.i and 12.2.k use the phrase, and goodwill,
+intangibles and several others behave the same way: a company that has never
+acquired anything has no goodwill, and treating that absence as blocking would
+make total assets underivable for most filings. The case the optionality could
+hide -- a filer who DOES report goodwill and whose goodwill was left unmapped
+-- does not stay hidden: the derived total differs from the reported total by
+exactly the goodwill, and 12.4.i reports that difference with its amount.
+`test_every_optional_line_is_a_term_of_some_subtotal` is that argument as an
+assertion, and it caught `amortization` sitting unwatched for the ten minutes
+combined D&A was not derived.
+
+**A subtotal with no term reported is not a subtotal of zero.** The engine's
+`Ledger._try_derive` has always tracked `contributed` and returned None when
+nothing did. The mapping reconciliation and the formula environment both
+summed no terms to zero instead. That was unreachable while every derivation
+had at least one required term, and reachable the moment 12.1.d's three
+operating expense categories arrived, all three optional. What it produced was
+not a small error: the reported operating expenses were compared against a
+derived zero, so the **whole** of the reported figure was reported as a
+discrepancy, the mapping behind it was flagged for review, and the fact lost
+its verified status. Both implementations now carry the engine's guard.
+
+**A derived account that cannot be derived here is still the best figure
+available.** The formula environment excluded every account in `DERIVED` as an
+input, on the reasoning that the formulas produce it -- which is what makes the
+recomputation a *check* on the reported figure rather than a reading of it.
+That reasoning holds only while the derivation can run. This repository has
+fixtures of both shapes: one filing reports three operating expense categories
+and no total, the other a total and no categories. For the second, excluding
+the reported total left EBIT to be computed from three absent categories, and
+EBIT came out too high by the whole of operating expenses. `_derivable_here`
+is the fix: skip a derived account as an input only where its own derivation
+has something to run on.
+
+The intermediate design was worse and is worth recording. Seeing operating
+expenses and D&A break, the first fix made them *checks* rather than
+derivations -- reported, compared against their components, never substituted.
+That is right for the net income attribution (12.1.l), because net income is
+already derived as pre-tax less taxes and an account may be derived only one
+way. It is wrong for these two, because the filer who reports categories and
+no total then has no total at all. `COMPONENT_CHECKS` kept the one entry that
+earned it.
+
+**The forecast's balance sheet totals were summed by hand.** `ending_cash + ar
++ inventory + ...` -- correct for the accounts that existed when it was
+written, and silently wrong the moment goodwill joined `ASSET_ACCOUNTS`: the
+line was forecast and left out of the total, so A = L + E broke by exactly the
+goodwill across every forecast year. The totals now read their own membership
+from the chart, which cannot drift.
+
+**Four balances are carried forward, and the forecast says so.** Goodwill,
+intangibles, lease liabilities and minority interest are held at their last
+reported value with that stated in the basis string, because no assumption in
+this model drives them and STEP 10 forbids hiding a forecast decision inside a
+formula. The alternatives are worse: growing goodwill forecasts acquisitions
+the company has not announced, running leases down needs a payment schedule
+(13.5), growing minority interest means forecasting the subsidiaries' earnings
+separately from the parent's. **Absent stays absent** -- a company with no
+goodwill has none to project, and writing a zero would turn "does not have it"
+into "has zero of it" for every forecast year.
+
+**A line that was a trap stopped being one.** "Net increase in cash" was in
+`BLOCKED` with the reason that the chart had no line for it and mapping it
+would make it an input to the check meant to test it. 12.3.m gave it a line,
+and the block came off on the same reasoning every other subtotal already
+uses: 12.4.f compares the reported figure against the sum of the three
+subtotals rather than substituting one for the other. The fixture filing that
+carried it now maps completely, so check 17.6 passes where it used to fail --
+asserted as a PASS rather than deleted, because a regression in the chart
+should put the failure back.
+
+Two tests had been written to fail the day the chart grew an EBITDA line, so
+that nobody would have to notice. They did, and they said what to do.
+
+#### The original finding
+
+**Was: the chart is short of Section 12, and mapping makes it visible.**
+
 
 [`data-dictionary.md`](data-dictionary.md) already listed what the engine's
 vocabulary lacks against specification 12.1–12.3: `goodwill`, `intangibles`,
@@ -673,6 +761,25 @@ A fourth consequence is subtler and shows up as a caveat rather than a gap:
 amortization against PP&E. That is right only if the company amortizes
 nothing, and the schedule says so rather than quietly being wrong for any
 filing with intangibles.
+
+#### What the chart change does not by itself close
+
+The chart was the blocker for all four, and it is gone. Building on it is
+separate work, still outstanding:
+
+- **13.3 intangibles** now has both sides -- `intangibles` and `amortization`
+  -- so the roll-forward can be built. It has not been.
+- **13.5 leases** now has a liability line, so a filer with leases is
+  distinguishable from one whose leases sit inside other non-current
+  liabilities. The payment schedule the roll-forward needs does not exist.
+- **13.7 share counts** is unchanged and is NOT a chart problem. The chart
+  holds currency amounts; a share count is neither. It remains a valuation
+  input supplied with its own source (STEP 35), and `BLOCKED` still refuses to
+  map a weighted-average share line into a statement.
+- The **PP&E caveat** above is now avoidable for a filer that discloses the
+  split: `depreciation` exists. The schedule does not yet prefer it.
+
+Check 17.12 still reports SKIP citing F-17, and will until 13.3 is built.
 
 
 ### F-18 — RESOLVED in Phase 6. The extractor was truncating long row labels

@@ -311,3 +311,151 @@ def test_a_missing_input_skips_rather_than_passes(forecast, fcff_years, valuatio
     results = {r.name: r for r in run_all_checks(stripped, fcff_years, valuation)}
     assert results["Historical balance sheet balances"].status is Status.SKIP
     assert results["PP&E schedule linkage"].status is Status.SKIP
+
+
+# --- F-17: the Section 12 lines, and what makes their optionality safe ------
+
+
+def _balance_sheet(**amounts):
+    """One balance sheet, from whatever lines are passed."""
+    from model.accounts import Statement
+    from model.provenance import Figure, Source
+
+    ledger = Ledger(Statement.BALANCE, ("2025A",))
+    src = Source("10-K", 3, "line")
+    for account, value in amounts.items():
+        ledger.set_reported(account, "2025A", Figure(str(value), "2025A", src))
+    ledger.fill_derivable()
+    return ledger
+
+
+def test_a_company_with_no_goodwill_still_derives_its_total_assets():
+    """12.2.e is optional because a whole class of filer genuinely has none.
+
+    If an absent goodwill blocked the derivation, total assets would be
+    underivable for every company that has never made an acquisition -- which
+    is most of them, and the opposite of what rule 1.3 protects.
+    """
+    ledger = _balance_sheet(
+        **{
+            A.CASH: 100,
+            A.ACCOUNTS_RECEIVABLE: 200,
+            A.INVENTORY: 300,
+            A.OTHER_CURRENT_ASSETS: 50,
+            A.PPE_NET: 400,
+            A.OTHER_NONCURRENT_ASSETS: 50,
+        }
+    )
+    assert ledger.get(A.TOTAL_ASSETS, "2025A") == D("1100")
+    assert ledger.origin_of(A.TOTAL_ASSETS, "2025A") == "derived"
+
+
+def test_an_unmapped_goodwill_shows_up_as_the_difference_it_is():
+    """The safety net that makes 12.2.e's optionality honest.
+
+    Treating an absent goodwill as none is only defensible because the case it
+    could hide -- a filer who DOES report goodwill and whose goodwill was left
+    unmapped -- does not stay hidden. The derived total then differs from the
+    reported total by exactly the goodwill, and 12.4.i reports that difference
+    with its amount rather than plugging it.
+
+    Asserted on the exact amount, not merely that something failed: a check
+    that says "these disagree" without saying by how much sends a reviewer
+    looking at the wrong line.
+    """
+    goodwill = D("250")
+    lines = {
+        A.CASH: 100,
+        A.ACCOUNTS_RECEIVABLE: 200,
+        A.INVENTORY: 300,
+        A.OTHER_CURRENT_ASSETS: 50,
+        A.PPE_NET: 400,
+        A.OTHER_NONCURRENT_ASSETS: 50,
+    }
+    # The filing's own total includes the goodwill; the mapping left it out.
+    ledger = _balance_sheet(**lines, **{A.TOTAL_ASSETS: D("1100") + goodwill})
+    breaks = ledger.cross_check()
+    assert len(breaks) == 1, breaks
+    assert A.TOTAL_ASSETS in str(breaks[0])
+    assert str(goodwill) in str(breaks[0]) or "250" in str(breaks[0]), breaks[0]
+
+    # And with the goodwill mapped, the same filing reconciles.
+    whole = _balance_sheet(**lines, **{A.GOODWILL: goodwill, A.TOTAL_ASSETS: D("1100") + goodwill})
+    assert whole.cross_check() == []
+
+
+def test_the_lease_liability_is_not_folded_into_debt():
+    """12.2.i. A lease and a borrowing behave differently in a valuation.
+
+    Once one figure carries both, a reader cannot separate them again, so the
+    chart keeps them apart and total liabilities sums over both.
+    """
+    ledger = _balance_sheet(
+        **{
+            A.ACCOUNTS_PAYABLE: 100,
+            A.OTHER_CURRENT_LIABILITIES: 50,
+            A.DEBT: 400,
+            A.LEASE_LIABILITIES: 150,
+            A.OTHER_NONCURRENT_LIABILITIES: 25,
+        }
+    )
+    assert ledger.get(A.TOTAL_LIABILITIES, "2025A") == D("725")
+    assert ledger.get(A.DEBT, "2025A") == D("400")
+
+
+def test_the_minority_interest_is_inside_total_equity():
+    """12.2.k, so that assets = liabilities + equity still closes."""
+    ledger = _balance_sheet(
+        **{A.COMMON_EQUITY: 500, A.RETAINED_EARNINGS: 300, A.MINORITY_INTEREST: 75}
+    )
+    assert ledger.get(A.TOTAL_EQUITY, "2025A") == D("875")
+
+
+def test_ebitda_is_not_derived_without_a_visible_bridge():
+    """12.1.f: "EBITDA only when the precise bridge is visible."
+
+    D&A is deliberately NOT optional in that derivation. If it were, a filing
+    whose D&A cannot be separated would produce an EBITDA equal to its EBIT --
+    a figure that looks like a measurement and is an artefact of an absence.
+    """
+    assert A.DEPRECIATION_AMORTIZATION not in A.OPTIONAL_IN_DERIVATION
+    plus, minus = A.DERIVED[A.EBITDA]
+    assert plus == (A.EBIT, A.DEPRECIATION_AMORTIZATION)
+    assert minus == ()
+
+
+def test_a_subtotal_with_no_term_present_is_not_derived_as_zero():
+    """The guard the engine had and the other two implementations did not.
+
+    `Ledger._try_derive` has always tracked `contributed` and returned None
+    when nothing did. The mapping reconciliation and the formula environment
+    both summed no terms to zero instead -- unreachable while every derivation
+    had at least one required term, and reachable the moment 12.1.d's
+    operating expense categories arrived, all three of them optional.
+
+    What it produced was not a small error. The reported operating expenses
+    were compared against a derived zero, so the whole of the reported figure
+    was reported as a discrepancy, and the mapping behind it was flagged for
+    review and lost its verified status.
+    """
+    from model.accounts import Statement
+    from model.provenance import Figure, Source
+
+    ledger = Ledger(Statement.INCOME, ("2025A",))
+    src = Source("10-K", 2, "line")
+    # Operating expenses reported as one line, no categories -- the shape most
+    # filings take, and the shape that breaks a derivation of three optionals.
+    ledger.set_reported(A.OPERATING_EXPENSES, "2025A", Figure("270000", "2025A", src))
+    ledger.fill_derivable()
+
+    assert ledger.get(A.OPERATING_EXPENSES, "2025A") == D("270000")
+    assert ledger.origin_of(A.OPERATING_EXPENSES, "2025A") == "reported"
+    assert ledger.cross_check() == [], "a derived zero would contradict the reported line"
+
+    # And with one category reported, the derivation runs and the residual
+    # categories are the zeros they claim to be.
+    split = Ledger(Statement.INCOME, ("2025A",))
+    split.set_reported(A.SGA, "2025A", Figure("270000", "2025A", src))
+    split.fill_derivable()
+    assert split.get(A.OPERATING_EXPENSES, "2025A") == D("270000")
+    assert split.origin_of(A.OPERATING_EXPENSES, "2025A") == "derived"

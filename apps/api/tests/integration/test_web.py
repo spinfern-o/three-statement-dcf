@@ -417,11 +417,18 @@ def test_mapping_without_a_note_is_refused(client, stored):
 
 
 def test_an_unknown_canonical_code_is_refused_not_created(client, stored):
+    """`ebitda` was the example until 12.1.f gave the chart one (F-17).
+
+    "Adjusted EBITDA" replaces it because the chart will not acquire that one:
+    its bridge is whatever the filer chose, and mapping a non-GAAP figure into
+    a subtotal the checks treat as arithmetic is the mistake this refusal
+    exists to stop.
+    """
     client.post(_mapping_url(client, "propose"), follow_redirects=True)
     fact = next(f for f in stored.facts if f.raw_label == "Revenue")
     response = client.post(
         _mapping_url(client, "facts", fact.id),
-        data={"action": "map", "canonical_code": "ebitda", "note": "looks right"},
+        data={"action": "map", "canonical_code": "adjusted_ebitda", "note": "looks right"},
         follow_redirects=True,
     )
     assert "not a canonical line item" in response.text

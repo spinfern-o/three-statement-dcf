@@ -11,7 +11,7 @@ It is the source for the `FormulaDefinition` rows described in
 
 **Phase 8 built the formula engine, and the derivation family is now data.**
 [`apps/api/app/formula/catalog.py`](../apps/api/app/formula/catalog.py) turns
-`IS-*-D`, `BS-*-D` and `CF-*-D` — the ten subtotal derivations — into
+`IS-*-D`, `BS-*-D` and `CF-*-D` — the subtotal derivations — into
 `FormulaDefinition` rows the engine parses, orders and evaluates. They are
 **generated from `model/accounts.py:DERIVED`**, not retyped from this table, so
 a component added to a subtotal appears in both without anyone remembering to;

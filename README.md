@@ -235,7 +235,7 @@ baked in by a script somebody has to remember to run. A deployment from a dirty
 tree reports its commit as `-dirty`, because that deployment is not the version
 the suite passed and the value itself should say so.
 
-1380 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+1435 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -249,6 +249,33 @@ mapping. Through Phase 4 the correct answer for every fact was no, because
 there was no mapping stage; Phase 5 built one. The application still evaluates
 all seven conditions separately and names the one that is failing, because
 rule 1.14 says an unresolved requirement must never appear as PASS.
+
+**The chart of accounts now covers Section 12.** For eleven phases it lacked
+goodwill, intangibles, lease liabilities, minority interest, EBITDA, interest
+income separate from interest expense, operating expense by category, the D&A
+split, disposals, share issuance, the FX effect on cash and the net change in
+cash — so a filing with material goodwill got a model whose balance sheet was
+right and whose intangibles schedule did not exist. That was finding F-17, and
+it is closed.
+
+The lines the specification qualifies with **"when applicable"** are optional
+in their subtotals: a company that has never acquired anything has no goodwill,
+and treating that absence as blocking would make total assets underivable for
+most filings. That is only safe because the case it could hide does not stay
+hidden — a filer who *does* report goodwill and whose goodwill was left
+unmapped derives a total differing from the reported one by exactly the
+goodwill, and 12.4.i reports that difference with its amount. A test asserts
+that every optional line has something reconciling over it, because an optional
+line nothing watches is a gap rather than a convenience.
+
+Building it found three real defects, each recorded in the ledger: a subtotal
+with **no** term reported was being derived as zero in two of the three places
+that derive one (the engine always had the guard); a reported subtotal the
+formulas could not derive was being excluded as an input, so EBIT came out too
+high by the whole of operating expenses for a filer reporting no expense
+categories; and the forecast's balance-sheet totals were summed by hand, so
+adding goodwill to the chart broke A = L + E by exactly the goodwill until the
+totals were made to read their own membership.
 
 **What does not exist yet: a deployment.** Every one of the specification's
 180 items that is code is built. What is left is Phase 17's decisions —

@@ -645,7 +645,22 @@ def test_the_vendored_fonts_actually_load(browser, served_forecast):
     page = context.new_page()
     try:
         page.goto(f"{served['base']}/documents/{served['document_id']}/statements")
-        page.wait_for_function("document.fonts.status === 'loaded'", timeout=5000)
+        # Wait for the condition the assertions below actually check, not for
+        # `document.fonts.status === 'loaded'`. That status reads "loaded"
+        # BOTH before any font has started loading and after they all finish,
+        # so waiting on it returned immediately about one run in three and the
+        # test then read an empty or half-populated `document.fonts`. A test
+        # that fails on a correct page is worse than no test: somebody goes
+        # and changes the page.
+        page.wait_for_function(
+            """() => {
+                const faces = Array.from(document.fonts);
+                const inter = faces.find(f => f.family.includes('Inter'));
+                const serif = faces.find(f => f.family.includes('Source Serif 4'));
+                return Boolean(inter && serif && inter.status === 'loaded');
+            }""",
+            timeout=10000,
+        )
         loaded = page.evaluate("Array.from(document.fonts).map(f => f.family + ' ' + f.status)")
         assert any("Inter" in item and "loaded" in item for item in loaded), loaded
         assert any("Source Serif 4" in item for item in loaded), loaded

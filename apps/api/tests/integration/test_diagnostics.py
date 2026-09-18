@@ -183,10 +183,25 @@ def test_the_fully_built_model_passes_the_checks_it_can(full):
 def test_the_failures_on_the_fixture_are_real_findings(full):
     """Not a demonstration: each of these is true of the fixture filing."""
     failures = {o.check.clause: o for o in full.failed}
-    # Two labels on this filing map to nothing -- correctly, they are traps.
-    assert "17.6" in failures and "no mapping at all" in failures["17.6"].detail
     # 16.19's bridge lines nobody addressed.
     assert "17.25" in failures and "nobody having addressed" in failures["17.25"].detail
+
+
+def test_every_label_on_the_fixture_now_maps(full):
+    """17.6 used to fail here, and the reason it stopped is the point.
+
+    The fixture's "Net increase in cash" had no canonical code to go to, so
+    the proposer refused it and 17.6 reported a label mapped to nothing. 12.3.m
+    gave the chart `net_change_in_cash` (F-17), so the line maps, 17.6 passes,
+    and 12.4.f's cash roll-forward now has a reported figure to check the three
+    subtotals against rather than nothing.
+
+    Asserted as a PASS rather than deleted, because "this check stopped
+    failing" is worth keeping a test on: a regression in the chart would put
+    the failure back.
+    """
+    outcome = full.by_code(BY_CLAUSE["17.6"].code)
+    assert outcome.status is Status.PASS, outcome.detail
 
 
 def test_two_clauses_report_that_this_system_cannot_evaluate_them(full):

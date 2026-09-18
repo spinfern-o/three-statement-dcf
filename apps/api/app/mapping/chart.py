@@ -195,6 +195,47 @@ CHART: tuple[NormalizedLineItem, ...] = (
         present it.""",
     ),
     _item(
+        accounts.SGA,
+        "Selling, general and administrative",
+        IS,
+        P,
+        NOCASH,
+        OP,
+        """
+        12.1.d, one of the two operating expense categories nearly every filer
+        discloses. Stored POSITIVE and subtracted, like every expense here. Map
+        it only when the filing reports it separately: a company reporting one
+        undifferentiated operating expense line maps that to
+        `operating_expenses` and leaves this absent.""",
+    ),
+    _item(
+        accounts.RESEARCH_DEVELOPMENT,
+        "Research and development",
+        IS,
+        P,
+        NOCASH,
+        OP,
+        """
+        12.1.d. Research and development expensed in the period. Capitalized
+        development costs are NOT here -- they are an addition to intangibles,
+        and mapping them to this line would both overstate the expense and
+        lose the asset.""",
+    ),
+    _item(
+        accounts.OTHER_OPERATING_EXPENSES,
+        "Other operating expenses",
+        IS,
+        E,
+        NOCASH,
+        OP,
+        """
+        12.1.d. Every operating expense the two named categories do not cover:
+        restructuring, impairment of operating assets, litigation provisions.
+        A residual line for derivation purposes, so a filer that omits it is
+        saying there were none. Sign is EITHER because a reversal of a prior
+        provision is a credit.""",
+    ),
+    _item(
         accounts.OPERATING_EXPENSES,
         "Operating expenses",
         IS,
@@ -210,6 +251,24 @@ CHART: tuple[NormalizedLineItem, ...] = (
         chart has one line for all of them (12.1.d is not implemented).""",
     ),
     _item(
+        accounts.EBITDA,
+        "EBITDA",
+        IS,
+        E,
+        NOCASH,
+        OP,
+        """
+        12.1.f: "EBITDA only when the precise bridge is visible." Operating
+        income plus depreciation and amortization -- and D&A is NOT optional in
+        that derivation, so a filing whose D&A cannot be separated produces no
+        EBITDA rather than an EBITDA that quietly equals EBIT.
+
+        A company-reported "adjusted EBITDA" is NOT this line. It carries
+        add-backs the filer chose, and mapping it here would put a
+        non-GAAP figure into a subtotal the checks treat as arithmetic. Map
+        the reported figure only when its bridge is the plain one.""",
+    ),
+    _item(
         accounts.EBIT,
         "Operating income (EBIT)",
         IS,
@@ -222,6 +281,21 @@ CHART: tuple[NormalizedLineItem, ...] = (
         filer presents an operating income that includes items this chart
         treats as non-operating, map the reported line and record the
         difference in the note rather than adjusting it silently.""",
+    ),
+    _item(
+        accounts.INTEREST_INCOME,
+        "Interest income",
+        IS,
+        P,
+        NOCASH,
+        NONOP,
+        """
+        12.1.h. Interest earned on cash, deposits and investments. Stored
+        POSITIVE and ADDED, which is the mirror of `interest_expense` being
+        stored positive and subtracted. A filer reporting a single net
+        interest figure maps it to whichever of the two it actually is and
+        leaves the other absent -- splitting a net figure into two invented
+        halves is exactly what rule 1.3 forbids.""",
     ),
     _item(
         accounts.INTEREST_EXPENSE,
@@ -369,6 +443,36 @@ CHART: tuple[NormalizedLineItem, ...] = (
         choice.""",
     ),
     _item(
+        accounts.GOODWILL,
+        "Goodwill",
+        BS,
+        P,
+        NOCASH,
+        INV,
+        """
+        12.2.e. The excess of consideration transferred over the fair value of
+        identifiable net assets acquired, carried at cost less any impairment.
+        Goodwill is NOT amortized under either IFRS or US GAAP, so it does not
+        belong in the intangibles roll-forward's amortization line -- it moves
+        only on an acquisition, a disposal or an impairment. An entity that has
+        never acquired anything has no goodwill, and absence here means exactly
+        that.""",
+    ),
+    _item(
+        accounts.INTANGIBLES,
+        "Intangible assets, net",
+        BS,
+        P,
+        NOCASH,
+        INV,
+        """
+        12.2.e. Identifiable intangibles -- customer relationships, developed
+        technology, trademarks, capitalized software -- at cost less
+        accumulated amortization. Goodwill is NOT here: it has its own line
+        because it is not amortized and the 13.3 roll-forward treats the two
+        differently.""",
+    ),
+    _item(
         accounts.OTHER_NONCURRENT_ASSETS,
         "Other non-current assets",
         BS,
@@ -376,12 +480,42 @@ CHART: tuple[NormalizedLineItem, ...] = (
         NOCASH,
         INV,
         """
-        Every non-current asset the chart does not name: goodwill,
-        intangibles, right-of-use assets, equity-method investments,
-        non-current deferred tax assets. The chart has NO goodwill or
-        intangibles line (12.2.e), so an entity with material goodwill needs
-        the chart extended before its model means much. Record that on the
-        mapping rather than burying it here.""",
+        Every non-current asset the chart does not name: right-of-use assets,
+        equity-method investments, non-current deferred tax assets. Goodwill
+        and intangibles have their own lines (12.2.e) and belong there --
+        putting them here makes the 13.3 roll-forward unbuildable for no
+        reason. Record anything unusual on the mapping rather than burying it
+        here.""",
+    ),
+    _item(
+        accounts.NET_INCOME_TO_PARENT,
+        "Net income attributable to the parent",
+        IS,
+        E,
+        NOCASH,
+        NOFLOW,
+        """
+        12.1.l, "including attribution when disclosed". Net income less the
+        share attributable to non-controlling interests. NOT a component of
+        `net_income` in the derivation sense -- net income is already pre-tax
+        income less taxes, and an account may be derived only one way. The two
+        attribution lines are checked against net income instead.
+
+        This is the numerator a per-share figure uses. A model that divides
+        consolidated net income by the parent's share count overstates EPS for
+        any group with material minorities.""",
+    ),
+    _item(
+        accounts.NET_INCOME_TO_MINORITY,
+        "Net income attributable to non-controlling interests",
+        IS,
+        E,
+        NOCASH,
+        NOFLOW,
+        """
+        12.1.l. The share of consolidated net income belonging to the
+        non-controlling holders of consolidated subsidiaries. Sign is EITHER:
+        a loss-making subsidiary attributes a loss.""",
     ),
     _item(
         accounts.TOTAL_ASSETS,
@@ -435,6 +569,21 @@ CHART: tuple[NormalizedLineItem, ...] = (
         notes, bonds, finance leases, and -- per decision 2.4.j -- disclosed
         lease liabilities. This is the line the enterprise-to-equity bridge
         subtracts, so anything mapped here reduces equity value directly.""",
+    ),
+    _item(
+        accounts.LEASE_LIABILITIES,
+        "Lease liabilities",
+        BS,
+        P,
+        NOCASH,
+        FIN,
+        """
+        12.2.i, "when applicable". The present value of remaining lease
+        payments recognised under IFRS 16 or ASC 842, current and non-current
+        portions together. Kept out of `debt` deliberately: a lease liability
+        and a borrowing behave differently in a valuation, and a reader who
+        sees one figure cannot separate them again. An entity that leases
+        nothing has none, and absence means that rather than zero.""",
     ),
     _item(
         accounts.OTHER_NONCURRENT_LIABILITIES,
@@ -494,6 +643,21 @@ CHART: tuple[NormalizedLineItem, ...] = (
         should be recorded on the mapping.""",
     ),
     _item(
+        accounts.MINORITY_INTEREST,
+        "Non-controlling interests",
+        BS,
+        E,
+        NOCASH,
+        NOFLOW,
+        """
+        12.2.k, "when applicable". The portion of a consolidated subsidiary's
+        equity not attributable to the parent. It sits INSIDE total equity
+        under both IAS 1.54 and ASC 810-10-45-16, which is why the accounting
+        identity still closes without a fourth section. Sign is EITHER: an
+        accumulated-deficit subsidiary can carry a negative non-controlling
+        interest.""",
+    ),
+    _item(
         accounts.TOTAL_EQUITY,
         "Total equity",
         BS,
@@ -507,6 +671,40 @@ CHART: tuple[NormalizedLineItem, ...] = (
         bridge subtracts minority interest separately.""",
     ),
     # --- cash flow statement ----------------------------------------------
+    _item(
+        accounts.DEPRECIATION,
+        "Depreciation",
+        CF,
+        P,
+        NONCASH,
+        OP,
+        """
+        12.1.e, the depreciation half of D&A, when the filing reports it
+        separately. This is the line the PP&E roll-forward (13.2) wants:
+        charging combined D&A against PP&E is right only for a company that
+        amortizes nothing.
+
+        Map this ONLY when the split is disclosed. A filer reporting one
+        combined figure maps it to `depreciation_amortization` and leaves both
+        components absent -- the combined line is what the cash flow statement
+        is built from, so nothing is lost and nothing is invented.""",
+    ),
+    _item(
+        accounts.AMORTIZATION,
+        "Amortization",
+        CF,
+        P,
+        NONCASH,
+        OP,
+        """
+        12.1.e, the amortization half of D&A. Amortization of identifiable
+        intangibles; goodwill is not amortized, so nothing here relates to it.
+        This is the charge the 13.3 intangibles roll-forward runs on.
+
+        "When applicable" in the derivation of combined D&A: a company with no
+        intangibles amortizes nothing, so a filing reporting depreciation and
+        no amortization still derives its combined line.""",
+    ),
     _item(
         accounts.DEPRECIATION_AMORTIZATION,
         "Depreciation and amortisation",
@@ -600,6 +798,19 @@ CHART: tuple[NormalizedLineItem, ...] = (
         NEGATIVE. A residual line for derivation purposes.""",
     ),
     _item(
+        accounts.DISPOSALS,
+        "Disposals of businesses and assets",
+        CF,
+        P,
+        CASH_,
+        INV,
+        """
+        12.3.f, the other half of "acquisitions and disposals". Proceeds from
+        selling a business or a long-lived asset. Stored POSITIVE, because it
+        is cash coming in -- the mirror of `acquisitions`, which is stored
+        negative. A residual line for derivation purposes.""",
+    ),
+    _item(
         accounts.OTHER_INVESTING,
         "Other investing activities",
         CF,
@@ -656,6 +867,20 @@ CHART: tuple[NormalizedLineItem, ...] = (
         total as long as the netting is recorded.""",
     ),
     _item(
+        accounts.SHARE_ISSUANCE,
+        "Share issuance",
+        CF,
+        P,
+        CASH_,
+        FIN,
+        """
+        12.3.i, the issuance half of "equity issuance and repurchase". Cash
+        received from issuing shares, including option exercises and employee
+        purchase plans. Stored POSITIVE. Stock-based compensation is NOT here:
+        it is a non-cash add-back in operating activities and issuing the
+        underlying shares brings in no cash.""",
+    ),
+    _item(
         accounts.SHARE_REPURCHASES,
         "Share repurchases",
         CF,
@@ -676,6 +901,35 @@ CHART: tuple[NormalizedLineItem, ...] = (
         """
         Cash dividends paid to shareholders. Stored NEGATIVE. Reduces retained
         earnings, which is what the retained-earnings linkage check tests.""",
+    ),
+    _item(
+        accounts.FX_EFFECT_ON_CASH,
+        "Effect of exchange rates on cash",
+        CF,
+        E,
+        CASH_,
+        NOFLOW,
+        """
+        12.3.l. The translation effect on cash balances held in currencies
+        other than the reporting currency. It is not an operating, investing
+        or financing flow -- no cash moved -- which is why 12.4.f states the
+        roll-forward as CFO + CFI + CFF **plus FX/other cash effects** rather
+        than as the three subtotals alone. Before this line existed, that
+        difference had nowhere to go and a foreign-operating filer's cash
+        check could not tie.""",
+    ),
+    _item(
+        accounts.NET_CHANGE_IN_CASH,
+        "Net change in cash",
+        CF,
+        E,
+        CASH_,
+        NOFLOW,
+        """
+        12.3.m. The period's total movement in cash and equivalents: CFO plus
+        CFI plus CFF plus the FX effect. Reported by nearly every filer, and
+        checked against the derived sum rather than replacing it -- which is
+        12.4.f, and then 12.4.g ties it to the balance sheet's cash.""",
     ),
     _item(
         accounts.OTHER_FINANCING,
