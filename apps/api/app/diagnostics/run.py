@@ -177,11 +177,25 @@ def evaluate(result, scenarios=None, scenario_id: str = "base") -> Diagnostics:
         build_error = str(exc)
 
     if built is not None and built.years:
+        # Verified rather than asserted. `Periods` enforces the A/E suffix at
+        # construction, so this holds by construction today -- and a check
+        # whose evidence names a property it never looked at is how 17.29
+        # spent four phases passing on nothing (F-38). Checking something
+        # guaranteed upstream costs one pass over a handful of labels.
+        unlabelled = [year for year in built.years if not year.endswith(("A", "E"))]
         record(
             "17.3",
-            Status.PASS,
-            f"{len(built.years)} period(s), each labelled actual or estimate: "
-            + ", ".join(built.years),
+            Status.PASS if not unlabelled else Status.FAIL,
+            (
+                f"{len(built.years)} period(s), each labelled actual or estimate: "
+                + ", ".join(built.years)
+                + ". This clause also asks for an unambiguous BASIS and DATE "
+                "RANGE, and neither is verified: the model carries no period "
+                "dates and no cadence, so ambiguity of basis cannot arise here "
+                "or be detected (validation-policy.md VAL-017-003)"
+            )
+            if not unlabelled
+            else "period(s) with no actual/estimate label: " + ", ".join(unlabelled),
         )
     else:
         record(
@@ -426,26 +440,74 @@ def _finite(built, valuation) -> tuple[Status, str]:
 def _rounding_ties(built) -> tuple[Status, str]:
     """17.29: a displayed value must tie back to its full-precision one.
 
-    Checked by re-rounding rather than by comparing to a stored display
-    string: the property is that rounding is a pure function of the stored
-    value, so doing it twice gives the same answer. A display that had drifted
-    would be a display computed from something else.
+    **The previous version of this check was vacuous** (finding F-38). It read
+    `quantize_for_display(value, 1) != quantize_for_display(value, 1)` -- a
+    pure function compared with itself, which can never differ. It reported
+    PASS with a count of values it had not examined, which is the failure mode
+    rule 1.14 exists to prevent, appearing in the panel that enforces it.
+
+    What 4.18 and 4.19 actually require is checkable, in three parts:
+
+    1. **The string on screen is recoverable from the stored decimal.** Parsed
+       back, it must equal the stored value at the display precision. That
+       goes through the f-string formatting where a real bug would live -- a
+       display computed from a float, or from a different value.
+    2. **A value that loses something on display is owed a tooltip** carrying
+       its full stored value (4.19).
+    3. **A value that displays losslessly is not owed one**, and must not
+       claim one. A tooltip repeating what is already on screen teaches a
+       reader that tooltips are noise.
     """
-    from model.numeric import quantize_for_display
+    from model.numeric import D, quantize_for_display
+
+    from ..display import PLACES, display, is_rounded, tooltip
 
     if built is None:
         return Status.SKIP, "nothing has been calculated yet"
+
+    kind = "currency"
+    places = PLACES[kind]
     checked = 0
+    with_tooltip = 0
     for ledger in built.ledgers.values():
         for year in built.years:
             for account in ledger.accounts_present(year):
                 value = ledger.get(account, year)
-                if quantize_for_display(value, 1) != quantize_for_display(value, 1):
-                    return Status.FAIL, f"{account} {year} does not round consistently"
+                if value is None:
+                    continue
+                shown = display(value, kind)
+                try:
+                    recovered = D(shown.replace(",", ""))
+                except Exception:
+                    return (
+                        Status.FAIL,
+                        f"{account} {year} displays as {shown!r}, which is not a number",
+                    )
+                expected = quantize_for_display(value, places)
+                if recovered != expected:
+                    return Status.FAIL, (
+                        f"{account} {year} displays as {shown!r}, which reads back "
+                        f"as {recovered} rather than the stored {value} rounded "
+                        f"to {expected}"
+                    )
+                owed = is_rounded(value, kind)
+                text = tooltip(value, kind)
+                if owed:
+                    with_tooltip += 1
+                    if str(value) not in text:
+                        return Status.FAIL, (
+                            f"{account} {year} is rounded for display and its "
+                            f"4.19 tooltip does not carry the stored {value}"
+                        )
+                elif text:
+                    return Status.FAIL, (
+                        f"{account} {year} displays losslessly and still claims a tooltip: {text!r}"
+                    )
                 checked += 1
     return Status.PASS, (
-        f"{checked} value(s) round deterministically from their stored decimal; "
-        "4.18 keeps calculation precision separate from display precision"
+        f"{checked} value(s) display a figure that reads back to the stored "
+        f"decimal at {places} decimal place(s); {with_tooltip} lose something "
+        "in rounding and each carries 4.19's full-value tooltip"
     )
 
 

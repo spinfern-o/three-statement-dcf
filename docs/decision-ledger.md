@@ -393,26 +393,88 @@ declaring both `dividend_payout_ratio` and `dividends_amount` silently prefers
 `dividends_amount`. Inconsistent with the engine's own stated stance, and with
 14.5.
 
-### F-8 — Declared helpers in `model/numeric.py` that nothing calls
+### F-8 — RESOLVED for two of three. Declared helpers nothing called
 
-Not defects, but they mean two specification requirements have no code path
-behind them despite appearing to.
+Two of the three claims below went stale without being corrected, which is the
+same drift item 167 exists to catch happening in the document that records
+findings. Re-verified by grep rather than by reading:
 
-- **`quantize_for_display`** is the declared 4.9/4.18 display boundary.
-  `model/report.py` formats with Python f-strings instead. The result is the
-  same under the installed context, but the declared helper is unexercised and
-  no test asserts check 17.29's tie between displayed and stored values.
-- **`relative_error`** implements specification 4.10 verbatim. The checks use
-  `Tolerance.close`, a different comparison. **No runtime code measures
-  relative error in the specification's terms**; `tests/test_precision.py`
-  does the equivalent independently.
+- **`quantize_for_display` — RESOLVED.** It is the declared 4.9/4.18 display
+  boundary and is now called by `model/report.py:_fmt`, `schedules/tax.py`,
+  `schedules/interest.py` and `apps/api/app/display.py`, which is the single
+  display path every screen and every export goes through (21.8).
+- **`relative_error` — RESOLVED.** It is called by `model/statements.py`,
+  `schedules/checks.py` and `mapping/checks.py`. The claim that "no runtime
+  code measures relative error in the specification's terms" has been false
+  since Phase 5.
+- **`profile.Units.multiplier` — still uncalled, and deliberately so.**
+  `model/profile.py` says as much beside the definition: the engine performs
+  no unit normalization, so specification 4.6 is unimplemented, and the
+  multiplier exists because a wrong one discovered later would be a 1000x
+  error. `test_units_multiplier_values_are_pinned` holds the values. This
+  becomes a real gap the moment 2.3.a permits more than one PDF per company.
 
-Similarly, **`profile.Units.multiplier`** is defined and never called anywhere
-in `model/`, `run_model.py` or `tests/`. The engine performs no unit
-normalization, so specification 4.6 (normalize to one base unit while retaining
-the source value) is unimplemented. For a single-document model this is
-indistinguishable in result; it becomes a real gap the moment 2.3.a permits
-more than one PDF per company.
+### F-38 — Check 17.29 was a tautology, and passed for four phases
+
+17.29 asks that every displayed rounded value tie to its full-precision stored
+value (4.18, 4.19). The check read:
+
+    if quantize_for_display(value, 1) != quantize_for_display(value, 1):
+        return Status.FAIL, ...
+
+**A pure function compared with itself.** It can never differ, so the check
+could only ever return PASS -- with a count of values it had walked past and
+not examined. Its own docstring stated the intent correctly ("rounding is a
+pure function of the stored value, so doing it twice gives the same answer")
+and then tested the tautology that sentence describes rather than the property
+17.29 asks for.
+
+This is the worst place in the system for a vacuous check. The diagnostics
+panel is what enforces rule 1.14 -- an unresolved requirement must never appear
+as PASS -- and one of its own thirty rows was appearing as PASS on nothing.
+
+The rewritten check tests three things, each of which can fail:
+
+1. **The string on screen reads back to the stored decimal** at the display
+   precision. That path goes through the f-string formatting where a real bug
+   would live -- a display computed from a float, or from a different value.
+2. **A value that loses something on display carries 4.19's tooltip** with its
+   full stored value.
+3. **A value that displays losslessly does not claim a tooltip**, because one
+   repeating what is already on screen teaches a reader that tooltips are noise.
+
+Three tests exercise it, two of them by breaking the display and asserting the
+check reports FAIL. A passing row is worth only the failure it could have
+reported instead.
+
+**The guard is a test, not a lint rule, and the distinction is the finding's
+real lesson.** Ruff's PLR0124 catches `x != x` and is now enabled -- but it
+compares *names*, and this was a *call*, verified by running the rule against
+the exact shape. Enabling it and calling the hole closed would have repeated
+the original mistake one level up. What actually catches this walks the AST and
+compares the two sides structurally, and a second test feeds it the original
+defect to prove it fires.
+
+A sweep for the same shape across `model/` and `apps/api/app/` found no others.
+
+**A second sweep asked the more general question: which of the thirty checks
+can never report FAIL?** Three. Two are correct — 17.21 is the declared
+unevaluable clause and reports SKIP with its reason, and 17.14 is scoped "where
+data permits" so PASS-or-SKIP is the whole of it.
+
+The third, **17.3, was a milder instance of the same shape.** It recorded a
+bare PASS whose evidence read "each labelled actual or estimate" — a property
+it never looked at, true only because `Periods` enforces the A/E suffix at
+construction. And 17.3 asks for more than that: one unambiguous basis **and
+date range**. `validation-policy.md` has recorded since Phase 13 that the
+second half is not verified, because the model carries no period dates and no
+cadence. So the row was true and the reader's conclusion was not, which is
+rule 1.14's concern one level milder than a tautology.
+
+It now checks the labels rather than asserting them — cheap, and a check whose
+evidence names a property it never examined is exactly how 17.29 spent four
+phases passing on nothing — and its evidence states plainly which half of the
+clause it did not verify.
 
 ### F-9 — The engine's error messages conflict with 20.16 under hosted deployment
 

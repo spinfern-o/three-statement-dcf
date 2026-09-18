@@ -406,3 +406,82 @@ def test_every_covered_output_names_where_it_is_compared():
     for row in Report().compared:
         assert row.where.endswith(".py") or "::" in row.where, row.output
         assert len(row.method.split()) >= 4, row.output
+
+
+# --- F-38: 17.29 was a tautology ---------------------------------------------
+
+
+def test_17_29_now_checks_the_display_against_the_stored_value(full):
+    """It passes, and the evidence says what it looked at.
+
+    The previous version read
+    `quantize_for_display(v, 1) != quantize_for_display(v, 1)` -- a pure
+    function compared with itself -- so it reported PASS with a count of
+    values it had not examined. A passing row is only worth the failure it
+    could have reported instead, which is what the next test establishes.
+    """
+    outcome = full.by_code(BY_CLAUSE["17.29"].code)
+    assert outcome.status is Status.PASS
+    assert "reads back to the stored decimal" in outcome.detail
+    assert "tooltip" in outcome.detail
+
+
+def test_17_29_fails_when_the_display_does_not_tie_to_the_stored_value(
+    forecastable, scenarios, monkeypatch
+):
+    """The failure the old check could not produce.
+
+    A display computed from a float rather than from the stored decimal is the
+    real shape of this bug: it is right for almost every value and wrong for
+    the ones that matter, and nothing on the screen says so.
+    """
+    from decimal import Decimal
+
+    from apps.api.app import display as display_module
+
+    def truncating(value, kind="currency"):
+        if value is None:
+            return display_module.ABSENT
+        # Drops the last digit of the integer part: a plausible-looking
+        # number that no longer reads back to what is stored.
+        whole = str(int(Decimal(value)))
+        return f"{whole[:-1] or '0'}"
+
+    monkeypatch.setattr(display_module, "display", truncating)
+    broken = evaluate(forecastable, scenarios)
+    outcome = broken.by_code(BY_CLAUSE["17.29"].code)
+    assert outcome.status is Status.FAIL, outcome.detail
+    assert "reads back as" in outcome.detail
+
+
+def test_17_29_fails_when_a_rounded_value_is_owed_a_tooltip_and_has_none(
+    forecastable, scenarios, monkeypatch
+):
+    """4.19's half. A rounded figure with no tooltip hides what it dropped."""
+    from apps.api.app import display as display_module
+
+    monkeypatch.setattr(display_module, "tooltip", lambda value, kind="currency": "")
+    monkeypatch.setattr(display_module, "is_rounded", lambda value, kind="currency": True)
+    broken = evaluate(forecastable, scenarios)
+    outcome = broken.by_code(BY_CLAUSE["17.29"].code)
+    assert outcome.status is Status.FAIL, outcome.detail
+    assert "does not carry the stored" in outcome.detail
+
+
+def test_17_3_says_which_half_of_its_clause_it_verified(full):
+    """Rule 1.14 applied to a partially-verifiable clause.
+
+    17.3 asks that every period resolve to one unambiguous basis AND date
+    range. This model carries no dates and no cadence, so the second half
+    cannot be checked -- `validation-policy.md` has recorded that since Phase
+    13. The check passed on the first half with a message that read like full
+    compliance; it now names what it did not look at.
+
+    A bare PASS on a clause the policy says is unverified is the same shape as
+    F-38, one level milder: the row is true and the reader's conclusion is not.
+    """
+    outcome = full.by_code(BY_CLAUSE["17.3"].code)
+    assert outcome.status is Status.PASS
+    assert "labelled actual or estimate" in outcome.detail
+    assert "neither is verified" in outcome.detail
+    assert "VAL-017-003" in outcome.detail

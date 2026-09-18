@@ -235,7 +235,7 @@ baked in by a script somebody has to remember to run. A deployment from a dirty
 tree reports its commit as `-dirty`, because that deployment is not the version
 the suite passed and the value itself should say so.
 
-1443 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+1449 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -292,6 +292,27 @@ canonical lines**: additions, payments and the interest component live in the
 lease maturity table, not on the face of the statements. 13.7's share counts
 were never a chart-length problem at all — the chart holds currency amounts
 and a share count is neither.
+
+**One of the thirty diagnostics checks was a tautology and passed for four
+phases.** Check 17.29 — every displayed rounded value ties to its stored
+full-precision one — read `quantize_for_display(v, 1) != quantize_for_display(v, 1)`.
+A pure function compared with itself; it could only ever return PASS, with a
+count of values it had walked past and not examined. The worst place in the
+system for one: the diagnostics panel is what enforces rule 1.14, and one of
+its own rows was appearing as PASS on nothing.
+
+It now parses the displayed string back and asserts it equals the stored
+decimal at the display precision, that a rounded value carries 4.19's tooltip,
+and that a lossless one does not claim one. Two of its three tests break the
+display and assert the check reports FAIL — a passing row is worth only the
+failure it could have reported instead.
+
+**The guard is a test, not a lint rule, and that distinction is the lesson.**
+Ruff's `PLR0124` catches `x != x` and is enabled, but it compares *names* and
+this was a *call* — verified by running the rule against the exact shape.
+Enabling it and calling the hole closed would have repeated the original
+mistake one level up. What catches it walks the AST and compares the two sides
+structurally, and a second test feeds it the original defect to prove it fires.
 
 **What does not exist yet: a deployment.** Every one of the specification's
 180 items that is code is built. What is left is Phase 17's decisions —
@@ -729,7 +750,7 @@ Documentation:
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-37 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-38 |
 
 Specification Phase 2 contract documents. These are **definitions for the
 website, not descriptions of the engine** — each one states plainly where the
