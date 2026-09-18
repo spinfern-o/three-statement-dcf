@@ -192,6 +192,18 @@ the suite, so it names the dataset, lists all twenty-two of 4.16's outputs, and
 reports the contract **UNPROVEN** when the benchmark did not pass rather than
 carrying the claim forward.
 
+**Section 24's twenty-two acceptance criteria each have a row with its
+evidence**, which is criterion 24.22 — and until finding F-37 the report
+covered items 154–168 and Section 22's clauses while saying nothing about the
+section that defines what release means. A criterion that defers to a gate
+takes **that gate's result** rather than asserting its own, so a criterion
+cannot read PASS with a red gate under it, and a criterion whose gate did not
+run reads NOT RUN. Three of the twenty-two cannot be closed by a green row and
+say so instead: the clean-checkout half of 24.20 belongs to CI rather than to
+a report running in a possibly-dirty tree, whether 24.21's instructions are
+*exact* is a human reading, and 24.22 is a self-reference whose check is that
+the record has no blank rows — not that the evidence is sufficient.
+
 **A READY verdict is not permission to deploy**, and the report says so: Phase
 17 item 169 requires the target, the access level and the data policy to be
 confirmed first.
@@ -223,7 +235,7 @@ baked in by a script somebody has to remember to run. A deployment from a dirty
 tree reports its commit as `-dirty`, because that deployment is not the version
 the suite passed and the value itself should say so.
 
-1367 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
+1380 tests pass on Python 3.10–3.13, including a keyboard-and-screen-reader
 suite driven through a real browser, a golden historical model asserting every
 cell of all three statements, four tests that each break a different figure and
 assert the reconciliation catches it with the right amount, and two independent
@@ -655,6 +667,7 @@ Final verification (specification Phase 16, items 154–168):
 |---|---|---|
 | `pyproject.toml` | 154, 155 | Ruff and mypy, with a reason beside every rule and every exclusion |
 | `apps/api/app/verification/plan.py` | 156–162 | Section 22's fifty-five clauses, mapped onto the tests that cover them |
+| `apps/api/app/verification/acceptance.py` | 24.22 | Section 24's twenty-two criteria, each deriving its status from the gate it names |
 | `apps/api/app/verification/report.py` | 168 | The release-readiness report: every row the result of running something |
 | [`docs/release-readiness.md`](docs/release-readiness.md) | 168 | Its output, regenerated in CI so it cannot go stale |
 
@@ -673,7 +686,7 @@ Documentation:
 |---|---|
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Each of the 37 steps mapped to the code implementing it |
 | [`docs/website-build-spec.md`](docs/website-build-spec.md) | The web application specification, verbatim |
-| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-36 |
+| [`docs/decision-ledger.md`](docs/decision-ledger.md) | All 37 Section 2 decisions, and findings F-1 to F-37 |
 
 Specification Phase 2 contract documents. These are **definitions for the
 website, not descriptions of the engine** — each one states plainly where the

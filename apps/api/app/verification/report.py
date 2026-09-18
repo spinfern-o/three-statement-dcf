@@ -286,6 +286,7 @@ def accuracy_contract(benchmark: Outcome) -> Outcome:
 def documentation_claims() -> list[Outcome]:
     from ..diagnostics.registry import FORCED, PROPOSED, REGISTRY
     from ..exports.gather import TAB_ORDER
+    from . import acceptance
     from .plan import PLAN, missing_tests
 
     outcomes: list[Outcome] = []
@@ -353,6 +354,33 @@ def documentation_claims() -> list[Outcome]:
         f"{len(PLAN)} clauses, "
         f"{sum(1 for item in PLAN if item.covered)} covered, "
         f"{sum(1 for item in PLAN if not item.covered)} with a stated reason",
+    )
+
+    # Criterion 24.22 itself. Reported as a gate rather than left to the table
+    # below, because a section of a document is not a check: a criterion added
+    # to Section 24 with nothing behind it has to fail something.
+    unevidenced = acceptance.unevidenced()
+    outcomes.append(
+        Outcome(
+            "24.22",
+            "Every Section 24 criterion has recorded evidence",
+            PASS if acceptance.every_criterion_is_evidenced() else FAIL,
+            f"{len(acceptance.CRITERIA)} criteria, "
+            f"{len(acceptance.CRITERIA) - len(unevidenced)} evidenced"
+            + ("" if not unevidenced else f"; unevidenced: {[c.clause for c in unevidenced]}"),
+        )
+    )
+
+    missing_24 = acceptance.missing_tests()
+    outcomes.append(
+        Outcome(
+            "24.22",
+            "Every test the Section 24 table names exists",
+            PASS if not missing_24 else FAIL,
+            "every named test resolves"
+            if not missing_24
+            else f"{len(missing_24)} named test(s) do not exist: {missing_24[:3]}",
+        )
     )
 
     return outcomes
@@ -461,9 +489,88 @@ class Report:
             lines.append(item.uncovered_because)
             lines.append("")
 
+        lines += self._acceptance_section()
         lines += self._benchmark_section()
         lines += ["", "---", "", _disclaimer(), ""]
         return "\n".join(lines)
+
+    def _acceptance_section(self) -> list[str]:
+        """Criterion 24.22: evidence for every one of Section 24's twenty-two.
+
+        This section is here because it was missing. The report recorded
+        evidence for items 154-168 and for Section 22's clauses, and said
+        nothing about Section 24 -- the section that defines what release
+        means -- while printing READY. Finding F-37.
+        """
+        from .acceptance import CRITERIA, assess, not_applicable, unevidenced
+
+        assessments = assess(self._worst_status_per_item())
+        clear = sum(1 for a in assessments if a.is_pass)
+
+        lines = [
+            "",
+            "## Section 24, criterion by criterion",
+            "",
+            f"{clear} of {len(CRITERIA)} acceptance criteria are clear. "
+            f"Criterion 24.22 asks that this report record evidence for every "
+            f"criterion, so this table is that record.",
+            "",
+            "A criterion that defers to a gate above takes **that gate's "
+            "result** rather than asserting its own, so a criterion cannot "
+            "read PASS while the gate under it is red. A criterion whose gate "
+            "is absent from this run reads NOT RUN, never PASS.",
+            "",
+            "| Criterion | What Section 24 requires | Result | Evidence |",
+            "|---|---|---|---|",
+        ]
+        for a in assessments:
+            parts = []
+            if a.criterion.gate:
+                parts.append(f"item {a.criterion.gate}")
+            parts += [f"`{name}`" for name in a.criterion.tests]
+            if a.criterion.document:
+                parts.append(f"[`{a.criterion.document}`]({a.criterion.document})")
+            evidence = ", ".join(parts) or a.evidence
+            lines.append(
+                f"| {a.criterion.clause} | {a.criterion.what} | **{a.status}** | {evidence} |"
+            )
+
+        noted = [c for c in CRITERIA if c.note]
+        if noted:
+            lines += ["", "### What the evidence does and does not establish", ""]
+            for criterion in noted:
+                lines.append(f"**{criterion.clause} — {criterion.what}**")
+                lines.append("")
+                lines.append(criterion.note)
+                lines.append("")
+
+        for heading, rows in (
+            ("### Criteria with no evidence", unevidenced()),
+            ("### Criteria that do not apply, and why", not_applicable()),
+        ):
+            if rows:
+                lines += ["", heading, ""]
+                for criterion in rows:
+                    lines.append(f"- **{criterion.clause} {criterion.what}** — {criterion.because}")
+        return lines
+
+    def _worst_status_per_item(self) -> dict[str, str]:
+        """Each item's worst row, not its last.
+
+        Several rows share an item -- `documentation_claims` emits seven under
+        167 -- so a plain `{o.item: o.status}` keeps whichever came last. That
+        is the wrong one exactly when it matters: a failing 167 row followed by
+        a passing one would leave criterion 24.21 reading PASS with a red gate
+        under it, which is the thing deriving the status was supposed to
+        prevent.
+        """
+        order = {FAIL: 0, NOT_RUN: 1, PASS: 2}
+        worst: dict[str, str] = {}
+        for outcome in self.outcomes:
+            current = worst.get(outcome.item)
+            if current is None or order.get(outcome.status, 0) < order.get(current, 0):
+                worst[outcome.item] = outcome.status
+        return worst
 
     def _benchmark_section(self) -> list[str]:
         from ..diagnostics.benchmark import COVERAGE, EXTREMES
@@ -501,6 +608,20 @@ def _disclaimer() -> str:
     return DISCLAIMER
 
 
+def _item_order(outcome: Outcome) -> tuple[int, int, str]:
+    """Phase-16 items numerically, then Section 24's clauses.
+
+    The first version sorted on `int(o.item)`, which was fine while every item
+    was a phase number and raised `ValueError` the moment criterion 24.22 was
+    reported as a row. Sorting is not the place to discover that an item
+    string is not always a number.
+    """
+    head, _, tail = outcome.item.partition(".")
+    if not tail:
+        return (0, int(head), outcome.what)
+    return (1, int(tail), outcome.what)
+
+
 def build(fast: bool = False) -> Report:
     """Run everything and assemble the report."""
     outcomes: list[Outcome] = []
@@ -512,7 +633,7 @@ def build(fast: bool = False) -> Report:
     outcomes.append(accuracy_contract(benchmark))
     outcomes += documentation_claims()
 
-    outcomes.sort(key=lambda o: (int(o.item), o.what))
+    outcomes.sort(key=_item_order)
     return Report(
         generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         outcomes=outcomes,

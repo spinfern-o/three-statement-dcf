@@ -852,6 +852,76 @@ what the stylesheet claims.
 
 ---
 
+### F-37 — The release report said READY without addressing Section 24
+
+Section 24 lists twenty-two release acceptance criteria and opens with "the
+application is not complete until all applicable items pass". 24.22 then asks
+that a release-readiness report **record evidence for every criterion**.
+
+The generated report recorded evidence for items 154-168 and mapped Section
+22's fifty-five test clauses. **It said nothing about Section 24 at all** — and
+printed `READY`. The section that defines what release means was the one
+section the release report did not cover, and the verdict was being read as
+though it did.
+
+Found by reading the specification against the report rather than against the
+code, which is the reading that was missing: every individual item had a row,
+so nothing looked absent. It is the same shape as F-32 — a checker that
+verified everything it knew about and did not know about this.
+
+`verification/acceptance.py` now carries all twenty-two, each with one of
+three kinds of evidence, and the kind is part of the record:
+
+  `gate`      a row already in this report. The criterion's status is
+              **derived** from that gate rather than asserted, so a criterion
+              cannot read PASS with a red gate under it.
+  `tests`     named tests, read out of the tree with grep. `missing_tests()`
+              imports `plan._test_names` rather than copying it: two scanners
+              would eventually disagree about which directories hold tests,
+              and the one that found fewer would be the one reporting
+              everything fine.
+  `document`  for a criterion about what is written down. Two are of this
+              kind and both say so.
+
+`Criterion.__post_init__` refuses a row with none of the three and no stated
+reason, for `Coverage`'s reason: in a rendered markdown table a row with no
+evidence is indistinguishable from a row with evidence.
+
+Three of the criteria could not be answered with a green row and say so
+instead:
+
+- **24.20 (CI passes from a clean checkout).** The gate runs here, but the
+  *clean checkout* half is CI's: this report runs in a working tree that may
+  be dirty, and `/health` says `-dirty` when it is. A report cannot certify
+  the environment it is running in.
+- **24.21 (exact start, test, review, export and recovery instructions).**
+  Item 167's checks verify the claims in `README.md` a program can check. That
+  the instructions are *exact* in the sense of a reader following them on a
+  clean machine is a human reading, and it belongs to item 177's approval.
+- **24.22 itself** is satisfied by the section it asks for, which is a
+  self-reference and so stated plainly. The check is that the record has no
+  blank rows — not that the evidence is sufficient, which is what the other
+  twenty-one rows and a human approver are for.
+
+Two defects came out of building it, both worth recording:
+
+**A plain `{outcome.item: outcome.status}` keeps the last row, not the worst.**
+`documentation_claims` emits seven rows under item 167, and criterion 24.21
+defers to 167. A failing 167 row followed by a passing one would have left
+24.21 reading PASS with a red gate under it — precisely what deriving the
+status instead of asserting it was supposed to prevent. `_worst_status_per_item`
+folds them.
+
+**The report's row sort was `int(outcome.item)`.** Fine while every item was a
+phase number; `ValueError` the moment a criterion was reported as a row.
+Sorting is not the place to discover that an item string is not always a
+number.
+
+CI's drift check filtered `| 22.` rows only, so it now covers `| 24.` as well
+— with the Result column masked, because that column is *derived from the
+gates* and `--fast` legitimately leaves 24.15 and 24.16 as NOT RUN. What must
+not drift is the evidence each criterion names.
+
 ### F-34 — Phase 17. The application was sending no security headers at all
 
 Item 175 asks that TLS and security headers be verified. There was nothing to

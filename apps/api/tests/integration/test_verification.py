@@ -402,3 +402,177 @@ def test_the_smoke_headers_are_case_insensitive():
     headers = _Headers([("content-security-policy", "default-src 'none'")])
     assert "Content-Security-Policy" in headers
     assert headers.get("CONTENT-SECURITY-POLICY") == "default-src 'none'"
+
+
+# --- criterion 24.22: evidence for every acceptance criterion ---------------
+#
+# F-37: the report recorded evidence for items 154-168 and for Section 22's
+# clauses, and said nothing about Section 24 at all -- while printing READY.
+# Section 24 is the section that defines what release means.
+
+
+def test_section_24_has_all_twenty_two_criteria():
+    from apps.api.app.verification.acceptance import CRITERIA
+
+    assert len(CRITERIA) == 22
+    assert [c.clause for c in CRITERIA] == [f"24.{n}" for n in range(1, 23)]
+
+
+def test_every_criterion_is_evidenced():
+    """24.22's own requirement, as a check rather than as a section heading."""
+    from apps.api.app.verification.acceptance import every_criterion_is_evidenced, unevidenced
+
+    assert every_criterion_is_evidenced(), [c.clause for c in unevidenced()]
+
+
+def test_every_test_the_table_names_exists():
+    """The failure that plan.py's first draft had twenty-seven of.
+
+    A name written from what a test ought to be called turns a criterion into
+    a claim. This is what turns it back into a failure.
+    """
+    from apps.api.app.verification.acceptance import missing_tests
+
+    assert missing_tests() == ()
+
+
+def test_a_criterion_with_no_evidence_and_no_reason_is_refused():
+    from apps.api.app.verification.acceptance import AcceptanceError, Criterion
+
+    with pytest.raises(AcceptanceError) as raised:
+        Criterion(clause="24.99", what="something nobody checked")
+    assert "indistinguishable from an evidenced one" in str(raised.value)
+
+
+def test_a_criterion_declared_inapplicable_must_say_why():
+    from apps.api.app.verification.acceptance import AcceptanceError, Criterion
+
+    with pytest.raises(AcceptanceError):
+        Criterion(clause="24.99", what="x", tests=("test_x",), not_applicable=True)
+
+
+def test_a_criterion_takes_the_status_of_the_gate_it_defers_to():
+    """The point of deriving rather than asserting.
+
+    24.16 defers to item 161, the accessibility suite. If that suite failed,
+    24.16 is not a green row with a red gate above it.
+    """
+    from apps.api.app.verification.acceptance import assess
+
+    failed = dict.fromkeys(("157", "158", "160", "162", "163", "164", "166", "167"), "PASS")
+    failed["161"] = "FAIL"
+    by_clause = {a.criterion.clause: a for a in assess(failed)}
+    assert by_clause["24.16"].status == "FAIL"
+    assert "161" in by_clause["24.16"].blocking
+    assert by_clause["24.15"].status == "PASS"
+
+
+def test_a_criterion_whose_gate_did_not_run_is_not_a_pass():
+    """Rule 1.14 on the table most likely to be read as a summary."""
+    from apps.api.app.verification.acceptance import assess
+
+    by_clause = {a.criterion.clause: a for a in assess({})}
+    for clause in ("24.5", "24.8", "24.13", "24.16", "24.19", "24.20"):
+        assert by_clause[clause].status == "NOT RUN", clause
+    # A criterion evidenced only by tests or a document has no gate to miss.
+    assert by_clause["24.2"].status == "PASS"
+    assert by_clause["24.22"].status == "PASS"
+
+
+def test_the_criteria_that_defer_to_a_gate_name_one_the_report_produces():
+    """A gate reference that matches no row reads NOT RUN forever.
+
+    `documentation_claims` emits its rows under item 167 and criterion 24.22
+    directly rather than from a table, so they are named here alongside the
+    two tables. This test caught a genuine dangling reference when it was
+    written -- 24.21 defers to 167, which is in neither SUITES nor CHECKS.
+    """
+    from apps.api.app.verification.acceptance import gates_named
+    from apps.api.app.verification.report import CHECKS, SUITES
+
+    produced = {item for item, *_ in SUITES} | {item for item, *_ in CHECKS} | {"167", "24.22"}
+    assert set(gates_named()) <= produced, set(gates_named()) - produced
+
+
+def test_a_failing_row_is_not_masked_by_a_later_row_with_the_same_item():
+    """Seven rows share item 167, and a plain dict keeps the last one.
+
+    That is the wrong one precisely when it matters. 24.21 defers to 167, so
+    a failing 167 row followed by a passing one must not leave 24.21 green.
+    """
+    from apps.api.app.verification.report import Outcome, Report
+
+    one = Report(generated_at="now")
+    one.outcomes = [
+        Outcome("167", "a claim that went stale", "FAIL", "stale"),
+        Outcome("167", "a claim that held", "PASS", "fine"),
+    ]
+    assert one._worst_status_per_item()["167"] == "FAIL"
+
+    from apps.api.app.verification.acceptance import assess
+
+    by_clause = {a.criterion.clause: a for a in assess(one._worst_status_per_item())}
+    assert by_clause["24.21"].status == "FAIL"
+
+
+def test_the_report_carries_the_section_24_table():
+    from apps.api.app.verification.report import Report
+
+    text = Report(generated_at="now").markdown()
+    assert "## Section 24, criterion by criterion" in text
+    for n in range(1, 23):
+        assert f"| 24.{n} |" in text
+
+
+def test_the_section_24_table_reports_not_run_when_no_gate_ran():
+    """The empty report is the honest one, and it must not read green."""
+    from apps.api.app.verification.report import Report
+
+    text = Report(generated_at="now").markdown()
+    assert "**NOT RUN**" in text
+
+
+def test_ci_checks_the_section_24_table_for_drift():
+    """The table is only worth having if it cannot go stale quietly.
+
+    CI's drift check filtered `| 22.` rows only, so a criterion could have
+    named a renamed test and the committed report would have kept the old
+    name. It now covers `| 24.` too.
+    """
+    from pathlib import Path
+
+    workflow = Path("/".join(__file__.split("/")[:-4]) + "/../.github/workflows/tests.yml")
+    text = workflow.resolve().read_text()
+    assert 'line.startswith("| 22.")' in text
+    assert 'line.startswith("| 24.")' in text
+
+
+def test_only_the_result_column_of_the_section_24_table_depends_on_the_run():
+    """Which is why CI masks it rather than excluding the rows.
+
+    `--fast` does not run the accessibility or visual suites, so 24.15 and
+    24.16 legitimately read NOT RUN there and PASS in the committed full run.
+    Everything else in those rows -- the clause, the requirement, the evidence
+    each names -- must be identical, because that is the part that goes stale.
+    """
+    import re
+
+    def masked(text):
+        return [
+            re.sub(r"\*\*(PASS|FAIL|NOT RUN|UNEVIDENCED)\*\*", "**-**", line)
+            for line in text.splitlines()
+            if line.startswith("| 24.")
+        ]
+
+    gates = [str(n) for n in range(154, 168)] + ["24.22"]
+    full = report.Report(generated_at="a")
+    full.outcomes = [report.Outcome(g, "x", "PASS", "e") for g in gates]
+    fast = report.Report(generated_at="b")
+    fast.outcomes = [
+        report.Outcome(g, "x", "NOT RUN" if g in ("161", "162") else "PASS", "e") for g in gates
+    ]
+
+    assert masked(full.markdown()) == masked(fast.markdown())
+    # And the masking is doing work rather than passing trivially.
+    assert "**NOT RUN**" in fast.markdown()
+    assert "**NOT RUN**" not in full.markdown()
